@@ -1,0 +1,17 @@
+{
+  "name": "becsy",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "server": "tsc-watch --onSuccess \"node --enable-source-maps --es-module-specifier-resolution=node dist/server/main.js\""
+  },
+  "author": "Piotr Kaminski <piotr@lastolive.games>",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^7.22.0",
+    "eslint-plugin-disable": "^2.0.1",
+    "eslint-plugin-import": "^2.22.1",
+    "tsc-watch": "^4.2.9",
+    "typescript": "^4.2.3"
+  }
+}

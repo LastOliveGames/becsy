@@ -1,0 +1,7 @@
+/.env
+/.gitconfig
+/.vscode
+/dist
+/node_modules
+/yarn-error.log
+tsconfig.tsbuildinfo
