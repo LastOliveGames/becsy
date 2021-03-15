@@ -10,7 +10,7 @@ export class PooledObject {
   }
 
   get available(): boolean {
-    return this.__numUsers == 0;
+    return this.__numUsers === 0;
   }
 }
 

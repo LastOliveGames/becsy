@@ -5,44 +5,21 @@ module.exports = {
   parserOptions: {
     sourceType: 'script'
   },
-  plugins: ['lodash'],
   extends: [
     'eslint:recommended', 'plugin:import/recommended'
   ],
-  ignorePatterns: ['node_modules', 'dist', 'build', '.cache'],
+  ignorePatterns: ['node_modules', 'dist', 'build', 'lib', '.cache'],
   overrides: [
+    {
+      files: ['src/**'],
+      env: {
+        es2020: true, 'shared-node-browser': true, worker: true
+      },
+    },
     {
       files: ['src/**', 'tests/**'],
       parserOptions: {
         sourceType: 'module'
-      },
-      extends: ['plugin:lodash/recommended'],
-      rules: {
-        'lodash/chaining': ['error', 'implicit'],
-        'lodash/import-scope': ['error', 'member'],
-        'lodash/matches-prop-shorthand': 'off',
-        'lodash/prefer-immutable-method': 'off',
-        'lodash/prefer-invoke-map': 'off',
-        'lodash/prefer-filter': 'off',
-        'lodash/prefer-lodash-method': ['error', {
-          ignoreMethods: ['split', 'replace']
-        }],
-        'lodash/prefer-map': 'off',
-        'lodash/prop-shorthand': 'off',
-      }
-    },
-    {
-      files: ['src/recsy/**'],
-      plugins: ['disable'],
-      processor: 'disable/disable',
-      settings: {
-        'disable/plugins': ['lodash']
-      }
-    },
-    {
-      files: ['src/client/**'],
-      env: {
-        es2020: true, browser: true
       }
     },
     {
@@ -118,7 +95,7 @@ module.exports = {
     'new-parens': 'error',
     'no-alert': 'error',
     'no-array-constructor': 'error',
-    'no-bitwise': ['error', {allow: ['~']}],
+    'no-bitwise': 'off',
     'no-caller': 'error',
     'no-console': 'off',
     'no-constant-condition': ['error', {checkLoops: false}],

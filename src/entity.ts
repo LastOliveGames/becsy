@@ -1,7 +1,9 @@
 import {Component, Controller, ComponentType} from './component';
 import {Pool, PooledObject} from './pool';
 import type {System} from './system';
-import type {EntityId} from './types';
+
+
+export type EntityId = number;
 
 
 export class Entity extends PooledObject {
@@ -64,7 +66,9 @@ export class Entity extends PooledObject {
 
   mutate<C extends Component>(type: ComponentType<C>): C {
     this.__entities.markMutated(this.__id, type);
-    return this.get(type);
+    const component = this.getIfPresent(type, true);
+    if (component === undefined) throw new Error(`Entity doesn't have a ${type.name} component`);
+    return component;
   }
 
   delete(): void {
@@ -75,9 +79,9 @@ export class Entity extends PooledObject {
 
 export class Entities {
   private readonly stride: number;
-  private current: Uint8Array;
-  private previous: Uint8Array;
-  private readonly mutations: Uint8Array;
+  private readonly current: Uint32Array;
+  private readonly previous: Uint32Array;
+  private readonly mutations: Uint32Array;
   private readonly pool = new Pool(Entity);
   private readonly controllers: Map<ComponentType<any>, Controller<any>> = new Map();
 
@@ -86,34 +90,23 @@ export class Entities {
     for (const type of types) {
       this.controllers.set(type, new Controller(componentId++, type, maxNum));
     }
-    this.stride = Math.ceil(this.controllers.size / 8);
-    this.current = new Uint8Array(maxNum * this.stride);
-    this.previous = new Uint8Array(maxNum * this.stride);
-    this.mutations = new Uint8Array(maxNum * this.stride);
+    this.stride = Math.ceil(this.controllers.size / 32);
+    this.current = new Uint32Array(maxNum * this.stride);
+    this.previous = new Uint32Array(maxNum * this.stride);
+    this.mutations = new Uint32Array(maxNum * this.stride);
   }
 
-  tick(): void {
-    const swap = this.current;
-    this.current = this.previous;
-    this.previous = swap;
+  cycle(): void {
+    this.previous.set(this.current);
     this.mutations.fill(0);
   }
 
-  createEntity(callback: (entity: Entity) => void): void {
+  createEntity(): Entity {
     let id: EntityId;
+    // TODO: start scanning at last allocated?
     for (id = 1; id < this.maxNum; id += 1) {
-      if (!this.isAllocated(id, this.current) &&
-          !this.isAllocated(id, this.previous)) {
-        const entity = this.bind(id);
-        try {
-          callback(entity);
-          if (!this.isAllocated(id, this.current)) {
-            throw new Error('You must add at least one component to a newly created entity');
-          }
-        } finally {
-          entity.release();
-        }
-        return;
+      if (!this.isAllocated(id, this.current) && !this.isAllocated(id, this.previous)) {
+        return this.bind(id);
       }
     }
     throw new Error(`Max number of entities reached: ${this.maxNum - 1}`);
@@ -137,7 +130,7 @@ export class Entities {
     this.current[id * this.stride + type.__flagOffset] &= ~type.__flagMask;
   }
 
-  isAllocated(id: EntityId, entities: Uint8Array): boolean {
+  isAllocated(id: EntityId, entities: Uint32Array = this.current): boolean {
     const base = id * this.stride;
     for (let offset = 0; offset < this.stride; offset += 1) {
       if (entities[base + offset] !== 0) return true;
@@ -155,6 +148,7 @@ export class Entities {
 
   bindComponent<C extends Component, M extends boolean>(
     type: ComponentType<C>, id: EntityId, mutate: M): M extends true ? C : Readonly<C>;
+
   bindComponent<C extends Component>(type: ComponentType<C>, id: EntityId, mutate: boolean): C {
     return this.controllers.get(type)!.bind(id, mutate);
   }
@@ -172,17 +166,17 @@ export class Entities {
   }
 
   private match(
-    id: EntityId, entities: Uint8Array, positiveMask?: number[], negativeMask?: number[]
+    id: EntityId, entities: Uint32Array, positiveMask?: number[], negativeMask?: number[]
   ): boolean {
     const offset = id * this.stride;
     if (positiveMask) {
-      for (let i = offset; i < positiveMask.length; i++) {
+      for (let i = 0; i < positiveMask.length; i++) {
         const maskByte = positiveMask[i];
         if ((entities[offset + i] & maskByte) !== maskByte) return false;
       }
     }
     if (negativeMask) {
-      for (let i = offset; i < negativeMask.length; i++) {
+      for (let i = 0; i < negativeMask.length; i++) {
         const maskByte = negativeMask[i];
         if ((entities[offset + i] & maskByte) !== 0) return false;
       }
@@ -190,7 +184,8 @@ export class Entities {
     return true;
   }
 
-  *iterate(system: System, predicate: (id: EntityId) => boolean): Iterable<Entity> {
+  *iterate(
+      system: System, predicate: (id: EntityId) => boolean, cleanup: () => void): Iterable<Entity> {
     const maxEntities = this.maxNum;
     for (let id = 1; id < maxEntities; id++) {
       if (predicate(id)) {
@@ -202,4 +197,6 @@ export class Entities {
         }
       }
     }
-  }}
+    cleanup();
+  }
+}

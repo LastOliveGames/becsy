@@ -1,44 +1,5 @@
 import type {ComponentType} from './component';
-import type {Entities} from './entity';
-
-export interface SystemType {
-  new(): System;
-
-}
-
-
-export class System {
-  __readMask: number[] = [];
-  __writeMask: number[] = [];
-  __systems: Systems;
-
-  query(): Query {
-    return new Query(this);
-  }
-
-  execute(delta: number, time: number) {}
-}
-
-
-export class Systems {
-  private readonly systems: System[];
-
-  constructor(systems: (System | SystemType)[], readonly entities: Entities) {
-    for (const item of systems) {
-      const system = item instanceof System ? item : new item();
-      if (system.__systems) {
-        throw new Error(
-          `You can't reuse an instance of system ${system.constructor.name} in different worlds`)
-      }
-      system.__systems = this;
-      this.systems.push(system);
-    }
-  }
-
-  execute(delta: number, time: number): void {
-    for (const system of this.systems) system.execute(delta, time);
-  }
-}
+import type {Entities, Entity, EntityId} from './entity';
 
 
 class Query {
@@ -46,8 +7,9 @@ class Query {
   private withMask: number[] | undefined;
   private withoutMask: number[] | undefined;
   private watchMask: number[] | undefined;
+  private borrowedEntities: Entity[] = [];
 
-  constructor(private readonly system: System) {}
+  constructor(private readonly system: System) { }
 
   with(type: ComponentType<any>): Query {
     return this.derive(type, 'withMask');
@@ -71,6 +33,7 @@ class Query {
   }
 
   get write(): Query {
+    setFlag(this.system.__readMask, this.lastType);
     setFlag(this.system.__writeMask, this.lastType);
     return this;
   }
@@ -97,15 +60,13 @@ class Query {
 
   get all() {
     const entities = this.system.__systems.entities;
-    return entities.iterate(
-      this.system,
+    return this.iterate(
       id => entities.matchCurrent(id, this.withMask, this.withoutMask));
   }
 
   get added() {
     const entities = this.system.__systems.entities;
-    return entities.iterate(
-      this.system,
+    return this.iterate(
       id =>
         entities.matchCurrent(id, this.withMask, this.withoutMask) &&
         !entities.matchPrevious(id, this.withMask, this.withoutMask)
@@ -114,8 +75,7 @@ class Query {
 
   get removed() {
     const entities = this.system.__systems.entities;
-    return entities.iterate(
-      this.system,
+    return this.iterate(
       id =>
         !entities.matchCurrent(id, this.withMask, this.withoutMask) &&
         entities.matchPrevious(id, this.withMask, this.withoutMask)
@@ -124,18 +84,80 @@ class Query {
 
   get changed() {
     const entities = this.system.__systems.entities;
-    return entities.iterate(
-      this.system,
+    return this.iterate(
       id =>
         entities.matchCurrent(id, this.withMask, this.withoutMask) &&
         entities.matchMutated(id, this.watchMask)
     );
   }
 
+  private iterate(predicate: (id: EntityId) => boolean): Iterable<Entity> {
+    return this.system.__systems.entities.iterate(
+      this.system, predicate, () => {this.releaseEntities();}
+    );
+  }
+
+  createEntity(callback?: (entity: Entity) => void): Entity {
+    const entities = this.system.__systems.entities;
+    const entity = entities.createEntity();
+    this.borrowedEntities.push(entity);
+    callback?.(entity);
+    return entity;
+  }
+
+  private releaseEntities() {
+    const entities = this.system.__systems.entities;
+    for (const entity of this.borrowedEntities) {
+      if (!entities.isAllocated(entity.__id)) {
+        throw new Error('You must add at least one component to a newly created entity');
+      }
+      entity.release();
+    }
+  }
 }
 
+
+export interface SystemType {
+  new(): System;
+}
+
+export abstract class System {
+  __readMask: number[] = [];
+  __writeMask: number[] = [];
+  __systems: Systems;
+
+  query(): Query {
+    return new Query(this);
+  }
+
+  abstract execute(delta: number, time: number): void;
+}
+
+
+export class Systems {
+  private readonly systems: System[] = [];
+
+  constructor(systems: (System | SystemType)[], readonly entities: Entities) {
+    for (const item of systems) {
+      // eslint-disable-next-line new-cap
+      const system = item instanceof System ? item : new item();
+      if (system.__systems) {
+        throw new Error(
+          `You can't reuse an instance of system ${system.constructor.name} in different worlds`);
+      }
+      system.__systems = this;
+      this.systems.push(system);
+    }
+  }
+
+  execute(delta: number, time: number): void {
+    for (const system of this.systems) system.execute(delta, time);
+  }
+}
+
+
 function setFlag(mask: number[], type: ComponentType<any>): void {
-  if(type.__flagOffset >= mask.length) {
+  if (type.__flagOffset >= mask.length) {
     mask.length = type.__flagOffset + 1;
     mask.fill(0, mask.length, type.__flagOffset);
   }

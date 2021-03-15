@@ -2,6 +2,7 @@
 /.gitconfig
 /.vscode
 /dist
+/lib
 /node_modules
 /yarn-error.log
 tsconfig.tsbuildinfo
