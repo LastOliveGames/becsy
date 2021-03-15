@@ -1,7 +1,7 @@
 {
   "name": "becsy",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "scripts": {
     "test": "jest --config jestconfig.json",
     "server": "tsc-watch --onSuccess \"node --enable-source-maps --es-module-specifier-resolution=node dist/server/main.js\"",
