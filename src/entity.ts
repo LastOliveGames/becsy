@@ -185,7 +185,8 @@ export class Entities {
   }
 
   *iterate(
-      system: System, predicate: (id: EntityId) => boolean, cleanup: () => void): Iterable<Entity> {
+    system: System, predicate: (id: EntityId) => boolean, cleanup: () => void
+  ): Iterable<Entity> {
     const maxEntities = this.maxNum;
     for (let id = 1; id < maxEntities; id++) {
       if (predicate(id)) {
