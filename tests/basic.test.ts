@@ -20,6 +20,8 @@ class SystemA extends System {
 
 test('iteration', () => {
   const world = new World({maxEntities: 5, componentTypes: [A], systems: [SystemA]});
-  world.createEntity(entity => {entity.add(A, {byte: 1});});
+  world.build(createEntity => {
+    createEntity().add(A, {byte: 1});
+  });
   world.execute();
 });

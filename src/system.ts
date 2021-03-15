@@ -7,7 +7,6 @@ class Query {
   private withMask: number[] | undefined;
   private withoutMask: number[] | undefined;
   private watchMask: number[] | undefined;
-  private borrowedEntities: Entity[] = [];
 
   constructor(private readonly system: System) { }
 
@@ -93,27 +92,18 @@ class Query {
 
   private iterate(predicate: (id: EntityId) => boolean): Iterable<Entity> {
     return this.system.__systems.entities.iterate(
-      this.system, predicate, () => {this.releaseEntities();}
+      this.system, predicate, () => {this.system.__releaseEntities();}
     );
   }
 
   createEntity(callback?: (entity: Entity) => void): Entity {
     const entities = this.system.__systems.entities;
-    const entity = entities.createEntity();
-    this.borrowedEntities.push(entity);
+    const entity = entities.createEntity(this.system);
+    this.system.__borrowedEntities.push(entity);
     callback?.(entity);
     return entity;
   }
 
-  private releaseEntities() {
-    const entities = this.system.__systems.entities;
-    for (const entity of this.borrowedEntities) {
-      if (!entities.isAllocated(entity.__id)) {
-        throw new Error('You must add at least one component to a newly created entity');
-      }
-      entity.release();
-    }
-  }
 }
 
 
@@ -125,12 +115,31 @@ export abstract class System {
   __readMask: number[] = [];
   __writeMask: number[] = [];
   __systems: Systems;
+  __borrowedEntities: Entity[] = [];
 
   query(): Query {
     return new Query(this);
   }
 
   abstract execute(delta: number, time: number): void;
+
+  __bindAndBorrowEntity(id: EntityId): Entity {
+    const entities = this.__systems.entities;
+    const entity = entities.bind(id, this);
+    this.__borrowedEntities.push(entity);
+    return entity;
+  }
+
+  __releaseEntities(): void {
+    const entities = this.__systems.entities;
+    for (const entity of this.__borrowedEntities) {
+      if (!entities.isAllocated(entity.__id)) {
+        throw new Error('You must add at least one component to a newly created entity');
+      }
+      entity.__release();
+    }
+    this.__borrowedEntities.length = 0;
+  }
 }
 
 

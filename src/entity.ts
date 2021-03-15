@@ -19,18 +19,19 @@ export class Entity extends PooledObject {
     this.__borrowedComponents.length = 0;
   }
 
-  release(): void {
+  __release(): void {
     for (const component of this.__borrowedComponents) {
-      component.release();
+      component.__release();
     }
     this.__borrowedComponents.length = 0;
-    super.release();
+    super.__release();
   }
 
-  add<C extends Component>(type: ComponentType<C>, values: any): void {
+  add<C extends Component>(type: ComponentType<C>, values: any): this {
     if (this.has(type)) throw new Error(`Entity already has a ${type.name} component`);
     this.__entities.setFlag(this.__id, type);
     this.__entities.initComponent(type, this.__id, values);
+    return this;
   }
 
   remove<C extends Component>(type: ComponentType<C>): boolean {
@@ -59,7 +60,7 @@ export class Entity extends PooledObject {
           `System didn't mark ${type.name} component as ${mutate ? 'writable' : 'readable'}`);
       }
     }
-    const component = this.__entities.bindComponent(type, this.__id, mutate);
+    const component = this.__entities.bindComponent(type, this.__id, mutate, this.__system);
     this.__borrowedComponents.push(component);
     return component;
   }
@@ -88,7 +89,7 @@ export class Entities {
   constructor(readonly maxNum: number, readonly types: ComponentType<any>[]) {
     let componentId = 0;
     for (const type of types) {
-      this.controllers.set(type, new Controller(componentId++, type, maxNum));
+      this.controllers.set(type, new Controller(componentId++, type, this));
     }
     this.stride = Math.ceil(this.controllers.size / 32);
     this.current = new Uint32Array(maxNum * this.stride);
@@ -96,17 +97,19 @@ export class Entities {
     this.mutations = new Uint32Array(maxNum * this.stride);
   }
 
+  get numComponents(): number {return this.controllers.size;}
+
   cycle(): void {
     this.previous.set(this.current);
     this.mutations.fill(0);
   }
 
-  createEntity(): Entity {
+  createEntity(system?: System): Entity {
     let id: EntityId;
     // TODO: start scanning at last allocated?
     for (id = 1; id < this.maxNum; id += 1) {
       if (!this.isAllocated(id, this.current) && !this.isAllocated(id, this.previous)) {
-        return this.bind(id);
+        return this.bind(id, system);
       }
     }
     throw new Error(`Max number of entities reached: ${this.maxNum - 1}`);
@@ -147,10 +150,13 @@ export class Entities {
   }
 
   bindComponent<C extends Component, M extends boolean>(
-    type: ComponentType<C>, id: EntityId, mutate: M): M extends true ? C : Readonly<C>;
+    type: ComponentType<C>, id: EntityId, mutate: M, system?: System
+  ): M extends true ? C : Readonly<C>;
 
-  bindComponent<C extends Component>(type: ComponentType<C>, id: EntityId, mutate: boolean): C {
-    return this.controllers.get(type)!.bind(id, mutate);
+  bindComponent<C extends Component>(
+    type: ComponentType<C>, id: EntityId, mutate: boolean, system?: System
+  ): C {
+    return this.controllers.get(type)!.bind(id, mutate, system);
   }
 
   matchCurrent(id: EntityId, positiveMask?: number[], negativeMask?: number[]): boolean {
@@ -194,7 +200,7 @@ export class Entities {
         try {
           yield entity;
         } finally {
-          entity.release();
+          entity.__release();
         }
       }
     }

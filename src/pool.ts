@@ -1,16 +1,16 @@
 export class PooledObject {
-  private __numUsers = 0;
+  private __locks = 0;
 
-  acquire(): void {
-    this.__numUsers++;
+  __acquire(): void {
+    this.__locks++;
   }
 
-  release(): void {
-    if (--this.__numUsers < 0) throw new Error('Unmatched call to release()');
+  __release(): void {
+    if (--this.__locks < 0) throw new Error('Unmatched call to release()');
   }
 
   get available(): boolean {
-    return this.__numUsers === 0;
+    return this.__locks === 0;
   }
 }
 
@@ -42,7 +42,7 @@ export class Pool<T extends PooledObject> {
       next = 0;
     }
     this.next = next;
-    item.acquire();
+    item.__acquire();
     return item;
   }
 }

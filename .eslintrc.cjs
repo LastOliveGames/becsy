@@ -3,7 +3,7 @@ module.exports = {
     es2020: true, node: true
   },
   parserOptions: {
-    sourceType: 'script'
+    sourceType: 'module'
   },
   extends: [
     'eslint:recommended', 'plugin:import/recommended'

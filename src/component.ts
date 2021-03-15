@@ -1,6 +1,7 @@
 import {Pool, PooledObject} from './pool';
 import {Type} from './type';
-import type {EntityId} from './entity';
+import type {Entities, EntityId} from './entity';
+import type {System} from './system';
 
 interface SchemaDef<JSType> {
   type: Type<JSType>;
@@ -30,6 +31,7 @@ export class Component extends PooledObject {
 
   __data: DataView;
   __bytes: Uint8Array;
+  __system?: System;
   __offset: number;
   __mutable: boolean;
 
@@ -49,13 +51,13 @@ export class Controller<C extends Component> {
   private readonly stride: number;
   private readonly pool: Pool<C>;
 
-  constructor(readonly id: number, readonly type: ComponentType<C>, maxEntities: number) {
+  constructor(readonly id: number, readonly type: ComponentType<C>, readonly entities: Entities) {
     type.__flagOffset = Math.floor(id / 32);
     type.__flagMask = 1 << (id % 32);
     this.pool = new Pool(type);
     const fields = this.arrangeFields();
     this.stride = this.defineComponentProperties(fields);
-    this.buffer = new SharedArrayBuffer(this.stride * maxEntities);
+    this.buffer = new SharedArrayBuffer(this.stride * entities.maxNum);
     this.data = new DataView(this.buffer);
     this.bytes = new Uint8Array(this.buffer);
     this.saveDefaultComponent(fields);
@@ -77,18 +79,19 @@ export class Controller<C extends Component> {
           (component as any)[key] = values[key];
         }
       } finally {
-        component.release();
+        component.__release();
       }
     }
   }
 
-  bind(id: EntityId, mutable: boolean): C {
+  bind(id: EntityId, mutable: boolean, system?: System): C {
     const component = this.pool.borrow();
     component.__data = this.data;
     component.__bytes = this.bytes;
+    component.__system = system;
     component.__offset = id * this.stride;
     component.__mutable = mutable;
-    component.acquire();
+    component.__acquire();
     return component;
   }
 
@@ -122,7 +125,7 @@ export class Controller<C extends Component> {
         (component as any)[field.name] = field.default;
       }
     } finally {
-      component.release();
+      component.__release();
     }
   }
 

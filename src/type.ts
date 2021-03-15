@@ -1,4 +1,5 @@
 import type {Component, ComponentType} from './component';
+import type {Entity} from './entity';
 import {TextEncoder, TextDecoder} from 'util';
 
 export abstract class Type<JSType> {
@@ -17,6 +18,7 @@ export abstract class Type<JSType> {
   static float64: Type<number>;
   static staticString: (choices: string[]) => Type<string>;
   static dynamicString: (maxUtf8Length: number) => Type<string>;
+  static ref: Type<Entity | null>;
 }
 
 class BooleanType extends Type<boolean> {
@@ -99,7 +101,7 @@ class Uint16Type extends Type<number> {
         const offset = this.__offset + fieldOffset;
         return this.__data.getUint16(offset);
       },
-      set(this: Component, value) {
+      set(this: Component, value: number) {
         const offset = this.__offset + fieldOffset;
         this.__checkMutable();
         this.__data.setUint16(offset, value);
@@ -120,7 +122,7 @@ class Int16Type extends Type<number> {
         const offset = this.__offset + fieldOffset;
         return this.__data.getInt16(offset);
       },
-      set(this: Component, value) {
+      set(this: Component, value: number) {
         const offset = this.__offset + fieldOffset;
         this.__checkMutable();
         this.__data.setInt16(offset, value);
@@ -141,7 +143,7 @@ class Uint32Type extends Type<number> {
         const offset = this.__offset + fieldOffset;
         return this.__data.getUint32(offset);
       },
-      set(this: Component, value) {
+      set(this: Component, value: number) {
         const offset = this.__offset + fieldOffset;
         this.__checkMutable();
         this.__data.setUint32(offset, value);
@@ -162,7 +164,7 @@ class Int32Type extends Type<number> {
         const offset = this.__offset + fieldOffset;
         return this.__data.getInt32(offset);
       },
-      set(this: Component, value) {
+      set(this: Component, value: number) {
         const offset = this.__offset + fieldOffset;
         this.__checkMutable();
         this.__data.setInt32(offset, value);
@@ -183,7 +185,7 @@ class Float32Type extends Type<number> {
         const offset = this.__offset + fieldOffset;
         return this.__data.getFloat32(offset);
       },
-      set(this: Component, value) {
+      set(this: Component, value: number) {
         const offset = this.__offset + fieldOffset;
         this.__checkMutable();
         this.__data.setFloat32(offset, value);
@@ -204,7 +206,7 @@ class Float64Type extends Type<number> {
         const offset = this.__offset + fieldOffset;
         return this.__data.getFloat64(offset);
       },
-      set(this: Component, value) {
+      set(this: Component, value: number) {
         const offset = this.__offset + fieldOffset;
         this.__checkMutable();
         this.__data.setFloat64(offset, value);
@@ -239,7 +241,7 @@ class StaticStringType extends Type<string> {
         if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
         return result;
       },
-      set(this: Component, value) {
+      set(this: Component, value: string) {
         const offset = this.__offset + fieldOffset;
         this.__checkMutable();
         const index = choicesIndex.get(value);
@@ -268,7 +270,7 @@ class DynamicStringType extends Type<string> {
         return DynamicStringType.decoder.decode(
           new Uint8Array(this.__data.buffer, offset + 2, length));
       },
-      set(this: Component, value) {
+      set(this: Component, value: string) {
         const offset = this.__offset + fieldOffset;
         this.__checkMutable();
         const encodedString = DynamicStringType.encoder.encode(value);
@@ -279,6 +281,29 @@ class DynamicStringType extends Type<string> {
         this.__bytes.set(encodedString, offset);
       }
     });
+  }
+}
+
+class RefType extends Type<Entity | null> {
+  constructor() {
+    super(4, null);
+  }
+
+  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+    Object.defineProperty(target.prototype, name, {
+      enumerable: true,
+      get(this: Component) {
+        const offset = this.__offset + fieldOffset;
+        if (!this.__system) throw new Error('Unable to dereference entity in this context');
+        return this.__system.__bindAndBorrowEntity(this.__data.getUint32(offset));
+      },
+      set(this: Component, value: Entity) {
+        const offset = this.__offset + fieldOffset;
+        this.__checkMutable();
+        this.__data.setUint32(offset, value.__id);
+      }
+    });
+
   }
 }
 
@@ -293,3 +318,4 @@ Type.float32 = new Float32Type();
 Type.float64 = new Float64Type();
 Type.staticString = (choices: string[]) => new StaticStringType(choices);
 Type.dynamicString = (maxUtf8Length: number) => new DynamicStringType(maxUtf8Length);
+Type.ref = new RefType();
