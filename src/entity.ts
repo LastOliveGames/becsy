@@ -28,6 +28,7 @@ export class Entity extends PooledObject {
   }
 
   add<C extends Component>(type: ComponentType<C>, values: any): this {
+    this.__checkMask(type, true);
     if (this.has(type)) throw new Error(`Entity already has a ${type.name} component`);
     this.__entities.setFlag(this.__id, type);
     this.__entities.initComponent(type, this.__id, values);
@@ -35,45 +36,55 @@ export class Entity extends PooledObject {
   }
 
   remove<C extends Component>(type: ComponentType<C>): boolean {
+    this.__checkMask(type, true);
     if (!this.has(type)) return false;
     this.__entities.clearFlag(this.__id, type);
     return true;
   }
 
   has(type: ComponentType<any>): boolean {
+    this.__checkMask(type, false);
     return this.__entities.hasFlag(this.__id, type);
   }
 
-  get<C extends Component>(type: ComponentType<C>): Readonly<C> {
-    const component = this.getIfPresent(type, false);
+  read<C extends Component>(type: ComponentType<C>): Readonly<C> {
+    const component = this.__get(type, false);
     if (component === undefined) throw new Error(`Entity doesn't have a ${type.name} component`);
     return component;
   }
 
-  getIfPresent<C extends Component>(type: ComponentType<C>, mutate: boolean): C | undefined {
-    if (!this.has(type)) return;
-    if (this.__system) {
-      const maskByte =
-        (mutate ? this.__system.__writeMask : this.__system.__readMask)[type.__flagOffset] ?? 0;
-      if ((maskByte & type.__flagMask) === 0) {
-        throw new Error(
-          `System didn't mark ${type.name} component as ${mutate ? 'writable' : 'readable'}`);
-      }
-    }
-    const component = this.__entities.bindComponent(type, this.__id, mutate, this.__system);
-    this.__borrowedComponents.push(component);
-    return component;
+  readIfPresent<C extends Component>(type: ComponentType<C>): Readonly<C> | undefined {
+    return this.__get(type, false);
   }
 
-  mutate<C extends Component>(type: ComponentType<C>): C {
+  write<C extends Component>(type: ComponentType<C>): C {
+    const component = this.__get(type, true);
+    if (component === undefined) throw new Error(`Entity doesn't have a ${type.name} component`);
     this.__entities.markMutated(this.__id, type);
-    const component = this.getIfPresent(type, true);
-    if (component === undefined) throw new Error(`Entity doesn't have a ${type.name} component`);
     return component;
   }
 
   delete(): void {
     for (const type of this.__entities.types) this.remove(type);
+  }
+
+  __get<C extends Component>(type: ComponentType<C>, allowWrite: boolean): C | undefined {
+    this.__checkMask(type, allowWrite);
+    if (!this.has(type)) return;
+    const component = this.__entities.bindComponent(type, this.__id, allowWrite, this.__system);
+    this.__borrowedComponents.push(component);
+    return component;
+  }
+
+  __checkMask(type: ComponentType<any>, write: boolean): void {
+    if (this.__system) {
+      const maskByte =
+        (write ? this.__system.__writeMask : this.__system.__readMask)[type.__flagOffset] ?? 0;
+      if ((maskByte & type.__flagMask) === 0) {
+        throw new Error(
+          `System didn't mark component ${type.name} as ${write ? 'writable' : 'readable'}`);
+      }
+    }
   }
 }
 
@@ -150,13 +161,13 @@ export class Entities {
   }
 
   bindComponent<C extends Component, M extends boolean>(
-    type: ComponentType<C>, id: EntityId, mutate: M, system?: System
+    type: ComponentType<C>, id: EntityId, allowWrite: M, system?: System
   ): M extends true ? C : Readonly<C>;
 
   bindComponent<C extends Component>(
-    type: ComponentType<C>, id: EntityId, mutate: boolean, system?: System
+    type: ComponentType<C>, id: EntityId, allowWrite: boolean, system?: System
   ): C {
-    return this.controllers.get(type)!.bind(id, mutate, system);
+    return this.controllers.get(type)!.bind(id, allowWrite, system);
   }
 
   matchCurrent(id: EntityId, positiveMask?: number[], negativeMask?: number[]): boolean {

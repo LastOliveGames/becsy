@@ -4,7 +4,7 @@ import {TextEncoder, TextDecoder} from 'util';
 
 export abstract class Type<JSType> {
   constructor(readonly byteSize: number, readonly defaultValue: JSType) { }
-  abstract decorate(
+  abstract define(
     target: ComponentType<any>, name: string, fieldOffset: number, mask?: number): void;
 
   static boolean: Type<boolean>;
@@ -26,7 +26,7 @@ class BooleanType extends Type<boolean> {
     super(0.125, false);
   }
 
-  decorate(target: any, name: string, fieldOffset: number, mask: number): void {
+  define(target: any, name: string, fieldOffset: number, mask: number): void {
     Object.defineProperty(target, name, {
       enumerable: true,
       get() {
@@ -52,7 +52,7 @@ class Uint8Type extends Type<number> {
     super(1, 0);
   }
 
-  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
     Object.defineProperty(target.prototype, name, {
       enumerable: true,
       get(this: Component) {
@@ -73,7 +73,7 @@ class Int8Type extends Type<number> {
     super(1, 0);
   }
 
-  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
     Object.defineProperty(target.prototype, name, {
       enumerable: true,
       get(this: Component) {
@@ -94,7 +94,7 @@ class Uint16Type extends Type<number> {
     super(2, 0);
   }
 
-  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
     Object.defineProperty(target.prototype, name, {
       enumerable: true,
       get(this: Component) {
@@ -115,7 +115,7 @@ class Int16Type extends Type<number> {
     super(2, 0);
   }
 
-  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
     Object.defineProperty(target.prototype, name, {
       enumerable: true,
       get(this: Component) {
@@ -136,7 +136,7 @@ class Uint32Type extends Type<number> {
     super(4, 0);
   }
 
-  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
     Object.defineProperty(target.prototype, name, {
       enumerable: true,
       get(this: Component) {
@@ -157,7 +157,7 @@ class Int32Type extends Type<number> {
     super(4, 0);
   }
 
-  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
     Object.defineProperty(target.prototype, name, {
       enumerable: true,
       get(this: Component) {
@@ -178,7 +178,7 @@ class Float32Type extends Type<number> {
     super(4, 0);
   }
 
-  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
     Object.defineProperty(target.prototype, name, {
       enumerable: true,
       get(this: Component) {
@@ -199,7 +199,7 @@ class Float64Type extends Type<number> {
     super(8, 0);
   }
 
-  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
     Object.defineProperty(target.prototype, name, {
       enumerable: true,
       get(this: Component) {
@@ -229,7 +229,7 @@ class StaticStringType extends Type<string> {
     for (let i = 0; i < choices.length; i++) this.choicesIndex.set(choices[i], i);
   }
 
-  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
     const getter = this.getter, setter = this.setter;
     const choices = this.choices, choicesIndex = this.choicesIndex;
     Object.defineProperty(target.prototype, name, {
@@ -260,7 +260,7 @@ class DynamicStringType extends Type<string> {
     super(maxUtf8Length + 2, '');
   }
 
-  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
     const maxUtf8Length = this.maxUtf8Length;
     Object.defineProperty(target.prototype, name, {
       enumerable: true,
@@ -289,18 +289,20 @@ class RefType extends Type<Entity | null> {
     super(4, null);
   }
 
-  decorate(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
     Object.defineProperty(target.prototype, name, {
       enumerable: true,
       get(this: Component) {
         const offset = this.__offset + fieldOffset;
         if (!this.__system) throw new Error('Unable to dereference entity in this context');
-        return this.__system.__bindAndBorrowEntity(this.__data.getUint32(offset));
+        const id = this.__data.getUint32(offset);
+        if (id === 0) return null;
+        return this.__system.__bindAndBorrowEntity(id);
       },
       set(this: Component, value: Entity) {
         const offset = this.__offset + fieldOffset;
         this.__checkMutable();
-        this.__data.setUint32(offset, value.__id);
+        this.__data.setUint32(offset, value?.__id || 0);
       }
     });
 

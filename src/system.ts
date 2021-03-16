@@ -2,60 +2,76 @@ import type {ComponentType} from './component';
 import type {Entities, Entity, EntityId} from './entity';
 
 
-class Query {
+class QueryBuilder {
   private lastType: ComponentType<any>;
+
+  constructor(
+    private readonly callback: (q: QueryBuilder) => void,
+    private readonly query: Query,
+    private readonly system: System
+  ) {}
+
+  __build() {
+    try {
+      this.callback(this);
+    } catch (e) {
+      e.message = `Failed to build query in system ${this.system.name}: ${e.message}`;
+      throw e;
+    }
+  }
+
+  with(type: ComponentType<any>): this {
+    return this.set('withMask', type);
+  }
+
+  without(type: ComponentType<any>): this {
+    return this.set('withoutMask', type);
+  }
+
+  also(type: ComponentType<any>): this {
+    this.lastType = type;
+    return this;
+  }
+
+  get track(): this {
+    return this.set('watchMask');
+  }
+
+  get read(): this {
+    return this.set(this.system.__readMask);
+  }
+
+  get write(): this {
+    this.set(this.system.__readMask);
+    return this.set(this.system.__writeMask);
+  }
+
+  private set(
+    mask: 'withMask' | 'withoutMask' | 'watchMask' | number[], type?: ComponentType<any>
+  ): this {
+    if (!type) type = this.lastType;
+    if (!type) throw new Error('No component type to apply query modifier to');
+    this.lastType = type;
+    if (typeof mask === 'string') {
+      if (!this.query[mask]) this.query[mask] = [];
+      mask = this.query[mask]!;
+    }
+    if (type.__flagOffset >= mask.length) {
+      mask.length = type.__flagOffset + 1;
+      mask.fill(0, mask.length, type.__flagOffset);
+    }
+    mask[type.__flagOffset] |= type.__flagMask;
+    return this;
+  }
+}
+
+
+class Query {
   private withMask: number[] | undefined;
   private withoutMask: number[] | undefined;
   private watchMask: number[] | undefined;
 
   constructor(private readonly system: System) { }
-
-  with(type: ComponentType<any>): Query {
-    return this.derive(type, 'withMask');
-  }
-
-  without(type: ComponentType<any>): Query {
-    return this.derive(type, 'withoutMask');
-  }
-
-  and(type: ComponentType<any>): Query {
-    return this.derive(type);
-  }
-
-  get watch(): Query {
-    return this.derive(this.lastType, 'watchMask');
-  }
-
-  get read(): Query {
-    setFlag(this.system.__readMask, this.lastType);
-    return this;
-  }
-
-  get write(): Query {
-    setFlag(this.system.__readMask, this.lastType);
-    setFlag(this.system.__writeMask, this.lastType);
-    return this;
-  }
-
-  private derive(type: ComponentType<any>, maskName?: 'withMask' | 'withoutMask' | 'watchMask') {
-    if (!type) throw new Error('No component type to apply query modifier to');
-    const query = this.clone(type);
-    if (maskName) {
-      let mask = query[maskName];
-      if (!mask) query[maskName] = mask = [];
-      setFlag(mask, type);
-    }
-    return query;
-  }
-
-  private clone(type: ComponentType<any>): Query {
-    const query = new Query(this.system);
-    query.lastType = type;
-    query.withMask = this.withMask ? Array.from(this.withMask) : undefined;
-    query.withoutMask = this.withoutMask ? Array.from(this.withoutMask) : undefined;
-    query.watchMask = this.watchMask ? Array.from(this.watchMask) : undefined;
-    return query;
-  }
 
   get all() {
     const entities = this.system.__systems.entities;
@@ -111,17 +127,33 @@ export interface SystemType {
   new(): System;
 }
 
+
 export abstract class System {
   __readMask: number[] = [];
   __writeMask: number[] = [];
   __systems: Systems;
   __borrowedEntities: Entity[] = [];
+  private readonly queryBuilders: QueryBuilder[] = [];
 
-  query(): Query {
-    return new Query(this);
+  get name(): string {return this.constructor.name;}
+
+  query(buildCallback: (q: QueryBuilder) => void): Query {
+    const query = new Query(this);
+    const builder = new QueryBuilder(buildCallback, query, this);
+    this.queryBuilders.push(builder);
+    return query;
   }
 
   abstract execute(delta: number, time: number): void;
+
+  __init(systems: Systems): void {
+    if (this.__systems) {
+      throw new Error(`You can't reuse an instance of system ${this.name} in different worlds`);
+    }
+    this.__systems = systems;
+    for (const builder of this.queryBuilders) builder.__build();
+    this.queryBuilders.length = 0;
+  }
 
   __bindAndBorrowEntity(id: EntityId): Entity {
     const entities = this.__systems.entities;
@@ -150,11 +182,7 @@ export class Systems {
     for (const item of systems) {
       // eslint-disable-next-line new-cap
       const system = item instanceof System ? item : new item();
-      if (system.__systems) {
-        throw new Error(
-          `You can't reuse an instance of system ${system.constructor.name} in different worlds`);
-      }
-      system.__systems = this;
+      system.__init(this);
       this.systems.push(system);
     }
   }
@@ -162,13 +190,4 @@ export class Systems {
   execute(delta: number, time: number): void {
     for (const system of this.systems) system.execute(delta, time);
   }
-}
-
-
-function setFlag(mask: number[], type: ComponentType<any>): void {
-  if (type.__flagOffset >= mask.length) {
-    mask.length = type.__flagOffset + 1;
-    mask.fill(0, mask.length, type.__flagOffset);
-  }
-  mask[type.__flagOffset] |= type.__flagMask;
 }

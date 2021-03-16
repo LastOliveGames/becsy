@@ -21,7 +21,7 @@
     // Don't change these unless you know what you're doing.
     // See: https://github.com/microsoft/TypeScript/issues/25430
     "baseUrl": "./"
-},
+  },
   "include": ["src", "test"],
-  "exclude": ["node_modules"],
+  "exclude": ["node_modules"]
 }

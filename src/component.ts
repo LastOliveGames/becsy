@@ -28,6 +28,7 @@ export interface ComponentType<C extends Component> {
 export class Component extends PooledObject {
   static __flagOffset: number;
   static __flagMask: number;
+  static schema: Schema = {};
 
   __data: DataView;
   __bytes: Uint8Array;
@@ -99,7 +100,7 @@ export class Controller<C extends Component> {
     let offset = 0, booleanMask = 1;
     for (const field of fields) {
       if (field.type === Type.boolean) {
-        field.type.decorate(this.type, field.name, offset, booleanMask);
+        field.type.define(this.type, field.name, offset, booleanMask);
         booleanMask <<= 1;
         if (booleanMask > 128) {
           offset += 1;
@@ -110,7 +111,7 @@ export class Controller<C extends Component> {
           offset += 1;
           booleanMask = 1;
         }
-        field.type.decorate(this.type, field.name, offset);
+        field.type.define(this.type, field.name, offset);
         offset += field.type.byteSize;
       }
     }
