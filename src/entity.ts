@@ -1,4 +1,4 @@
-import {Component, Controller, ComponentType} from './component';
+import {Component, Controller, ComponentType, Field} from './component';
 import {Pool, PooledObject} from './pool';
 import type {System} from './system';
 import {Type} from './type';
@@ -89,9 +89,10 @@ export class Entity extends PooledObject {
   }
 
   private __deindexOutboundRefs(type: ComponentType<any>): void {
-    if (type.__fields.some(field => field.type === Type.ref)) {
+    const fields = this.__entities.getFields(type);
+    if (fields.some(field => field.type === Type.ref)) {
       const component = this.write(type);
-      for (const field of type.__fields) {
+      for (const field of fields) {
         if (field.type === Type.ref) (component as any)[field.name] = null;
       }
     }
@@ -102,13 +103,11 @@ export class Entity extends PooledObject {
   }
 
   private __checkMask(type: ComponentType<any>, write: boolean): void {
-    if (this.__system) {
-      const maskByte =
-        (write ? this.__system.__writeMask : this.__system.__readMask)[type.__flagOffset] ?? 0;
-      if ((maskByte & type.__flagMask) === 0) {
-        throw new Error(
-          `System didn't mark component ${type.name} as ${write ? 'writable' : 'readable'}`);
-      }
+    if (this.__system && !this.__entities.maskHasFlag(
+      write ? this.__system.__writeMask : this.__system.__readMask, type
+    )) {
+      throw new Error(
+        `System didn't mark component ${type.name} as ${write ? 'writable' : 'readable'}`);
     }
   }
 }
@@ -180,16 +179,38 @@ export class Entities {
     return entity;
   }
 
+  extendMaskAndSetFlag(mask: number[], type: ComponentType<any>): void {
+    const ctrl = this.controllers.get(type)!;
+    const flagOffset = ctrl.flagOffset;
+    if (flagOffset >= mask.length) {
+      mask.length = flagOffset + 1;
+      mask.fill(0, mask.length, flagOffset);
+    }
+    mask[flagOffset] |= ctrl.flagMask;
+  }
+
+  maskHasFlag(mask: number[], type: ComponentType<any>): boolean {
+    const ctrl = this.controllers.get(type)!;
+    return ((mask[ctrl.flagOffset] ?? 0) & ctrl.flagMask) !== 0;
+  }
+
+  getFields(type: ComponentType<any>): Field<any>[] {
+    return this.controllers.get(type)!.fields;
+  }
+
   hasFlag(id: EntityId, type: ComponentType<any>): boolean {
-    return (this.current[id * this.stride + type.__flagOffset] & type.__flagMask) !== 0;
+    const ctrl = this.controllers.get(type)!;
+    return (this.current[id * this.stride + ctrl.flagOffset] & ctrl.flagMask) !== 0;
   }
 
   setFlag(id: EntityId, type: ComponentType<any>): void {
-    this.current[id * this.stride + type.__flagOffset] |= type.__flagMask;
+    const ctrl = this.controllers.get(type)!;
+    this.current[id * this.stride + ctrl.flagOffset] |= ctrl.flagMask;
   }
 
   clearFlag(id: EntityId, type: ComponentType<any>): void {
-    this.current[id * this.stride + type.__flagOffset] &= ~type.__flagMask;
+    const ctrl = this.controllers.get(type)!;
+    this.current[id * this.stride + ctrl.flagOffset] &= ~ctrl.flagMask;
   }
 
   isAllocated(id: EntityId, entities: Uint32Array = this.current): boolean {
@@ -201,7 +222,8 @@ export class Entities {
   }
 
   markMutated(id: EntityId, type: ComponentType<any>): void {
-    this.mutations[id * this.stride + type.__flagOffset] |= type.__flagMask;
+    const ctrl = this.controllers.get(type)!;
+    this.mutations[id * this.stride + ctrl.flagOffset] |= ctrl.flagMask;
   }
 
   initComponent(type: ComponentType<any>, id: EntityId, values: any): void {

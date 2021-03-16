@@ -61,11 +61,7 @@ class QueryBuilder {
     } else if (onlyOne && mask.some(n => n !== 0)) {
       throw new Error(`Only one ${onlyOne} allowed`);
     }
-    if (type.__flagOffset >= mask.length) {
-      mask.length = type.__flagOffset + 1;
-      mask.fill(0, mask.length, type.__flagOffset);
-    }
-    mask[type.__flagOffset] |= type.__flagMask;
+    this.system.__systems.entities.extendMaskAndSetFlag(mask, type);
     return this;
   }
 }

@@ -14,7 +14,7 @@ interface Schema {
   [prop: string]: Type<any> | SchemaDef<any>;
 }
 
-interface Field<JSType> {
+export interface Field<JSType> {
   name: string;
   type: Type<JSType>;
   default: JSType;
@@ -23,16 +23,10 @@ interface Field<JSType> {
 export interface ComponentType<C extends Component> {
   new(): C;
   schema: Schema;
-  __fields: Field<any>[];
-  __flagOffset: number;
-  __flagMask: number;
 }
 
 export class Component extends PooledObject {
   static schema: Schema = {};
-  static __fields: Field<any>[];
-  static __flagOffset: number;
-  static __flagMask: number;
 
   __data: DataView;
   __bytes: Uint8Array;
@@ -56,17 +50,20 @@ export class Controller<C extends Component> {
   private readonly bytes: Uint8Array;
   private readonly stride: number;
   private readonly pool: Pool<C>;
+  fields: Field<any>[];
+  flagOffset: number;
+  flagMask: number;
 
   constructor(readonly id: number, readonly type: ComponentType<C>, readonly entities: Entities) {
-    type.__flagOffset = Math.floor(id / 32);
-    type.__flagMask = 1 << (id % 32);
+    this.flagOffset = Math.floor(id / 32);
+    this.flagMask = 1 << (id % 32);
     this.pool = new Pool(type);
-    type.__fields = this.arrangeFields();
-    this.stride = this.defineComponentProperties(type.__fields);
+    this.fields = this.arrangeFields();
+    this.stride = this.defineComponentProperties();
     this.buffer = new SharedArrayBuffer(this.stride * entities.maxNum);
     this.data = new DataView(this.buffer);
     this.bytes = new Uint8Array(this.buffer);
-    this.saveDefaultComponent(type.__fields);
+    this.saveDefaultComponent();
   }
 
   get name(): string {
@@ -101,9 +98,9 @@ export class Controller<C extends Component> {
     return component;
   }
 
-  private defineComponentProperties(fields: Field<any>[]): number {
+  private defineComponentProperties(): number {
     let offset = 0, booleanMask = 1;
-    for (const field of fields) {
+    for (const field of this.fields) {
       if (field.type === Type.boolean) {
         field.type.define(this.type, field.name, offset, booleanMask);
         booleanMask <<= 1;
@@ -124,10 +121,10 @@ export class Controller<C extends Component> {
     return offset;
   }
 
-  private saveDefaultComponent(fields: Field<any>[]): void {
+  private saveDefaultComponent(): void {
     const component = this.bind(0, true);
     try {
-      for (const field of fields) {
+      for (const field of this.fields) {
         (component as any)[field.name] = field.default;
       }
     } finally {
