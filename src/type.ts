@@ -302,7 +302,14 @@ class RefType extends Type<Entity | null> {
       set(this: Component, value: Entity) {
         const offset = this.__offset + fieldOffset;
         this.__checkMutable();
-        this.__data.setUint32(offset, value?.__id || 0);
+        const oldId = this.__data.getUint32(offset);
+        const newId = value?.__id ?? 0;
+        if (oldId === newId) return;
+        const indexer = this.__system?.__systems.indexer;
+        if (!indexer) throw new Error('Unable to reference an entity in this context');
+        if (oldId !== 0) indexer.remove(oldId, this.__entityId);
+        this.__data.setUint32(offset, newId);
+        if (newId !== 0) indexer.insert(newId, this.__entityId);
       }
     });
 

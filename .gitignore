@@ -1,8 +1,12 @@
 /.env
 /.gitconfig
 /.vscode
+/.clinic
 /dist
 /lib
 /node_modules
 /yarn-error.log
 tsconfig.tsbuildinfo
+traceopt.txt
+v8*.log
+

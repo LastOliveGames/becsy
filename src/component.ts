@@ -2,6 +2,8 @@ import {Pool, PooledObject} from './pool';
 import {Type} from './type';
 import type {Entities, EntityId} from './entity';
 import type {System} from './system';
+import {config} from './config';
+
 
 interface SchemaDef<JSType> {
   type: Type<JSType>;
@@ -21,25 +23,28 @@ interface Field<JSType> {
 export interface ComponentType<C extends Component> {
   new(): C;
   schema: Schema;
+  __fields: Field<any>[];
   __flagOffset: number;
   __flagMask: number;
 }
 
 export class Component extends PooledObject {
+  static schema: Schema = {};
+  static __fields: Field<any>[];
   static __flagOffset: number;
   static __flagMask: number;
-  static schema: Schema = {};
 
   __data: DataView;
   __bytes: Uint8Array;
   __system?: System;
+  __entityId: EntityId;
   __offset: number;
   __mutable: boolean;
 
   __checkMutable(): void {
     if (!this.__mutable) {
       throw new Error(
-        'Component is not mutable; use entity.mutate(Component) to acquire a mutable version');
+        'Component is not mutable; use entity.write(Component) to acquire a mutable version');
     }
   }
 }
@@ -56,12 +61,12 @@ export class Controller<C extends Component> {
     type.__flagOffset = Math.floor(id / 32);
     type.__flagMask = 1 << (id % 32);
     this.pool = new Pool(type);
-    const fields = this.arrangeFields();
-    this.stride = this.defineComponentProperties(fields);
+    type.__fields = this.arrangeFields();
+    this.stride = this.defineComponentProperties(type.__fields);
     this.buffer = new SharedArrayBuffer(this.stride * entities.maxNum);
     this.data = new DataView(this.buffer);
     this.bytes = new Uint8Array(this.buffer);
-    this.saveDefaultComponent(fields);
+    this.saveDefaultComponent(type.__fields);
   }
 
   get name(): string {
@@ -71,17 +76,17 @@ export class Controller<C extends Component> {
   init(id: EntityId, values?: any): void {
     this.bytes.copyWithin(id * this.stride, 0, this.stride);
     if (values !== undefined) {
-      const component = this.bind(id, true);
-      try {
+      if (config.DEBUG) {
+        console.log(process.env.NODE_ENV);
         for (const key in values) {
           if (!this.type.schema[key]) {
-            throw new Error(`Property ${key} not defined for ${this.name} components`);
+            throw new Error(`Property ${key} not defined for component ${this.name}`);
           }
-          (component as any)[key] = values[key];
         }
-      } finally {
-        component.__release();
       }
+      const component = this.bind(id, true);
+      Object.assign(component, values);
+      component.__release();
     }
   }
 
@@ -90,9 +95,9 @@ export class Controller<C extends Component> {
     component.__data = this.data;
     component.__bytes = this.bytes;
     component.__system = system;
+    component.__entityId = id;
     component.__offset = id * this.stride;
     component.__mutable = mutable;
-    component.__acquire();
     return component;
   }
 

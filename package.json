@@ -4,7 +4,7 @@
   "version": "0.0.2",
   "scripts": {
     "test": "jest --config jestconfig.json",
-    "server": "tsc-watch --onSuccess \"node --enable-source-maps --es-module-specifier-resolution=node dist/server/main.js\"",
+    "perf": "tsc-watch --onSuccess \"node --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js\"",
     "build": "tsc && rollup --config",
     "prepare": "yarn build",
     "lint": "eslint src tests"

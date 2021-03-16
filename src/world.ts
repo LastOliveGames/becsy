@@ -1,5 +1,6 @@
 import type {ComponentType} from './component';
 import {Entities, Entity} from './entity';
+import {Indexer} from './indexer';
 import {System, Systems, SystemType} from './system';
 
 
@@ -18,22 +19,26 @@ type ComponentTypesArray = ComponentType<any>[] | ComponentTypesArray[];
 type SystemsArray = (System | SystemType)[] | SystemsArray[];
 
 interface WorldOptions {
-  maxEntities: number;
+  maxEntities?: number;
+  maxRefs?: number;
   componentTypes: ComponentTypesArray;
   systems: SystemsArray;
 }
 
 
 export class World {
+  private readonly indexer;
   private readonly entities;
   private readonly systems;
   private lastTime = now() / 1000;
   private buildSystem: System;
 
-  constructor({maxEntities = 10000, componentTypes, systems}: WorldOptions) {
+  constructor({maxEntities = 10000, maxRefs = 10000, componentTypes, systems}: WorldOptions) {
+    this.indexer = new Indexer(maxRefs);
     this.entities = new Entities(maxEntities + 1, componentTypes.flat(Infinity));
     this.buildSystem = this.configureBuildSystem();
-    this.systems = new Systems([this.buildSystem, systems].flat(Infinity), this.entities);
+    this.systems =
+      new Systems([this.buildSystem, systems].flat(Infinity), this.entities, this.indexer);
   }
 
   private configureBuildSystem(): BuildSystem {
@@ -45,9 +50,13 @@ export class World {
   }
 
   build(callback: (createEntity: () => Entity) => void | Promise<void>): void | Promise<void> {
-    const result = callback(() => this.entities.createEntity(this.buildSystem));
+    const result = callback(() => this.buildSystem.createEntity());
     if (result && result.then) return result.then(() => {this.buildSystem.__releaseEntities();});
     this.buildSystem.__releaseEntities();
+  }
+
+  createEntity(...initialComponents: (ComponentType<any> | any)[]): void {
+    this.entities.createEntity(initialComponents).__release();
   }
 
   execute(time?: number, delta?: number): void {
@@ -55,6 +64,6 @@ export class World {
     if (!delta) delta = time - this.lastTime;
     this.lastTime = time;
     this.entities.cycle();
-    this.systems.execute(delta, time);
+    this.systems.execute(time, delta);
   }
 }

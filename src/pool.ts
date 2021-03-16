@@ -1,5 +1,5 @@
 export class PooledObject {
-  private __locks = 0;
+  __locks = 0;
 
   __acquire(): void {
     this.__locks++;
@@ -8,10 +8,6 @@ export class PooledObject {
   __release(): void {
     if (--this.__locks < 0) throw new Error('Unmatched call to release()');
   }
-
-  get available(): boolean {
-    return this.__locks === 0;
-  }
 }
 
 
@@ -19,24 +15,30 @@ export class Pool<T extends PooledObject> {
   readonly pool: T[];
   private next = 0;
 
-  constructor(readonly Class: {new() : T}, initialSize = 10) {
+  constructor(readonly Class: {new() : T}, initialSize = 20) {
     this.pool = new Array(initialSize);
     for (let i = 0; i < initialSize; i++) {
       this.pool[i] = new Class();
     }
   }
 
+  logStats(): void {
+    let count = 0;
+    for (const item of this.pool) if (!item.__locks) count++;
+    console.log(`Pool ${this.Class.name}: ${count} of ${this.pool.length} available`);
+  }
+
   borrow(): T {
     let next = this.next;
     const initial = next;
     const length = this.pool.length;
-    while (!this.pool[next].available) {
+    while (this.pool[next].__locks) {
       next += 1;
       if (next === length) next = 0;
       if (next === initial) break;
     }
     let item = this.pool[next];
-    if (!item) {
+    if (item.__locks) {
       item = new this.Class();
       this.pool.push(item);
       next = 0;

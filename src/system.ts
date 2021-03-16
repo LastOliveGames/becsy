@@ -1,118 +1,7 @@
 import type {ComponentType} from './component';
 import type {Entities, Entity, EntityId} from './entity';
-
-
-class QueryBuilder {
-  private lastType: ComponentType<any>;
-
-  constructor(
-    private readonly callback: (q: QueryBuilder) => void,
-    private readonly query: Query,
-    private readonly system: System
-  ) {}
-
-  __build() {
-    try {
-      this.callback(this);
-    } catch (e) {
-      e.message = `Failed to build query in system ${this.system.name}: ${e.message}`;
-      throw e;
-    }
-  }
-
-  with(type: ComponentType<any>): this {
-    return this.set('withMask', type);
-  }
-
-  without(type: ComponentType<any>): this {
-    return this.set('withoutMask', type);
-  }
-
-  also(type: ComponentType<any>): this {
-    this.lastType = type;
-    return this;
-  }
-
-  get track(): this {
-    return this.set('watchMask');
-  }
-
-  get read(): this {
-    return this.set(this.system.__readMask);
-  }
-
-  get write(): this {
-    this.set(this.system.__readMask);
-    return this.set(this.system.__writeMask);
-  }
-
-  private set(
-    mask: 'withMask' | 'withoutMask' | 'watchMask' | number[], type?: ComponentType<any>
-  ): this {
-    if (!type) type = this.lastType;
-    if (!type) throw new Error('No component type to apply query modifier to');
-    this.lastType = type;
-    if (typeof mask === 'string') {
-      if (!this.query[mask]) this.query[mask] = [];
-      mask = this.query[mask]!;
-    }
-    if (type.__flagOffset >= mask.length) {
-      mask.length = type.__flagOffset + 1;
-      mask.fill(0, mask.length, type.__flagOffset);
-    }
-    mask[type.__flagOffset] |= type.__flagMask;
-    return this;
-  }
-}
-
-
-class Query {
-  private withMask: number[] | undefined;
-  private withoutMask: number[] | undefined;
-  private watchMask: number[] | undefined;
-
-  constructor(private readonly system: System) { }
-
-  get all() {
-    const entities = this.system.__systems.entities;
-    return this.iterate(
-      id => entities.matchCurrent(id, this.withMask, this.withoutMask));
-  }
-
-  get added() {
-    const entities = this.system.__systems.entities;
-    return this.iterate(
-      id =>
-        entities.matchCurrent(id, this.withMask, this.withoutMask) &&
-        !entities.matchPrevious(id, this.withMask, this.withoutMask)
-    );
-  }
-
-  get removed() {
-    const entities = this.system.__systems.entities;
-    return this.iterate(
-      id =>
-        !entities.matchCurrent(id, this.withMask, this.withoutMask) &&
-        entities.matchPrevious(id, this.withMask, this.withoutMask)
-    );
-  }
-
-  get changed() {
-    const entities = this.system.__systems.entities;
-    return this.iterate(
-      id =>
-        entities.matchCurrent(id, this.withMask, this.withoutMask) &&
-        entities.matchMutated(id, this.watchMask)
-    );
-  }
-
-  private iterate(predicate: (id: EntityId) => boolean): Iterable<Entity> {
-    return this.system.__systems.entities.iterate(
-      this.system, predicate, () => {this.system.__releaseEntities();}
-    );
-  }
-
-}
+import type {Indexer} from './indexer';
+import {MainQuery, MainQueryBuilder} from './query';
 
 
 export interface SystemType {
@@ -125,26 +14,27 @@ export abstract class System {
   __writeMask: number[] = [];
   __systems: Systems;
   __borrowedEntities: Entity[] = [];
-  private readonly queryBuilders: QueryBuilder[] = [];
+  private readonly queryBuilders: MainQueryBuilder[] = [];
 
   get name(): string {return this.constructor.name;}
 
-  query(buildCallback: (q: QueryBuilder) => void): Query {
-    const query = new Query(this);
-    const builder = new QueryBuilder(buildCallback, query, this);
+  query(buildCallback: (q: MainQueryBuilder) => void): MainQuery {
+    const query = new MainQuery(this);
+    const builder = new MainQueryBuilder(buildCallback, query, this);
     this.queryBuilders.push(builder);
     return query;
   }
 
-  createEntity(callback?: (entity: Entity) => void): Entity {
+  createEntity(...initialComponents: (ComponentType<any> | any)[]): Entity {
     const entities = this.__systems.entities;
-    const entity = entities.createEntity(this);
+    const entity = entities.createEntity(initialComponents, this);
     this.__borrowedEntities.push(entity);
-    callback?.(entity);
     return entity;
   }
 
-  abstract execute(delta: number, time: number): void;
+  execute(time: number, delta: number): void {
+    // do nothing by default
+  }
 
   __init(systems: Systems): void {
     if (this.__systems) {
@@ -178,7 +68,9 @@ export abstract class System {
 export class Systems {
   private readonly systems: System[] = [];
 
-  constructor(systems: (System | SystemType)[], readonly entities: Entities) {
+  constructor(
+    systems: (System | SystemType)[], readonly entities: Entities, readonly indexer: Indexer
+  ) {
     for (const item of systems) {
       // eslint-disable-next-line new-cap
       const system = item instanceof System ? item : new item();
@@ -187,7 +79,7 @@ export class Systems {
     }
   }
 
-  execute(delta: number, time: number): void {
-    for (const system of this.systems) system.execute(delta, time);
+  execute(time: number, delta: number): void {
+    for (const system of this.systems) system.execute(time, delta);
   }
 }

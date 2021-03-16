@@ -1,5 +1,5 @@
 export default {
-  input: 'lib/index.js',
+  input: 'lib/src/index.js',
   external: ['util'],
   output: [
     {

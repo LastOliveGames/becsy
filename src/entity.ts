@@ -1,6 +1,7 @@
 import {Component, Controller, ComponentType} from './component';
 import {Pool, PooledObject} from './pool';
 import type {System} from './system';
+import {Type} from './type';
 
 
 export type EntityId = number;
@@ -11,6 +12,7 @@ export class Entity extends PooledObject {
   __id: EntityId;
   __system: System | undefined;
   __borrowedComponents: Readonly<Component>[] = [];
+  joined: {[name: string]: Iterable<Entity>} | undefined;
 
   __reset(entities: Entities, id: EntityId, system?: System): void {
     this.__entities = entities;
@@ -20,14 +22,13 @@ export class Entity extends PooledObject {
   }
 
   __release(): void {
-    for (const component of this.__borrowedComponents) {
-      component.__release();
-    }
+    for (const component of this.__borrowedComponents) component.__release();
     this.__borrowedComponents.length = 0;
+    delete this.joined;
     super.__release();
   }
 
-  add<C extends Component>(type: ComponentType<C>, values: any): this {
+  add(type: ComponentType<any>, values: any): this {
     this.__checkMask(type, true);
     if (this.has(type)) throw new Error(`Entity already has a ${type.name} component`);
     this.__entities.setFlag(this.__id, type);
@@ -35,10 +36,10 @@ export class Entity extends PooledObject {
     return this;
   }
 
-  remove<C extends Component>(type: ComponentType<C>): boolean {
+  remove(type: ComponentType<any>): boolean {
     this.__checkMask(type, true);
-    if (!this.has(type)) return false;
-    this.__entities.clearFlag(this.__id, type);
+    if (!this.__entities.hasFlag(this.__id, type)) return false;
+    this.__remove(type);
     return true;
   }
 
@@ -65,10 +66,14 @@ export class Entity extends PooledObject {
   }
 
   delete(): void {
-    for (const type of this.__entities.types) this.remove(type);
+    for (const type of this.__entities.types) {
+      if (!this.__entities.hasFlag(this.__id, type)) continue;
+      this.__checkMask(type, true);
+      this.__remove(type);
+    }
   }
 
-  __get<C extends Component>(type: ComponentType<C>, allowWrite: boolean): C | undefined {
+  private __get<C extends Component>(type: ComponentType<C>, allowWrite: boolean): C | undefined {
     this.__checkMask(type, allowWrite);
     if (!this.has(type)) return;
     const component = this.__entities.bindComponent(type, this.__id, allowWrite, this.__system);
@@ -76,7 +81,27 @@ export class Entity extends PooledObject {
     return component;
   }
 
-  __checkMask(type: ComponentType<any>, write: boolean): void {
+  private __remove(type: ComponentType<any>): boolean {
+    this.__deindexOutboundRefs(type);
+    this.__entities.clearFlag(this.__id, type);
+    if (!this.__entities.isAllocated(this.__id)) this.__wipeInboundRefs();
+    return true;
+  }
+
+  private __deindexOutboundRefs(type: ComponentType<any>): void {
+    if (type.__fields.some(field => field.type === Type.ref)) {
+      const component = this.write(type);
+      for (const field of type.__fields) {
+        if (field.type === Type.ref) (component as any)[field.name] = null;
+      }
+    }
+  }
+
+  private __wipeInboundRefs(): void {
+    // TODO: implement
+  }
+
+  private __checkMask(type: ComponentType<any>, write: boolean): void {
     if (this.__system) {
       const maskByte =
         (write ? this.__system.__writeMask : this.__system.__readMask)[type.__flagOffset] ?? 0;
@@ -91,6 +116,10 @@ export class Entity extends PooledObject {
 
 export class Entities {
   private readonly stride: number;
+  private nextId = 1;
+  private readonly currentBuffer: SharedArrayBuffer;
+  private readonly previousBuffer: SharedArrayBuffer;
+  private readonly mutationsBuffer: SharedArrayBuffer;
   private readonly current: Uint32Array;
   private readonly previous: Uint32Array;
   private readonly mutations: Uint32Array;
@@ -103,9 +132,10 @@ export class Entities {
       this.controllers.set(type, new Controller(componentId++, type, this));
     }
     this.stride = Math.ceil(this.controllers.size / 32);
-    this.current = new Uint32Array(maxNum * this.stride);
-    this.previous = new Uint32Array(maxNum * this.stride);
-    this.mutations = new Uint32Array(maxNum * this.stride);
+    const size = maxNum * this.stride * 4;
+    this.current = new Uint32Array(this.currentBuffer = new SharedArrayBuffer(size));
+    this.previous = new Uint32Array(this.previousBuffer = new SharedArrayBuffer(size));
+    this.mutations = new Uint32Array(this.mutationsBuffer = new SharedArrayBuffer(size));
   }
 
   get numComponents(): number {return this.controllers.size;}
@@ -115,13 +145,31 @@ export class Entities {
     this.mutations.fill(0);
   }
 
-  createEntity(system?: System): Entity {
-    let id: EntityId;
-    // TODO: start scanning at last allocated?
-    for (id = 1; id < this.maxNum; id += 1) {
+  createEntity(initialComponents?: (ComponentType<any> | any)[], system?: System): Entity {
+    const initial = this.nextId;
+    let id = initial;
+    while (true) {
       if (!this.isAllocated(id, this.current) && !this.isAllocated(id, this.previous)) {
-        return this.bind(id, system);
+        this.nextId = id + 1;
+        if (this.nextId === this.maxNum) this.nextId = 1;
+        const entity = this.bind(id, system);
+        if (initialComponents) {
+          for (let i = 0; i < initialComponents.length; i++) {
+            const type = initialComponents[i];
+            if (typeof type !== 'function') {
+              throw new Error(
+                `Bad arguments to createEntity: expected component type, got: ${type}`);
+            }
+            let value = initialComponents[i + 1];
+            if (typeof value === 'function') value = undefined; else i++;
+            entity.add(type, value);
+          }
+        }
+        return entity;
       }
+      id += 1;
+      if (id === this.maxNum) id = 1;
+      if (id === initial) break;
     }
     throw new Error(`Max number of entities reached: ${this.maxNum - 1}`);
   }
@@ -208,13 +256,34 @@ export class Entities {
     for (let id = 1; id < maxEntities; id++) {
       if (predicate(id)) {
         const entity = this.bind(id, system);
-        try {
-          yield entity;
-        } finally {
-          entity.__release();
-        }
+        yield entity;
+        entity.__release();
+        system.__releaseEntities();
       }
     }
     cleanup();
+
+    // An explicit iterator implementation doesn't appear to be any faster:
+    // return {
+    //   [Symbol.iterator]: () => {
+    //     let id: EntityId = 1;
+    //     let entity: Entity;
+    //     return {
+    //       next: () => {
+    //         if (entity) entity.__release();
+    //         system.__releaseEntities();
+    //         while (id < maxEntities && !predicate(id)) id++;
+    //         if (id < maxEntities) {
+    //           entity = this.bind(id, system);
+    //           id++;
+    //           return {value: entity};
+    //         }
+    //         cleanup();
+    //         return {done: true, value: undefined};
+    //       }
+    //     };
+    //   }
+    // };
+
   }
 }
