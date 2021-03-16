@@ -112,14 +112,6 @@ class Query {
     );
   }
 
-  createEntity(callback?: (entity: Entity) => void): Entity {
-    const entities = this.system.__systems.entities;
-    const entity = entities.createEntity(this.system);
-    this.system.__borrowedEntities.push(entity);
-    callback?.(entity);
-    return entity;
-  }
-
 }
 
 
@@ -142,6 +134,14 @@ export abstract class System {
     const builder = new QueryBuilder(buildCallback, query, this);
     this.queryBuilders.push(builder);
     return query;
+  }
+
+  createEntity(callback?: (entity: Entity) => void): Entity {
+    const entities = this.__systems.entities;
+    const entity = entities.createEntity(this);
+    this.__borrowedEntities.push(entity);
+    callback?.(entity);
+    return entity;
   }
 
   abstract execute(delta: number, time: number): void;
