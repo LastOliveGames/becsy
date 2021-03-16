@@ -1,4 +1,4 @@
-import {Pool, PooledObject} from './pool';
+import {Pool} from './pool';
 import {Type} from './type';
 import type {Entities, EntityId} from './entity';
 import type {System} from './system';
@@ -25,7 +25,7 @@ export interface ComponentType<C extends Component> {
   schema: Schema;
 }
 
-export class Component extends PooledObject {
+export class Component {
   static schema: Schema = {};
 
   __data: DataView;
@@ -83,7 +83,7 @@ export class Controller<C extends Component> {
       }
       const component = this.bind(id, true);
       Object.assign(component, values);
-      component.__release();
+      this.pool.relinquish(component);
     }
   }
 
@@ -96,6 +96,10 @@ export class Controller<C extends Component> {
     component.__offset = id * this.stride;
     component.__mutable = mutable;
     return component;
+  }
+
+  relinquish(component: C): void {
+    this.pool.relinquish(component);
   }
 
   private defineComponentProperties(): number {
@@ -128,7 +132,7 @@ export class Controller<C extends Component> {
         (component as any)[field.name] = field.default;
       }
     } finally {
-      component.__release();
+      this.pool.relinquish(component);
     }
   }
 

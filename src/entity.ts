@@ -1,5 +1,5 @@
 import {Component, Controller, ComponentType, Field} from './component';
-import {Pool, PooledObject} from './pool';
+import {Pool} from './pool';
 import type {System} from './system';
 import {Type} from './type';
 
@@ -7,7 +7,7 @@ import {Type} from './type';
 export type EntityId = number;
 
 
-export class Entity extends PooledObject {
+export class Entity {
   __entities: Entities;
   __id: EntityId;
   __system: System | undefined;
@@ -22,10 +22,12 @@ export class Entity extends PooledObject {
   }
 
   __release(): void {
-    for (const component of this.__borrowedComponents) component.__release();
+    for (const component of this.__borrowedComponents) {
+      this.__entities.relinquishComponent(component);
+    }
     this.__borrowedComponents.length = 0;
     delete this.joined;
-    super.__release();
+    this.__entities.relinquish(this);
   }
 
   add(type: ComponentType<any>, values: any): this {
@@ -177,6 +179,14 @@ export class Entities {
     const entity = this.pool.borrow();
     entity.__reset(this, id, system);
     return entity;
+  }
+
+  relinquish(entity: Entity): void {
+    this.pool.relinquish(entity);
+  }
+
+  relinquishComponent(component: Component): void {
+    this.controllers.get(component.constructor as ComponentType<any>)!.relinquish(component);
   }
 
   extendMaskAndSetFlag(mask: number[], type: ComponentType<any>): void {

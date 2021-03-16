@@ -1,18 +1,6 @@
-export class PooledObject {
-  __locks = 0;
-
-  __acquire(): void {
-    this.__locks++;
-  }
-
-  __release(): void {
-    if (--this.__locks < 0) throw new Error('Unmatched call to release()');
-  }
-}
-
-
-export class Pool<T extends PooledObject> {
-  readonly pool: T[];
+export class Pool<T> {
+  private readonly pool: T[];
+  private readonly locks = new Map<T, number>();
   private next = 0;
 
   constructor(readonly Class: {new() : T}, initialSize = 20) {
@@ -24,7 +12,7 @@ export class Pool<T extends PooledObject> {
 
   logStats(): void {
     let count = 0;
-    for (const item of this.pool) if (!item.__locks) count++;
+    for (const item of this.pool) if (!this.locks.get(item)) count++;
     console.log(`Pool ${this.Class.name}: ${count} of ${this.pool.length} available`);
   }
 
@@ -32,19 +20,34 @@ export class Pool<T extends PooledObject> {
     let next = this.next;
     const initial = next;
     const length = this.pool.length;
-    while (this.pool[next].__locks) {
+    let item;
+    while (this.locks.get(item = this.pool[next])) {
       next += 1;
       if (next === length) next = 0;
       if (next === initial) break;
     }
-    let item = this.pool[next];
-    if (item.__locks) {
+
+    const count = this.locks.get(item)!;
+    if (count) {
       item = new this.Class();
       this.pool.push(item);
+      this.locks.set(item, 1);
       next = 0;
+    } else {
+      this.locks.set(item, count + 1);
     }
     this.next = next;
-    item.__acquire();
     return item;
+  }
+
+  relinquish(item: T): void {
+    const count = this.locks.get(item);
+    if (count === undefined) {
+      throw new Error(`Released item not in pool ${this.Class.name}: ${item}`);
+    }
+    if (count <= 0) {
+      throw new Error(`Item released too many times from pool ${this.Class.name}: ${item}`);
+    }
+    this.locks.set(item, count - 1);
   }
 }
