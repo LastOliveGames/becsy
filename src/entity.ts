@@ -270,36 +270,34 @@ export class Entities {
     return true;
   }
 
-  *iterate(predicate: (id: EntityId) => boolean): Iterable<Entity> {
+  iterate(predicate: (id: EntityId) => boolean): Iterable<Entity> {
     const maxEntities = this.maxNum;
-    for (let id = 1; id < maxEntities; id++) {
-      if (predicate(id)) {
-        yield this.bind(id);
-        this.dispatcher.flush();
-      }
-    }
-
-    // An explicit iterator implementation doesn't appear to be any faster:
-    // return {
-    //   [Symbol.iterator]: () => {
-    //     let id: EntityId = 1;
-    //     let entity: Entity;
-    //     return {
-    //       next: () => {
-    //         if (entity) entity.__release();
-    //         system.__releaseEntities();
-    //         while (id < maxEntities && !predicate(id)) id++;
-    //         if (id < maxEntities) {
-    //           entity = this.bind(id, system);
-    //           id++;
-    //           return {value: entity};
-    //         }
-    //         cleanup();
-    //         return {done: true, value: undefined};
-    //       }
-    //     };
+    // for (let id = 1; id < maxEntities; id++) {
+    //   if (predicate(id)) {
+    //     yield this.bind(id);
+    //     this.dispatcher.flush();
     //   }
-    // };
+    // }
+
+    // An explicit iterator seems to get optimized better by V8.
+    return {
+      [Symbol.iterator]: () => {
+        let id: EntityId = 1;
+        let entity: Entity;
+        return {
+          next: () => {
+            this.dispatcher.flush();
+            while (id < maxEntities && !predicate(id)) id++;
+            if (id < maxEntities) {
+              entity = this.bind(id);
+              id++;
+              return {value: entity};
+            }
+            return {done: true, value: undefined};
+          }
+        };
+      }
+    };
 
   }
 }
