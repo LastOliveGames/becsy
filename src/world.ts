@@ -17,8 +17,6 @@ export class World {
 
   constructor(options: WorldOptions) {
     this.__dispatcher = new Dispatcher(options);
-    this.__buildSystem.__readMask = this.__buildSystem.__writeMask =
-      this.__dispatcher.entities.filledMask;
   }
 
   build(callback: (system: System) => void): void {

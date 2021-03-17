@@ -1,31 +1,29 @@
 import {Component, Controller, ComponentType, Field} from './component';
 import type {Dispatcher} from './dispatcher';
 import {Pool} from './pool';
-import type {System} from './system';
 import {Type} from './type';
 
 
 export type EntityId = number;
+export type ReadWriteMasks = {read: number[], write: number[]};
 
 
 export class Entity {
   __entities: Entities;
   __id: EntityId;
-  __system: System | undefined;
   joined: {[name: string]: Iterable<Entity>} | undefined;
 
-  __reset(entities: Entities, id: EntityId, system?: System): void {
+  __reset(entities: Entities, id: EntityId): void {
     this.__entities = entities;
     this.__id = id;
-    this.__system = system;
-    delete this.joined;
+    this.joined = undefined;
   }
 
   add(type: ComponentType<any>, values: any): this {
     this.__checkMask(type, true);
     if (this.has(type)) throw new Error(`Entity already has a ${type.name} component`);
     this.__entities.setFlag(this.__id, type);
-    this.__entities.initComponent(type, this.__id, values, this.__system);
+    this.__entities.initComponent(type, this.__id, values);
     return this;
   }
 
@@ -69,7 +67,7 @@ export class Entity {
   private __get<C extends Component>(type: ComponentType<C>, allowWrite: boolean): C | undefined {
     this.__checkMask(type, allowWrite);
     if (!this.has(type)) return;
-    return this.__entities.bindComponent(type, this.__id, allowWrite, this.__system);
+    return this.__entities.bindComponent(type, this.__id, allowWrite);
   }
 
   private __remove(type: ComponentType<any>): boolean {
@@ -94,9 +92,8 @@ export class Entity {
   }
 
   private __checkMask(type: ComponentType<any>, write: boolean): void {
-    if (this.__system && !this.__entities.maskHasFlag(
-      write ? this.__system.__writeMask : this.__system.__readMask, type
-    )) {
+    const rwMasks = this.__entities.dispatcher.rwMasks;
+    if (rwMasks && !this.__entities.maskHasFlag(write ? rwMasks.write : rwMasks.read, type)) {
       throw new Error(
         `System didn't mark component ${type.name} as ${write ? 'writable' : 'readable'}`);
     }
@@ -119,9 +116,7 @@ export class Entities {
   readonly filledMask: number[];
 
   constructor(
-    maxEntities: number,
-    readonly types: ComponentType<any>[],
-    private readonly dispatcher: Dispatcher
+    maxEntities: number, readonly types: ComponentType<any>[], readonly dispatcher: Dispatcher
   ) {
     this.maxNum = maxEntities + 1;
     dispatcher.addPool(this.pool);
@@ -142,14 +137,14 @@ export class Entities {
     this.mutations.fill(0);
   }
 
-  createEntity(initialComponents?: (ComponentType<any> | any)[], system?: System): Entity {
+  createEntity(initialComponents: (ComponentType<any> | any)[]): Entity {
     const initial = this.nextId;
     let id = initial;
     while (true) {
       if (!this.isAllocated(id, this.current) && !this.isAllocated(id, this.previous)) {
         this.nextId = id + 1;
         if (this.nextId === this.maxNum) this.nextId = 1;
-        const entity = this.bind(id, system);
+        const entity = this.bind(id);
         if (initialComponents) {
           for (let i = 0; i < initialComponents.length; i++) {
             const type = initialComponents[i];
@@ -171,9 +166,9 @@ export class Entities {
     throw new Error(`Max number of entities reached: ${this.maxNum - 1}`);
   }
 
-  bind(id: EntityId, system?: System): Entity {
-    const entity = this.pool.take();
-    entity.__reset(this, id, system);
+  bind(id: EntityId): Entity {
+    const entity = this.pool.borrow();
+    entity.__reset(this, id);
     return entity;
   }
 
@@ -230,18 +225,17 @@ export class Entities {
     this.mutations[id * this.stride + ctrl.flagOffset] |= ctrl.flagMask;
   }
 
-  initComponent(type: ComponentType<any>, id: EntityId, values: any, system?: System): void {
-    this.controllers.get(type)!.init(id, values, system);
+  initComponent(type: ComponentType<any>, id: EntityId, values: any): void {
+    this.controllers.get(type)!.init(id, values);
   }
 
   bindComponent<C extends Component, M extends boolean>(
-    type: ComponentType<C>, id: EntityId, allowWrite: M, system?: System
-  ): M extends true ? C : Readonly<C>;
+    type: ComponentType<C>, id: EntityId, allowWrite: M): M extends true ? C : Readonly<C>;
 
   bindComponent<C extends Component>(
-    type: ComponentType<C>, id: EntityId, allowWrite: boolean, system?: System
+    type: ComponentType<C>, id: EntityId, allowWrite: boolean
   ): C {
-    return this.controllers.get(type)!.bind(id, allowWrite, system);
+    return this.controllers.get(type)!.bind(id, allowWrite);
   }
 
   matchCurrent(id: EntityId, positiveMask?: number[], negativeMask?: number[]): boolean {
@@ -275,11 +269,11 @@ export class Entities {
     return true;
   }
 
-  *iterate(predicate: (id: EntityId) => boolean, system: System): Iterable<Entity> {
+  *iterate(predicate: (id: EntityId) => boolean): Iterable<Entity> {
     const maxEntities = this.maxNum;
     for (let id = 1; id < maxEntities; id++) {
       if (predicate(id)) {
-        yield this.bind(id, system);
+        yield this.bind(id);
         this.dispatcher.flush();
       }
     }

@@ -1,5 +1,5 @@
 import type {Component, ComponentType} from './component';
-import {Entities, Entity, EntityId} from './entity';
+import {Entities, Entity, EntityId, ReadWriteMasks} from './entity';
 import {Indexer} from './indexer';
 import {Pool} from './pool';
 import type {System, SystemType} from './system';
@@ -13,7 +13,6 @@ export class Tag {
   entityId: EntityId;
   offset: number;
   mutable: boolean;
-  system?: System;
 }
 
 
@@ -35,6 +34,7 @@ export class Dispatcher {
   private readonly pools: Pool<any>[] = [];
   private lastTime = now() / 1000;
   private executing: boolean;
+  rwMasks: ReadWriteMasks | undefined;
   readonly tagPool = new Pool(Tag);
   readonly tagMap = new Map<Component, Tag>();
 
@@ -63,9 +63,11 @@ export class Dispatcher {
     this.lastTime = time;
     this.entities.step();
     for (const system of this.systems) {
+      this.rwMasks = system.__rwMasks;
       system.execute(time, delta);
       this.flush();
     }
+    this.rwMasks = undefined;
     this.executing = false;
   }
 
@@ -73,6 +75,8 @@ export class Dispatcher {
     if (this.executing) throw new Error('Recursive system execution not allowed');
     this.executing = true;
     system.__init(this);
+    // Don't set rwMasks -- give full power when executing a single system out of band.
+    this.rwMasks = system.__rwMasks;
     system.execute(0, 0);
     this.flush();
     this.executing = false;
@@ -86,18 +90,23 @@ export class Dispatcher {
     for (const pool of this.pools) pool.reset();
   }
 
-  createEntity(initialComponents: (ComponentType<any> | any)[], system?: System): Entity {
-    const entity = this.entities.createEntity(initialComponents, system);
+  createEntity(initialComponents: (ComponentType<any> | any)[]): Entity {
+    const entity = this.entities.createEntity(initialComponents);
     if (!this.executing) this.flush();
     return entity;
   }
 
-  tag(component: Component, id: EntityId, offset: number, mutable: boolean, system?: System): void {
-    const tag = this.tagPool.take();
+  bindEntity(id: EntityId): Entity {
+    return this.entities.bind(id);
+  }
+
+  tag(
+    component: Component, id: EntityId, offset: number, mutable: boolean, ephemeral = false
+  ): void {
+    const tag = this.tagPool.borrow(ephemeral);
     this.tagMap.set(component, tag);
     tag.entityId = id;
     tag.offset = offset;
     tag.mutable = mutable;
-    tag.system = system;
   }
 }

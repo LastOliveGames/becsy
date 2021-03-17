@@ -1,6 +1,6 @@
 import type {ComponentType} from './component';
 import type {Dispatcher} from './dispatcher';
-import type {Entity} from './entity';
+import type {Entity, ReadWriteMasks} from './entity';
 import {MainQuery, MainQueryBuilder} from './query';
 
 
@@ -10,8 +10,7 @@ export interface SystemType {
 
 
 export abstract class System {
-  __readMask: number[] = [];
-  __writeMask: number[] = [];
+  readonly __rwMasks : ReadWriteMasks = {read: [], write: []};
   __dispatcher: Dispatcher;
   private __queryBuilders: MainQueryBuilder[] | null = [];
 
@@ -29,7 +28,7 @@ export abstract class System {
   }
 
   createEntity(...initialComponents: (ComponentType<any> | any)[]): Entity {
-    return this.__dispatcher.createEntity(initialComponents, this);
+    return this.__dispatcher.createEntity(initialComponents);
   }
 
   execute(time: number, delta: number): void {

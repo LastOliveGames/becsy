@@ -292,10 +292,9 @@ class RefType extends Type<Entity | null> {
       get(this: Component) {
         const tag = tagFor(ctrl, this);
         const offset = tag.offset + fieldOffset;
-        if (!tag.system) throw new Error('Unable to dereference entity in this context');
         const id = ctrl.data.getUint32(offset);
         if (id === 0) return null;
-        return ctrl.dispatcher.entities.bind(id, tag.system);
+        return ctrl.dispatcher.bindEntity(id);
       },
       set(this: Component, value: Entity) {
         const tag = tagFor(ctrl, this, true);
@@ -303,7 +302,7 @@ class RefType extends Type<Entity | null> {
         const oldId = ctrl.data.getUint32(offset);
         const newId = value?.__id ?? 0;
         if (oldId === newId) return;
-        const indexer = tag.system?.__dispatcher.indexer;
+        const indexer = ctrl.dispatcher.indexer;
         if (!indexer) throw new Error('Unable to reference an entity in this context');
         if (oldId !== 0) indexer.remove(oldId, tag.entityId);
         ctrl.data.setUint32(offset, newId);

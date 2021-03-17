@@ -40,12 +40,12 @@ class QueryBuilder {
   }
 
   get read(): this {
-    return this.set(this.__system.__readMask);
+    return this.set(this.__system.__rwMasks.read);
   }
 
   get write(): this {
-    this.set(this.__system.__readMask);
-    return this.set(this.__system.__writeMask);
+    this.set(this.__system.__rwMasks.read);
+    return this.set(this.__system.__rwMasks.write);
   }
 
   protected set(
@@ -103,7 +103,7 @@ class JoinQueryBuilder extends QueryBuilder {
 
   ref(prop?: string): this {
     this.set('__refMask', this.__lastType, 'ref');
-    this.set(this.__system.__readMask);
+    this.set(this.__system.__rwMasks.read);
     (this.__query as JoinQuery)['refProp'] = prop;  // eslint-disable-line dot-notation
     return this;
   }
@@ -128,7 +128,7 @@ export class MainQuery extends Query {
     const entities = this.__system.__dispatcher.entities;
     return entities.iterate(
       id => entities.matchCurrent(id, this.__withMask, this.__withoutMask),
-      this.__system);
+    );
   }
 
   get added(): Iterable<Entity> {
@@ -137,7 +137,6 @@ export class MainQuery extends Query {
       id =>
         entities.matchCurrent(id, this.__withMask, this.__withoutMask) &&
         !entities.matchPrevious(id, this.__withMask, this.__withoutMask),
-      this.__system
     );
   }
 
@@ -147,7 +146,6 @@ export class MainQuery extends Query {
       id =>
         !entities.matchCurrent(id, this.__withMask, this.__withoutMask) &&
         entities.matchPrevious(id, this.__withMask, this.__withoutMask),
-      this.__system
     );
   }
 
@@ -157,7 +155,6 @@ export class MainQuery extends Query {
       id =>
         entities.matchCurrent(id, this.__withMask, this.__withoutMask) &&
         entities.matchMutated(id, this.__watchMask),
-      this.__system
     );
   }
 

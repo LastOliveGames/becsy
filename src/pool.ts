@@ -8,20 +8,12 @@ export class Pool<T> {
   }
 
   /**
-   * Take an item from the pool until the next reset.
+   * Take an item from the pool until the next reset.  If it's an ephemeral borrow, then the item
+   * remains in the pool and you must make sure you stop using it before you relinquish control!
    */
-  take(): T {
+  borrow(ephemeral = false): T {
     if (this.next === this.list.length) this.list.push(new this.Class());
     return this.list[this.next++];
-  }
-
-  /**
-   * Very temporarily borrow an item from the pool.  You must stop using it before you return
-   * control to any other code, since the item remains available to take!
-   */
-  borrow(): T {
-    if (this.next === this.list.length) this.list.push(new this.Class());
-    return this.list[this.next];
   }
 
   /**

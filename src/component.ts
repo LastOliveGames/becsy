@@ -1,7 +1,6 @@
 import {Pool} from './pool';
 import {Type} from './type';
 import type {EntityId} from './entity';
-import type {System} from './system';
 import {config} from './config';
 import type {Dispatcher} from './dispatcher';
 
@@ -63,7 +62,7 @@ export class Controller<C extends Component> {
     return this.type.name;
   }
 
-  init(id: EntityId, values?: any, system?: System): void {
+  init(id: EntityId, values: any): void {
     this.bytes.copyWithin(id * this.stride, 0, this.stride);
     if (values !== undefined) {
       if (config.DEBUG) {
@@ -73,14 +72,14 @@ export class Controller<C extends Component> {
           }
         }
       }
-      const component = this.bind(id, true, system, true);
+      const component = this.bind(id, true, true);
       Object.assign(component, values);
     }
   }
 
-  bind(id: EntityId, mutable: boolean, system?: System, temporary?: boolean): C {
-    const component = temporary ? this.pool.borrow() : this.pool.take();
-    this.dispatcher.tag(component, id, id * this.stride, mutable, system);
+  bind(id: EntityId, mutable: boolean, ephemeral?: boolean): C {
+    const component = this.pool.borrow(ephemeral);
+    this.dispatcher.tag(component, id, id * this.stride, mutable, ephemeral);
     return component;
   }
 
@@ -108,7 +107,7 @@ export class Controller<C extends Component> {
   }
 
   private saveDefaultComponent(): void {
-    const component = this.bind(0, true, undefined, true);
+    const component = this.bind(0, true, true);
     for (const field of this.fields) {
       (component as any)[field.name] = field.default;
     }
