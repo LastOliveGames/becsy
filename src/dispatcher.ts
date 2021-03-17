@@ -76,7 +76,6 @@ export class Dispatcher {
     this.executing = true;
     system.__init(this);
     // Don't set rwMasks -- give full power when executing a single system out of band.
-    this.rwMasks = system.__rwMasks;
     system.execute(0, 0);
     this.flush();
     this.executing = false;
