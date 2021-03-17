@@ -1,4 +1,3 @@
-import {tagPool} from '../src/tag';
 import {Component, config, prop, System, Type, World} from '../src';
 import {profile} from '../src/profile';
 
@@ -58,14 +57,12 @@ function setup(count: number) {
 
 function run(count: number) {
   for (let i = 0; i < count; i++) world.execute();
-  (world as any).entities.pool.logStats();
-  tagPool.logStats();
-  for (const controller of (world as any).entities.controllers.values()) {
-    controller.pool.logStats();
-  }
 }
 
+console.log('setup');
 // await profile(async() => setup(5000));
 setup(5000);
-// await profile(async() => run(1000));
-run(1000);
+console.log('run');
+await profile(async() => run(1000));
+// run(1000);
+console.log('done');

@@ -1,11 +1,11 @@
 import type {Component, Controller} from './component';
 import type {Entity} from './entity';
 import {TextEncoder, TextDecoder} from 'util';
-import {tagMap, Tag} from './tag';
+import type {Tag} from './dispatcher';
 
 
-function tagFor(component: Component, write = false): Tag {
-  const tag = tagMap.get(component);
+function tagFor(ctrl: Controller<any>, component: Component, write = false): Tag {
+  const tag = ctrl.dispatcher.tagMap.get(component);
   if (!tag) throw new Error('Component has been released');
   if (write && !tag.mutable) {
     throw new Error(
@@ -41,11 +41,11 @@ class BooleanType extends Type<boolean> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = tagFor(this).offset + fieldOffset;
+        const offset = tagFor(ctrl, this).offset + fieldOffset;
         return (ctrl.data.getUint8(offset) & mask) !== 0;
       },
       set(this: Component, value: boolean) {
-        const offset = tagFor(this, true).offset + fieldOffset;
+        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
         let byte = ctrl.data.getUint8(offset);
         if (value) byte |= mask; else byte &= ~mask;
         ctrl.data.setUint8(offset, byte);
@@ -63,11 +63,11 @@ class Uint8Type extends Type<number> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = tagFor(this).offset + fieldOffset;
+        const offset = tagFor(ctrl, this).offset + fieldOffset;
         return ctrl.data.getUint8(offset);
       },
       set(this: Component, value: number) {
-        const offset = tagFor(this, true).offset + fieldOffset;
+        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
         ctrl.data.setUint8(offset, value);
       }
     });
@@ -83,11 +83,11 @@ class Int8Type extends Type<number> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = tagFor(this).offset + fieldOffset;
+        const offset = tagFor(ctrl, this).offset + fieldOffset;
         return ctrl.data.getInt8(offset);
       },
       set(this: Component, value: number) {
-        const offset = tagFor(this, true).offset + fieldOffset;
+        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
         ctrl.data.setInt8(offset, value);
       }
     });
@@ -103,11 +103,11 @@ class Uint16Type extends Type<number> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = tagFor(this).offset + fieldOffset;
+        const offset = tagFor(ctrl, this).offset + fieldOffset;
         return ctrl.data.getUint16(offset);
       },
       set(this: Component, value: number) {
-        const offset = tagFor(this, true).offset + fieldOffset;
+        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
         ctrl.data.setUint16(offset, value);
       }
     });
@@ -123,11 +123,11 @@ class Int16Type extends Type<number> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = tagFor(this).offset + fieldOffset;
+        const offset = tagFor(ctrl, this).offset + fieldOffset;
         return ctrl.data.getInt16(offset);
       },
       set(this: Component, value: number) {
-        const offset = tagFor(this, true).offset + fieldOffset;
+        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
         ctrl.data.setInt16(offset, value);
       }
     });
@@ -143,11 +143,11 @@ class Uint32Type extends Type<number> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = tagFor(this).offset + fieldOffset;
+        const offset = tagFor(ctrl, this).offset + fieldOffset;
         return ctrl.data.getUint32(offset);
       },
       set(this: Component, value: number) {
-        const offset = tagFor(this, true).offset + fieldOffset;
+        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
         ctrl.data.setUint32(offset, value);
       }
     });
@@ -163,11 +163,11 @@ class Int32Type extends Type<number> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = tagFor(this).offset + fieldOffset;
+        const offset = tagFor(ctrl, this).offset + fieldOffset;
         return ctrl.data.getInt32(offset);
       },
       set(this: Component, value: number) {
-        const offset = tagFor(this, true).offset + fieldOffset;
+        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
         ctrl.data.setInt32(offset, value);
       }
     });
@@ -183,11 +183,11 @@ class Float32Type extends Type<number> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = tagFor(this).offset + fieldOffset;
+        const offset = tagFor(ctrl, this).offset + fieldOffset;
         return ctrl.data.getFloat32(offset);
       },
       set(this: Component, value: number) {
-        const offset = tagFor(this, true).offset + fieldOffset;
+        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
         ctrl.data.setFloat32(offset, value);
       }
     });
@@ -203,11 +203,11 @@ class Float64Type extends Type<number> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = tagFor(this).offset + fieldOffset;
+        const offset = tagFor(ctrl, this).offset + fieldOffset;
         return ctrl.data.getFloat64(offset);
       },
       set(this: Component, value: number) {
-        const offset = tagFor(this, true).offset + fieldOffset;
+        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
         ctrl.data.setFloat64(offset, value);
       }
     });
@@ -234,14 +234,14 @@ class StaticStringType extends Type<string> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = tagFor(this).offset + fieldOffset;
+        const offset = tagFor(ctrl, this).offset + fieldOffset;
         const index = getter.call(ctrl.data, offset);
         const result = choices[index];
         if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
         return result;
       },
       set(this: Component, value: string) {
-        const offset = tagFor(this, true).offset + fieldOffset;
+        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
         const index = choicesIndex.get(value);
         if (index === undefined) throw new Error(`Static string not in set: "${value}"`);
         setter.call(ctrl.data, offset, index);
@@ -263,13 +263,13 @@ class DynamicStringType extends Type<string> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = tagFor(this).offset + fieldOffset;
+        const offset = tagFor(ctrl, this).offset + fieldOffset;
         const length = ctrl.data.getUint16(offset);
         return DynamicStringType.decoder.decode(
           new Uint8Array(ctrl.data.buffer, offset + 2, length));
       },
       set(this: Component, value: string) {
-        const offset = tagFor(this, true).offset + fieldOffset;
+        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
         const encodedString = DynamicStringType.encoder.encode(value);
         if (encodedString.byteLength > maxUtf8Length) {
           throw new Error(`Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
@@ -290,20 +290,20 @@ class RefType extends Type<Entity | null> {
     Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const tag = tagFor(this);
+        const tag = tagFor(ctrl, this);
         const offset = tag.offset + fieldOffset;
         if (!tag.system) throw new Error('Unable to dereference entity in this context');
         const id = ctrl.data.getUint32(offset);
         if (id === 0) return null;
-        return tag.system.__bindAndBorrowEntity(id);
+        return ctrl.dispatcher.entities.bind(id, tag.system);
       },
       set(this: Component, value: Entity) {
-        const tag = tagFor(this, true);
+        const tag = tagFor(ctrl, this, true);
         const offset = tag.offset + fieldOffset;
         const oldId = ctrl.data.getUint32(offset);
         const newId = value?.__id ?? 0;
         if (oldId === newId) return;
-        const indexer = tag.system?.__systems.indexer;
+        const indexer = tag.system?.__dispatcher.indexer;
         if (!indexer) throw new Error('Unable to reference an entity in this context');
         if (oldId !== 0) indexer.remove(oldId, tag.entityId);
         ctrl.data.setUint32(offset, newId);

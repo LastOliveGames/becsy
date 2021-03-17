@@ -1,4 +1,5 @@
 import {Component, Controller, ComponentType, Field} from './component';
+import type {Dispatcher} from './dispatcher';
 import {Pool} from './pool';
 import type {System} from './system';
 import {Type} from './type';
@@ -11,22 +12,13 @@ export class Entity {
   __entities: Entities;
   __id: EntityId;
   __system: System | undefined;
-  __borrowedComponents: Readonly<Component>[] = [];
   joined: {[name: string]: Iterable<Entity>} | undefined;
 
   __reset(entities: Entities, id: EntityId, system?: System): void {
     this.__entities = entities;
     this.__id = id;
     this.__system = system;
-    this.__borrowedComponents.length = 0;
-  }
-
-  __release(): void {
-    for (const component of this.__borrowedComponents) {
-      this.__entities.relinquishComponent(component);
-    }
     delete this.joined;
-    this.__entities.relinquish(this);
   }
 
   add(type: ComponentType<any>, values: any): this {
@@ -77,9 +69,7 @@ export class Entity {
   private __get<C extends Component>(type: ComponentType<C>, allowWrite: boolean): C | undefined {
     this.__checkMask(type, allowWrite);
     if (!this.has(type)) return;
-    const component = this.__entities.bindComponent(type, this.__id, allowWrite, this.__system);
-    this.__borrowedComponents.push(component);
-    return component;
+    return this.__entities.bindComponent(type, this.__id, allowWrite, this.__system);
   }
 
   private __remove(type: ComponentType<any>): boolean {
@@ -115,6 +105,7 @@ export class Entity {
 
 
 export class Entities {
+  private readonly maxNum: number;
   private readonly stride: number;
   private nextId = 1;
   private readonly currentBuffer: SharedArrayBuffer;
@@ -125,22 +116,28 @@ export class Entities {
   private readonly mutations: Uint32Array;
   private readonly pool = new Pool(Entity);
   private readonly controllers: Map<ComponentType<any>, Controller<any>> = new Map();
+  readonly filledMask: number[];
 
-  constructor(readonly maxNum: number, readonly types: ComponentType<any>[]) {
+  constructor(
+    maxEntities: number,
+    readonly types: ComponentType<any>[],
+    private readonly dispatcher: Dispatcher
+  ) {
+    this.maxNum = maxEntities + 1;
+    dispatcher.addPool(this.pool);
     let componentId = 0;
     for (const type of types) {
-      this.controllers.set(type, new Controller(componentId++, type, this));
+      this.controllers.set(type, new Controller(componentId++, type, this.maxNum, this.dispatcher));
     }
     this.stride = Math.ceil(this.controllers.size / 32);
-    const size = maxNum * this.stride * 4;
+    const size = this.maxNum * this.stride * 4;
     this.current = new Uint32Array(this.currentBuffer = new SharedArrayBuffer(size));
     this.previous = new Uint32Array(this.previousBuffer = new SharedArrayBuffer(size));
     this.mutations = new Uint32Array(this.mutationsBuffer = new SharedArrayBuffer(size));
+    this.filledMask = this.createFilledMask();
   }
 
-  get numComponents(): number {return this.controllers.size;}
-
-  cycle(): void {
+  step(): void {
     this.previous.set(this.current);
     this.mutations.fill(0);
   }
@@ -175,17 +172,15 @@ export class Entities {
   }
 
   bind(id: EntityId, system?: System): Entity {
-    const entity = this.pool.borrow();
+    const entity = this.pool.take();
     entity.__reset(this, id, system);
     return entity;
   }
 
-  relinquish(entity: Entity): void {
-    this.pool.relinquish(entity);
-  }
-
-  relinquishComponent(component: Component): void {
-    this.controllers.get(component.constructor as ComponentType<any>)!.relinquish(component);
+  createFilledMask(): number[] {
+    const mask = new Array(Math.ceil(this.controllers.size / 32));
+    mask.fill(0xffffffff);
+    return mask;
   }
 
   extendMaskAndSetFlag(mask: number[], type: ComponentType<any>): void {
@@ -280,19 +275,14 @@ export class Entities {
     return true;
   }
 
-  *iterate(
-    system: System, predicate: (id: EntityId) => boolean, cleanup: () => void
-  ): Iterable<Entity> {
+  *iterate(predicate: (id: EntityId) => boolean, system: System): Iterable<Entity> {
     const maxEntities = this.maxNum;
     for (let id = 1; id < maxEntities; id++) {
       if (predicate(id)) {
-        const entity = this.bind(id, system);
-        yield entity;
-        entity.__release();
-        system.__releaseEntities();
+        yield this.bind(id, system);
+        this.dispatcher.flush();
       }
     }
-    cleanup();
 
     // An explicit iterator implementation doesn't appear to be any faster:
     // return {

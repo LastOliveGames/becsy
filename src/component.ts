@@ -1,9 +1,9 @@
 import {Pool} from './pool';
 import {Type} from './type';
-import type {Entities, EntityId} from './entity';
+import type {EntityId} from './entity';
 import type {System} from './system';
 import {config} from './config';
-import {tagMap, tagPool} from './tag';
+import type {Dispatcher} from './dispatcher';
 
 
 interface SchemaDef<JSType> {
@@ -41,13 +41,19 @@ export class Controller<C extends Component> {
   flagOffset: number;
   flagMask: number;
 
-  constructor(readonly id: number, readonly type: ComponentType<C>, readonly entities: Entities) {
+  constructor(
+    readonly id: number,
+    readonly type: ComponentType<C>,
+    maxNum: number,
+    readonly dispatcher: Dispatcher
+  ) {
     this.flagOffset = Math.floor(id / 32);
     this.flagMask = 1 << (id % 32);
     this.pool = new Pool(type);
+    dispatcher.addPool(this.pool);
     this.fields = this.arrangeFields();
     this.stride = this.defineComponentProperties();
-    this.buffer = new SharedArrayBuffer(this.stride * entities.maxNum);
+    this.buffer = new SharedArrayBuffer(this.stride * maxNum);
     this.data = new DataView(this.buffer);
     this.bytes = new Uint8Array(this.buffer);
     this.saveDefaultComponent();
@@ -67,28 +73,15 @@ export class Controller<C extends Component> {
           }
         }
       }
-      const component = this.bind(id, true, system);
+      const component = this.bind(id, true, system, true);
       Object.assign(component, values);
-      this.relinquish(component);
     }
   }
 
-  bind(id: EntityId, mutable: boolean, system?: System): C {
-    const component = this.pool.borrow();
-    const tag = tagPool.borrow();
-    tagMap.set(component, tag);
-    tag.entityId = id;
-    tag.offset = id * this.stride;
-    tag.mutable = mutable;
-    tag.system = system;
+  bind(id: EntityId, mutable: boolean, system?: System, temporary?: boolean): C {
+    const component = temporary ? this.pool.borrow() : this.pool.take();
+    this.dispatcher.tag(component, id, id * this.stride, mutable, system);
     return component;
-  }
-
-  relinquish(component: C): void {
-    const tag = tagMap.get(component)!;
-    tagMap.delete(component);
-    tagPool.relinquish(tag);
-    this.pool.relinquish(component);
   }
 
   private defineComponentProperties(): number {
@@ -115,13 +108,9 @@ export class Controller<C extends Component> {
   }
 
   private saveDefaultComponent(): void {
-    const component = this.bind(0, true);
-    try {
-      for (const field of this.fields) {
-        (component as any)[field.name] = field.default;
-      }
-    } finally {
-      this.relinquish(component);
+    const component = this.bind(0, true, undefined, true);
+    for (const field of this.fields) {
+      (component as any)[field.name] = field.default;
     }
   }
 

@@ -46,9 +46,9 @@ class Check extends System {
 test('iteration', () => {
   const check = new Check();
   const world = new World({maxEntities: 5, componentTypes, systems: [SystemA, SystemB, check]});
-  world.build(createEntity => {
-    const a = createEntity().add(A, {byte: 1});
-    createEntity().add(B, {a});
+  world.build(sys => {
+    const a = sys.createEntity().add(A, {byte: 1});
+    sys.createEntity().add(B, {a});
   });
   world.execute();
   expect(check.total).toBe(2);
