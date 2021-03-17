@@ -142,8 +142,6 @@ export class Entities {
     let id = initial;
     while (true) {
       if (!this.isAllocated(id, this.current) && !this.isAllocated(id, this.previous)) {
-        this.nextId = id + 1;
-        if (this.nextId === this.maxNum) this.nextId = 1;
         const entity = this.bind(id);
         if (initialComponents) {
           for (let i = 0; i < initialComponents.length; i++) {
@@ -157,6 +155,9 @@ export class Entities {
             entity.add(type, value);
           }
         }
+        id += 1;
+        if (id === this.maxNum) id = 1;
+        this.nextId = id;
         return entity;
       }
       id += 1;

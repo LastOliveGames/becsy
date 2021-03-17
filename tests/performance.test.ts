@@ -63,6 +63,6 @@ console.log('setup');
 // await profile(async() => setup(5000));
 setup(5000);
 console.log('run');
-await profile(async() => run(1000));
-// run(1000);
+// await profile(async() => run(1000));
+run(50000);
 console.log('done');
