@@ -1,5 +1,6 @@
 import {Component, config, prop, System, Type, World} from '../src';
 import {profile} from '../src/profile';
+import {performance} from 'perf_hooks';
 
 config.DEBUG = false;
 
@@ -59,10 +60,16 @@ function run(count: number) {
   for (let i = 0; i < count; i++) world.execute();
 }
 
+const PROFILE_SETUP = 0;
+const PROFILE_RUN = 0;
+const SIZE = 5000;
+const RUNS = 5000;
+
 console.log('setup');
-// await profile(async() => setup(5000));
-setup(5000);
+if (PROFILE_SETUP) await profile(async() => setup(SIZE)); else setup(SIZE);
 console.log('run');
-// await profile(async() => run(1000));
-run(50000);
-console.log('done');
+const start = performance.now();
+if (PROFILE_RUN) await profile(async() => run(RUNS)); else run(RUNS);
+const end = performance.now();
+const ops = Math.round(RUNS / (end - start) * 1000);
+console.log(`done in ${Math.round(end - start)}ms, ${ops} ops/s`);
