@@ -3,6 +3,7 @@ import {Type} from './type';
 import type {Entities, EntityId} from './entity';
 import type {System} from './system';
 import {config} from './config';
+import {tagMap, tagPool} from './tag';
 
 
 interface SchemaDef<JSType> {
@@ -27,27 +28,13 @@ export interface ComponentType<C extends Component> {
 
 export class Component {
   static schema: Schema = {};
-
-  __data: DataView;
-  __bytes: Uint8Array;
-  __system?: System;
-  __entityId: EntityId;
-  __offset: number;
-  __mutable: boolean;
-
-  __checkMutable(): void {
-    if (!this.__mutable) {
-      throw new Error(
-        'Component is not mutable; use entity.write(Component) to acquire a mutable version');
-    }
-  }
 }
 
 
 export class Controller<C extends Component> {
   private readonly buffer: SharedArrayBuffer;
-  private readonly data: DataView;
-  private readonly bytes: Uint8Array;
+  readonly data: DataView;
+  readonly bytes: Uint8Array;
   private readonly stride: number;
   private readonly pool: Pool<C>;
   fields: Field<any>[];
@@ -70,35 +57,37 @@ export class Controller<C extends Component> {
     return this.type.name;
   }
 
-  init(id: EntityId, values?: any): void {
+  init(id: EntityId, values?: any, system?: System): void {
     this.bytes.copyWithin(id * this.stride, 0, this.stride);
     if (values !== undefined) {
       if (config.DEBUG) {
-        console.log(process.env.NODE_ENV);
         for (const key in values) {
           if (!this.type.schema[key]) {
             throw new Error(`Property ${key} not defined for component ${this.name}`);
           }
         }
       }
-      const component = this.bind(id, true);
+      const component = this.bind(id, true, system);
       Object.assign(component, values);
-      this.pool.relinquish(component);
+      this.relinquish(component);
     }
   }
 
   bind(id: EntityId, mutable: boolean, system?: System): C {
     const component = this.pool.borrow();
-    component.__data = this.data;
-    component.__bytes = this.bytes;
-    component.__system = system;
-    component.__entityId = id;
-    component.__offset = id * this.stride;
-    component.__mutable = mutable;
+    const tag = tagPool.borrow();
+    tagMap.set(component, tag);
+    tag.entityId = id;
+    tag.offset = id * this.stride;
+    tag.mutable = mutable;
+    tag.system = system;
     return component;
   }
 
   relinquish(component: C): void {
+    const tag = tagMap.get(component)!;
+    tagMap.delete(component);
+    tagPool.relinquish(tag);
     this.pool.relinquish(component);
   }
 
@@ -106,7 +95,7 @@ export class Controller<C extends Component> {
     let offset = 0, booleanMask = 1;
     for (const field of this.fields) {
       if (field.type === Type.boolean) {
-        field.type.define(this.type, field.name, offset, booleanMask);
+        field.type.define(this, field.name, offset, booleanMask);
         booleanMask <<= 1;
         if (booleanMask > 128) {
           offset += 1;
@@ -117,7 +106,7 @@ export class Controller<C extends Component> {
           offset += 1;
           booleanMask = 1;
         }
-        field.type.define(this.type, field.name, offset);
+        field.type.define(this, field.name, offset);
         offset += field.type.byteSize;
       }
     }
@@ -132,7 +121,7 @@ export class Controller<C extends Component> {
         (component as any)[field.name] = field.default;
       }
     } finally {
-      this.pool.relinquish(component);
+      this.relinquish(component);
     }
   }
 

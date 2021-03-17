@@ -25,7 +25,6 @@ export class Entity {
     for (const component of this.__borrowedComponents) {
       this.__entities.relinquishComponent(component);
     }
-    this.__borrowedComponents.length = 0;
     delete this.joined;
     this.__entities.relinquish(this);
   }
@@ -34,7 +33,7 @@ export class Entity {
     this.__checkMask(type, true);
     if (this.has(type)) throw new Error(`Entity already has a ${type.name} component`);
     this.__entities.setFlag(this.__id, type);
-    this.__entities.initComponent(type, this.__id, values);
+    this.__entities.initComponent(type, this.__id, values, this.__system);
     return this;
   }
 
@@ -236,8 +235,8 @@ export class Entities {
     this.mutations[id * this.stride + ctrl.flagOffset] |= ctrl.flagMask;
   }
 
-  initComponent(type: ComponentType<any>, id: EntityId, values: any): void {
-    this.controllers.get(type)!.init(id, values);
+  initComponent(type: ComponentType<any>, id: EntityId, values: any, system?: System): void {
+    this.controllers.get(type)!.init(id, values, system);
   }
 
   bindComponent<C extends Component, M extends boolean>(

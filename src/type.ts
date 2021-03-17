@@ -1,11 +1,22 @@
-import type {Component, ComponentType} from './component';
+import type {Component, Controller} from './component';
 import type {Entity} from './entity';
 import {TextEncoder, TextDecoder} from 'util';
+import {tagMap, Tag} from './tag';
+
+
+function tagFor(component: Component, write = false): Tag {
+  const tag = tagMap.get(component);
+  if (!tag) throw new Error('Component has been released');
+  if (write && !tag.mutable) {
+    throw new Error(
+      'Component is not mutable; use entity.write(Component) to acquire a mutable version');
+  }
+  return tag;
+}
 
 export abstract class Type<JSType> {
   constructor(readonly byteSize: number, readonly defaultValue: JSType) { }
-  abstract define(
-    target: ComponentType<any>, name: string, fieldOffset: number, mask?: number): void;
+  abstract define<C>(ctrl: Controller<C>, name: string, fieldOffset: number, mask?: number): void;
 
   static boolean: Type<boolean>;
   static uint8: Type<number>;
@@ -26,22 +37,18 @@ class BooleanType extends Type<boolean> {
     super(0.125, false);
   }
 
-  define(target: any, name: string, fieldOffset: number, mask: number): void {
-    Object.defineProperty(target, name, {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number, mask: number): void {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
-      get() {
-        const component = this as Component;
-        const offset = component.__offset + fieldOffset;
-        return (component.__data.getUint8(offset) & mask) !== 0;
+      get(this: Component) {
+        const offset = tagFor(this).offset + fieldOffset;
+        return (ctrl.data.getUint8(offset) & mask) !== 0;
       },
-      set(value) {
-        const component = this as Component;
-        component.__checkMutable();
-        const data = component.__data;
-        const dataOffset = component.__offset + fieldOffset;
-        let byte = data.getUint8(dataOffset);
+      set(this: Component, value: boolean) {
+        const offset = tagFor(this, true).offset + fieldOffset;
+        let byte = ctrl.data.getUint8(offset);
         if (value) byte |= mask; else byte &= ~mask;
-        data.setUint8(dataOffset, byte);
+        ctrl.data.setUint8(offset, byte);
       }
     });
   }
@@ -52,17 +59,16 @@ class Uint8Type extends Type<number> {
     super(1, 0);
   }
 
-  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
-    Object.defineProperty(target.prototype, name, {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = this.__offset + fieldOffset;
-        return this.__data.getUint8(offset);
+        const offset = tagFor(this).offset + fieldOffset;
+        return ctrl.data.getUint8(offset);
       },
       set(this: Component, value: number) {
-        const offset = this.__offset + fieldOffset;
-        this.__checkMutable();
-        this.__data.setUint8(offset, value);
+        const offset = tagFor(this, true).offset + fieldOffset;
+        ctrl.data.setUint8(offset, value);
       }
     });
   }
@@ -73,17 +79,16 @@ class Int8Type extends Type<number> {
     super(1, 0);
   }
 
-  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
-    Object.defineProperty(target.prototype, name, {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = this.__offset + fieldOffset;
-        return this.__data.getInt8(offset);
+        const offset = tagFor(this).offset + fieldOffset;
+        return ctrl.data.getInt8(offset);
       },
       set(this: Component, value: number) {
-        const offset = this.__offset + fieldOffset;
-        this.__checkMutable();
-        this.__data.setInt8(offset, value);
+        const offset = tagFor(this, true).offset + fieldOffset;
+        ctrl.data.setInt8(offset, value);
       }
     });
   }
@@ -94,17 +99,16 @@ class Uint16Type extends Type<number> {
     super(2, 0);
   }
 
-  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
-    Object.defineProperty(target.prototype, name, {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = this.__offset + fieldOffset;
-        return this.__data.getUint16(offset);
+        const offset = tagFor(this).offset + fieldOffset;
+        return ctrl.data.getUint16(offset);
       },
       set(this: Component, value: number) {
-        const offset = this.__offset + fieldOffset;
-        this.__checkMutable();
-        this.__data.setUint16(offset, value);
+        const offset = tagFor(this, true).offset + fieldOffset;
+        ctrl.data.setUint16(offset, value);
       }
     });
   }
@@ -115,17 +119,16 @@ class Int16Type extends Type<number> {
     super(2, 0);
   }
 
-  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
-    Object.defineProperty(target.prototype, name, {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = this.__offset + fieldOffset;
-        return this.__data.getInt16(offset);
+        const offset = tagFor(this).offset + fieldOffset;
+        return ctrl.data.getInt16(offset);
       },
       set(this: Component, value: number) {
-        const offset = this.__offset + fieldOffset;
-        this.__checkMutable();
-        this.__data.setInt16(offset, value);
+        const offset = tagFor(this, true).offset + fieldOffset;
+        ctrl.data.setInt16(offset, value);
       }
     });
   }
@@ -136,17 +139,16 @@ class Uint32Type extends Type<number> {
     super(4, 0);
   }
 
-  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
-    Object.defineProperty(target.prototype, name, {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = this.__offset + fieldOffset;
-        return this.__data.getUint32(offset);
+        const offset = tagFor(this).offset + fieldOffset;
+        return ctrl.data.getUint32(offset);
       },
       set(this: Component, value: number) {
-        const offset = this.__offset + fieldOffset;
-        this.__checkMutable();
-        this.__data.setUint32(offset, value);
+        const offset = tagFor(this, true).offset + fieldOffset;
+        ctrl.data.setUint32(offset, value);
       }
     });
   }
@@ -157,17 +159,16 @@ class Int32Type extends Type<number> {
     super(4, 0);
   }
 
-  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
-    Object.defineProperty(target.prototype, name, {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = this.__offset + fieldOffset;
-        return this.__data.getInt32(offset);
+        const offset = tagFor(this).offset + fieldOffset;
+        return ctrl.data.getInt32(offset);
       },
       set(this: Component, value: number) {
-        const offset = this.__offset + fieldOffset;
-        this.__checkMutable();
-        this.__data.setInt32(offset, value);
+        const offset = tagFor(this, true).offset + fieldOffset;
+        ctrl.data.setInt32(offset, value);
       }
     });
   }
@@ -178,17 +179,16 @@ class Float32Type extends Type<number> {
     super(4, 0);
   }
 
-  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
-    Object.defineProperty(target.prototype, name, {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = this.__offset + fieldOffset;
-        return this.__data.getFloat32(offset);
+        const offset = tagFor(this).offset + fieldOffset;
+        return ctrl.data.getFloat32(offset);
       },
       set(this: Component, value: number) {
-        const offset = this.__offset + fieldOffset;
-        this.__checkMutable();
-        this.__data.setFloat32(offset, value);
+        const offset = tagFor(this, true).offset + fieldOffset;
+        ctrl.data.setFloat32(offset, value);
       }
     });
   }
@@ -199,17 +199,16 @@ class Float64Type extends Type<number> {
     super(8, 0);
   }
 
-  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
-    Object.defineProperty(target.prototype, name, {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = this.__offset + fieldOffset;
-        return this.__data.getFloat64(offset);
+        const offset = tagFor(this).offset + fieldOffset;
+        return ctrl.data.getFloat64(offset);
       },
       set(this: Component, value: number) {
-        const offset = this.__offset + fieldOffset;
-        this.__checkMutable();
-        this.__data.setFloat64(offset, value);
+        const offset = tagFor(this, true).offset + fieldOffset;
+        ctrl.data.setFloat64(offset, value);
       }
     });
   }
@@ -229,24 +228,23 @@ class StaticStringType extends Type<string> {
     for (let i = 0; i < choices.length; i++) this.choicesIndex.set(choices[i], i);
   }
 
-  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
     const getter = this.getter, setter = this.setter;
     const choices = this.choices, choicesIndex = this.choicesIndex;
-    Object.defineProperty(target.prototype, name, {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = this.__offset + fieldOffset;
-        const index = getter.call(this.__data, offset);
+        const offset = tagFor(this).offset + fieldOffset;
+        const index = getter.call(ctrl.data, offset);
         const result = choices[index];
         if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
         return result;
       },
       set(this: Component, value: string) {
-        const offset = this.__offset + fieldOffset;
-        this.__checkMutable();
+        const offset = tagFor(this, true).offset + fieldOffset;
         const index = choicesIndex.get(value);
         if (index === undefined) throw new Error(`Static string not in set: "${value}"`);
-        setter.call(this.__data, offset, index);
+        setter.call(ctrl.data, offset, index);
       }
     });
   }
@@ -260,25 +258,24 @@ class DynamicStringType extends Type<string> {
     super(maxUtf8Length + 2, '');
   }
 
-  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
     const maxUtf8Length = this.maxUtf8Length;
-    Object.defineProperty(target.prototype, name, {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = this.__offset + fieldOffset;
-        const length = this.__data.getUint16(offset);
+        const offset = tagFor(this).offset + fieldOffset;
+        const length = ctrl.data.getUint16(offset);
         return DynamicStringType.decoder.decode(
-          new Uint8Array(this.__data.buffer, offset + 2, length));
+          new Uint8Array(ctrl.data.buffer, offset + 2, length));
       },
       set(this: Component, value: string) {
-        const offset = this.__offset + fieldOffset;
-        this.__checkMutable();
+        const offset = tagFor(this, true).offset + fieldOffset;
         const encodedString = DynamicStringType.encoder.encode(value);
         if (encodedString.byteLength > maxUtf8Length) {
           throw new Error(`Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
         }
-        this.__data.setUint16(offset, encodedString.byteLength);
-        this.__bytes.set(encodedString, offset);
+        ctrl.data.setUint16(offset, encodedString.byteLength);
+        ctrl.bytes.set(encodedString, offset + 2);
       }
     });
   }
@@ -289,27 +286,28 @@ class RefType extends Type<Entity | null> {
     super(4, null);
   }
 
-  define(target: ComponentType<any>, name: string, fieldOffset: number): void {
-    Object.defineProperty(target.prototype, name, {
+  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
+    Object.defineProperty(ctrl.type.prototype, name, {
       enumerable: true,
       get(this: Component) {
-        const offset = this.__offset + fieldOffset;
-        if (!this.__system) throw new Error('Unable to dereference entity in this context');
-        const id = this.__data.getUint32(offset);
+        const tag = tagFor(this);
+        const offset = tag.offset + fieldOffset;
+        if (!tag.system) throw new Error('Unable to dereference entity in this context');
+        const id = ctrl.data.getUint32(offset);
         if (id === 0) return null;
-        return this.__system.__bindAndBorrowEntity(id);
+        return tag.system.__bindAndBorrowEntity(id);
       },
       set(this: Component, value: Entity) {
-        const offset = this.__offset + fieldOffset;
-        this.__checkMutable();
-        const oldId = this.__data.getUint32(offset);
+        const tag = tagFor(this, true);
+        const offset = tag.offset + fieldOffset;
+        const oldId = ctrl.data.getUint32(offset);
         const newId = value?.__id ?? 0;
         if (oldId === newId) return;
-        const indexer = this.__system?.__systems.indexer;
+        const indexer = tag.system?.__systems.indexer;
         if (!indexer) throw new Error('Unable to reference an entity in this context');
-        if (oldId !== 0) indexer.remove(oldId, this.__entityId);
-        this.__data.setUint32(offset, newId);
-        if (newId !== 0) indexer.insert(newId, this.__entityId);
+        if (oldId !== 0) indexer.remove(oldId, tag.entityId);
+        ctrl.data.setUint32(offset, newId);
+        if (newId !== 0) indexer.insert(newId, tag.entityId);
       }
     });
 

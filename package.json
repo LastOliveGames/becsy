@@ -5,6 +5,7 @@
   "scripts": {
     "test": "jest --config jestconfig.json",
     "perf": "tsc-watch --onSuccess \"node --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js\"",
+    "deopt": "rm *.log && node --trace-ic --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js && mv *.log v8.pre.log && node striplog.cjs && deoptigate",
     "build": "tsc && rollup --config",
     "prepare": "yarn build",
     "lint": "eslint src tests"
