@@ -46,12 +46,14 @@ export class Controller<C extends Component> {
     maxNum: number,
     readonly dispatcher: Dispatcher
   ) {
-    this.flagOffset = Math.floor(id / 32);
-    this.flagMask = 1 << (id % 32);
+    this.flagOffset = id >> 5;
+    this.flagMask = 1 << (id & 31);
     this.pool = new Pool(type);
     dispatcher.addPool(this.pool);
     this.fields = this.arrangeFields();
     this.stride = this.defineComponentProperties();
+    // TODO: deal correctly with a stride of 0 (tag component)
+    // TODO: offer option of using a sparse array
     this.buffer = new SharedArrayBuffer(this.stride * maxNum);
     this.data = new DataView(this.buffer);
     this.bytes = new Uint8Array(this.buffer);
@@ -131,6 +133,7 @@ export class Controller<C extends Component> {
       if (b.type === Type.boolean && a.type !== Type.boolean) return 1;
       return a < b ? -1 : 1;  // they can't be equal
     });
+    // TODO: make sure fields are size-aligned
     return fields;
   }
 }

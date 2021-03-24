@@ -31,4 +31,8 @@ export class World {
   execute(time?: number, delta?: number): void {
     this.__dispatcher.execute(time, delta);
   }
+
+  get stats(): any {
+    return this.__dispatcher.stats;
+  }
 }

@@ -9,7 +9,7 @@ import {component, Component, componentTypes, Entity, prop, System, Type, World}
 }
 
 class SystemA extends System {
-  private readonly things = this.query(q => q.with(B).read.also(A).write);
+  private readonly things = this.query(q => q.all.with(B).read.also(A).write);
 
   execute() {
     for (const thing of this.things.all) {
@@ -32,7 +32,7 @@ class SystemB extends System {
 }
 
 class Check extends System {
-  private readonly things = this.query(q => q.with(A).read);
+  private readonly things = this.query(q => q.all.with(A).read);
   total: number;
 
   execute() {

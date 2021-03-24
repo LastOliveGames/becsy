@@ -13,6 +13,8 @@ export abstract class System {
   readonly __rwMasks : ReadWriteMasks = {read: [], write: []};
   __dispatcher: Dispatcher;
   private __queryBuilders: MainQueryBuilder[] | null = [];
+  time: number;
+  delta: number;
 
   get name(): string {return this.constructor.name;}
 
@@ -31,7 +33,7 @@ export abstract class System {
     return this.__dispatcher.createEntity(initialComponents);
   }
 
-  execute(time: number, delta: number): void {
+  execute(): void {
     // do nothing by default
   }
 

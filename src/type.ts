@@ -255,6 +255,7 @@ class DynamicStringType extends Type<string> {
   private static readonly encoder = new TextEncoder();
 
   constructor(private readonly maxUtf8Length: number) {
+    // TODO: round max string length to next closest 2 to preserve alignment
     super(maxUtf8Length + 2, '');
   }
 
