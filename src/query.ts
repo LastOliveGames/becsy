@@ -7,17 +7,19 @@ import {ArrayEntityList, EntityList, SparseArrayEntityList} from './entitylists'
 type MaskKind = '__withMask' | '__withoutMask' | '__trackMask' | '__refMask';
 
 const enum QueryFlavor {
-  all = 1, added = 2, removed = 4, changed = 8, addedOrChanged = 16, addedChangedOrRemoved = 32
+  all = 1, added = 2, removed = 4, changed = 8, addedOrChanged = 16, changedOrRemoved = 32,
+  addedChangedOrRemoved = 64
 }
 
 type QueryFlavorName = keyof typeof QueryFlavor;
 
 const changedFlavorsMask =
-  QueryFlavor.changed | QueryFlavor.addedOrChanged | QueryFlavor.addedChangedOrRemoved;
+  QueryFlavor.changed | QueryFlavor.addedOrChanged | QueryFlavor.changedOrRemoved |
+  QueryFlavor.addedChangedOrRemoved;
 
 
 class QueryBuilder {
-  protected __lastType: ComponentType<any>;
+  protected __lastTypes: ComponentType<any>[];
 
   constructor(
     private readonly __callback: (q: QueryBuilder) => void,
@@ -36,6 +38,10 @@ class QueryBuilder {
   }
 
   get and(): this {
+    return this;
+  }
+
+  get but(): this {
     return this;
   }
 
@@ -64,43 +70,53 @@ class QueryBuilder {
     return this;
   }
 
+  get changedOrRemoved(): this {
+    this.__query.__flavors |= QueryFlavor.changedOrRemoved;
+    return this;
+  }
+
   get addedChangedOrRemoved(): this {
     this.__query.__flavors |= QueryFlavor.addedChangedOrRemoved;
     return this;
   }
 
-  with(type: ComponentType<any>): this {
-    return this.set('__withMask', type);
+  with(...types: ComponentType<any>[]): this {
+    this.set(this.__system.__rwMasks.read, types);
+    this.set('__withMask');
+    return this;
   }
 
-  without(type: ComponentType<any>): this {
-    return this.set('__withoutMask', type);
+  without(...types: ComponentType<any>[]): this {
+    this.set(this.__system.__rwMasks.read, types);
+    this.set('__withoutMask', types);
+    return this;
   }
 
-  also(type: ComponentType<any>): this {
-    this.__lastType = type;
+  using(...types: ComponentType<any>[]): this {
+    this.set(this.__system.__rwMasks.read, types);
     return this;
   }
 
   get track(): this {
-    return this.set('__trackMask');
+    this.set('__trackMask');
+    return this;
   }
 
   get read(): this {
-    return this.set(this.__system.__rwMasks.read);
+    return this;
   }
 
   get write(): this {
-    this.set(this.__system.__rwMasks.read);
-    return this.set(this.__system.__rwMasks.write);
+    this.set(this.__system.__rwMasks.write);
+    return this;
   }
 
   protected set(
-    mask: MaskKind | number[], type?: ComponentType<any>, onlyOne?: string
-  ): this {
-    if (!type) type = this.__lastType;
-    if (!type) throw new Error('No component type to apply query modifier to');
-    this.__lastType = type;
+    mask: MaskKind | number[], types?: ComponentType<any>[], onlyOne?: string
+  ): void {
+    if (!types) types = this.__lastTypes;
+    if (!types) throw new Error('No component type to apply query modifier to');
+    this.__lastTypes = types;
     if (typeof mask === 'string') {
       if (onlyOne && this.__query[mask]) throw new Error(`Only one ${onlyOne} allowed`);
       if (!this.__query[mask]) this.__query[mask] = [];
@@ -108,8 +124,7 @@ class QueryBuilder {
     } else if (onlyOne && mask.some(n => n !== 0)) {
       throw new Error(`Only one ${onlyOne} allowed`);
     }
-    this.__system.__dispatcher.entities.extendMaskAndSetFlag(mask, type);
-    return this;
+    for (const type of types) this.__system.__dispatcher.entities.extendMaskAndSetFlag(mask, type);
   }
 }
 
@@ -149,8 +164,7 @@ class JoinQueryBuilder extends QueryBuilder {
   }
 
   ref(prop?: string): this {
-    this.set('__refMask', this.__lastType, 'ref');
-    this.set(this.__system.__rwMasks.read);
+    this.set('__refMask', undefined, 'ref');
     (this.__query as JoinQuery).__refProp = prop;
     return this;
   }
@@ -211,6 +225,7 @@ export class MainQuery extends Query {
     if (this.__flavors & QueryFlavor.removed) this.allocateResult('removed', true);
     if (this.__flavors & QueryFlavor.changed) this.allocateResult('changed');
     if (this.__flavors & QueryFlavor.addedOrChanged) this.allocateResult('addedOrChanged');
+    if (this.__flavors & QueryFlavor.changedOrRemoved) this.allocateResult('changedOrRemoved');
     if (this.__flavors & QueryFlavor.addedChangedOrRemoved) {
       this.allocateResult('addedChangedOrRemoved', true);
     }
@@ -227,6 +242,7 @@ export class MainQuery extends Query {
     if (this.results.removed) this.results.removed.clear();
     if (this.results.changed) this.results.changed.clear();
     if (this.results.addedOrChanged) this.results.addedOrChanged.clear();
+    if (this.results.changedOrRemoved) this.results.changedOrRemoved.clear();
     if (this.results.addedChangedOrRemoved) this.results.addedChangedOrRemoved.clear();
   }
 
@@ -247,6 +263,7 @@ export class MainQuery extends Query {
           this.currentEntities.unset(id);
           this.results.all?.remove(id);
           this.results.removed?.add(id);
+          this.results.changedOrRemoved?.add(id);
           this.results.addedChangedOrRemoved?.add(id);
         }
       }
@@ -264,6 +281,7 @@ export class MainQuery extends Query {
           this.processedEntities.set(entityId);
           this.results.changed?.add(entityId);
           this.results.addedOrChanged?.add(entityId);
+          this.results.changedOrRemoved?.add(entityId);
           this.results.addedChangedOrRemoved?.add(entityId);
         }
       }
