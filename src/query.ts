@@ -217,8 +217,8 @@ export class MainQuery extends Query {
 
   private allocateBuffers(): void {
     const dispatcher = this.__system.__dispatcher;
-    this.processedEntities = new Bitset(dispatcher.maxEntityId);
-    this.currentEntities = new Bitset(dispatcher.maxEntityId);
+    this.processedEntities = new Bitset(dispatcher.maxEntities);
+    this.currentEntities = new Bitset(dispatcher.maxEntities);
     if (this.__flavors & QueryFlavor.all) this.results.all = new SparseArrayEntityList(dispatcher);
     // TODO: use pooled result buffers
     if (this.__flavors & QueryFlavor.added) this.allocateResult('added');

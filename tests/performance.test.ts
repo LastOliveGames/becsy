@@ -1,32 +1,32 @@
-import {Component, config, prop, System, Type, World} from '../src';
+import {config, prop, System, Type, World} from '../src';
 import {profile} from '../src/profile';
 import {performance} from 'perf_hooks';
 
 config.DEBUG = false;
 
-class A extends Component {
+class A {
   @prop(Type.int32) declare value: number;
 }
 
-class B extends Component {
+class B {
   static schema = {
     value: Type.int32
   };
 }
 
-class C extends Component {
+class C {
   static schema = {
     value: Type.int32
   };
 }
 
-class D extends Component {
+class D {
   static schema = {
     value: Type.int32
   };
 }
 
-class E extends Component {
+class E {
   static schema = {
     value: Type.int32
   };

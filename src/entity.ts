@@ -1,4 +1,4 @@
-import {Component, Controller, ComponentType, Field} from './component';
+import {Controller, ComponentType, Field} from './component';
 import {Log, LogPointer, SharedAtomicPool} from './datastructures';
 import type {Dispatcher} from './dispatcher';
 import {Pool} from './pool';
@@ -67,19 +67,19 @@ export class Entity {
     return this.__has(type, false);
   }
 
-  read<C extends Component>(type: ComponentType<C>): Readonly<C> {
+  read<C>(type: ComponentType<C>): Readonly<C> {
     this.__checkMask(type, false);
     const component = this.__get(type, false);
     if (component === undefined) throw new Error(`Entity doesn't have a ${type.name} component`);
     return component;
   }
 
-  readIfPresent<C extends Component>(type: ComponentType<C>): Readonly<C> | undefined {
+  readIfPresent<C>(type: ComponentType<C>): Readonly<C> | undefined {
     this.__checkMask(type, false);
     return this.__get(type, false);
   }
 
-  write<C extends Component>(type: ComponentType<C>): C {
+  write<C>(type: ComponentType<C>): C {
     this.__checkMask(type, true);
     const component = this.__get(type, true);
     if (component === undefined) throw new Error(`Entity doesn't have a ${type.name} component`);
@@ -97,7 +97,7 @@ export class Entity {
     this.__wipeInboundRefs();
   }
 
-  private __get<C extends Component>(type: ComponentType<C>, allowWrite: boolean): C | undefined {
+  private __get<C>(type: ComponentType<C>, allowWrite: boolean): C | undefined {
     if (!this.__has(type, allowWrite)) return;
     return this.__entities.bindComponent(type, this.__id, allowWrite);
   }
@@ -137,7 +137,6 @@ export class Entity {
 
 
 export class Entities {
-  readonly maxNum: number;
   private readonly stride: number;
   private readonly shapes: Uint32Array;
   private readonly pool = new Pool(Entity);
@@ -151,14 +150,13 @@ export class Entities {
     maxEntities: number, maxLimboEntities: number,
     readonly types: ComponentType<any>[], readonly dispatcher: Dispatcher
   ) {
-    this.maxNum = maxEntities + 1;
     dispatcher.addPool(this.pool);
     let componentId = 0;
     for (const type of types) {
-      this.controllers.set(type, new Controller(componentId++, type, this.maxNum, this.dispatcher));
+      this.controllers.set(type, new Controller(componentId++, type, this.dispatcher));
     }
     this.stride = Math.ceil(this.controllers.size / 32);
-    const size = this.maxNum * this.stride * 4;
+    const size = maxEntities * this.stride * 4;
     this.shapes = new Uint32Array(new SharedArrayBuffer(size));
     this.entityIdPool = new SharedAtomicPool(maxEntities, 'maxEntities');
     this.entityIdPool.fillWithDescendingIntegers(1);
@@ -249,12 +247,10 @@ export class Entities {
     this.controllers.get(type)!.init(id, values);
   }
 
-  bindComponent<C extends Component, M extends boolean>(
+  bindComponent<C, M extends boolean>(
     type: ComponentType<C>, id: EntityId, allowWrite: M): M extends true ? C : Readonly<C>;
 
-  bindComponent<C extends Component>(
-    type: ComponentType<C>, id: EntityId, allowWrite: boolean
-  ): C {
+  bindComponent<C>(type: ComponentType<C>, id: EntityId, allowWrite: boolean): C {
     return this.controllers.get(type)!.bind(id, allowWrite);
   }
 

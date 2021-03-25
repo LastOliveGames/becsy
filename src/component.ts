@@ -7,7 +7,7 @@ import type {Dispatcher} from './dispatcher';
 
 interface SchemaDef<JSType> {
   type: Type<JSType>;
-  default?: JSType;
+  default: JSType;
 }
 
 interface Schema {
@@ -22,19 +22,19 @@ export interface Field<JSType> {
 
 export interface ComponentType<C extends Component> {
   new(): C;
-  schema: Schema;
+  schema?: Schema;
+  maxEntities?: number;
 }
 
-export class Component {
-  static schema: Schema = {};
+export interface Component {
+  __entityId?: number;
+  __index?: number;
+  __writable?: boolean;
 }
 
 
 export class Controller<C extends Component> {
-  private readonly buffer: SharedArrayBuffer;
-  readonly data: DataView;
-  readonly bytes: Uint8Array;
-  private readonly stride: number;
+  private readonly maxEntities: number;
   private readonly pool: Pool<C>;
   fields: Field<any>[];
   flagOffset: number;
@@ -43,21 +43,23 @@ export class Controller<C extends Component> {
   constructor(
     readonly id: number,
     readonly type: ComponentType<C>,
-    maxNum: number,
     readonly dispatcher: Dispatcher
   ) {
+    if (config.DEBUG && (type.maxEntities ?? 0) > dispatcher.maxEntities) {
+      throw new Error(
+        `Component type ${type.name} maxEntities higher than world maxEntities; ` +
+        `reduce ${type.maxEntities} to or below ${dispatcher.maxEntities}`);
+    }
+    this.maxEntities = Math.min(type.maxEntities ?? dispatcher.maxEntities, dispatcher.maxEntities);
+    if (this.maxEntities < dispatcher.maxEntities) {
+      // TODO: enable packed array mode
+    }
     this.flagOffset = id >> 5;
     this.flagMask = 1 << (id & 31);
     this.pool = new Pool(type);
     dispatcher.addPool(this.pool);
-    this.fields = this.arrangeFields();
-    this.stride = this.defineComponentProperties();
-    // TODO: deal correctly with a stride of 0 (tag component)
-    // TODO: offer option of using a sparse array
-    this.buffer = new SharedArrayBuffer(this.stride * maxNum);
-    this.data = new DataView(this.buffer);
-    this.bytes = new Uint8Array(this.buffer);
-    this.saveDefaultComponent();
+    this.fields = this.gatherFields();
+    this.defineComponentProperties();
   }
 
   get name(): string {
@@ -65,57 +67,36 @@ export class Controller<C extends Component> {
   }
 
   init(id: EntityId, values: any): void {
-    this.bytes.copyWithin(id * this.stride, 0, this.stride);
-    if (values !== undefined) {
-      if (config.DEBUG) {
-        for (const key in values) {
-          if (!this.type.schema[key]) {
-            throw new Error(`Property ${key} not defined for component ${this.name}`);
-          }
+    if (config.DEBUG && values !== undefined) {
+      for (const key in values) {
+        if (!this.type.schema?.[key]) {
+          throw new Error(`Property ${key} not defined for component ${this.name}`);
         }
       }
-      const component = this.bind(id, true, true);
-      Object.assign(component, values);
+    }
+    // TODO: in packed array mode, allocate a new index
+    const component = this.bind(id, true, true);
+    for (const field of this.fields) {
+      (component as any)[field.name] = values?.[field.name] ?? field.default;
     }
   }
 
-  bind(id: EntityId, mutable: boolean, ephemeral?: boolean): C {
+  bind(id: EntityId, writable: boolean, ephemeral?: boolean): C {
     const component = this.pool.borrow(ephemeral);
-    this.dispatcher.tag(component, id, id * this.stride, mutable, ephemeral);
+    component.__entityId = id;
+    // TODO: in packed array mode, look up the index
+    component.__index = id;
+    component.__writable = writable;
     return component;
   }
 
-  private defineComponentProperties(): number {
-    let offset = 0, booleanMask = 1;
+  private defineComponentProperties(): void {
     for (const field of this.fields) {
-      if (field.type === Type.boolean) {
-        field.type.define(this, field.name, offset, booleanMask);
-        booleanMask <<= 1;
-        if (booleanMask > 128) {
-          offset += 1;
-          booleanMask = 1;
-        }
-      } else {
-        if (booleanMask !== 1) {
-          offset += 1;
-          booleanMask = 1;
-        }
-        field.type.define(this, field.name, offset);
-        offset += field.type.byteSize;
-      }
-    }
-    if (booleanMask !== 1) offset += 1;
-    return offset;
-  }
-
-  private saveDefaultComponent(): void {
-    const component = this.bind(0, true, true);
-    for (const field of this.fields) {
-      (component as any)[field.name] = field.default;
+      field.type.define(this.type, field.name, this.dispatcher, this.maxEntities);
     }
   }
 
-  private arrangeFields(): Field<any>[] {
+  private gatherFields(): Field<any>[] {
     const schema = this.type.schema;
     const fields: Field<any>[] = [];
     for (const name in schema) {
@@ -128,12 +109,6 @@ export class Controller<C extends Component> {
       }
       fields.push(field);
     }
-    fields.sort((a, b) => {
-      if (a.type === Type.boolean && b.type !== Type.boolean) return -1;
-      if (b.type === Type.boolean && a.type !== Type.boolean) return 1;
-      return a < b ? -1 : 1;  // they can't be equal
-    });
-    // TODO: make sure fields are size-aligned
     return fields;
   }
 }

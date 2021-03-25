@@ -85,7 +85,7 @@ export class SparseArrayEntityList implements EntityList, Iterable<Entity> {
 
   constructor(dispatcher: Dispatcher) {
     this.list = new Uint32Array(dispatcher.maxEntities);
-    this.lookupTable = new Int32Array(dispatcher.maxEntityId);
+    this.lookupTable = new Int32Array(dispatcher.maxEntities);
     this.lookupTable.fill(-1);
     this.iterator = new EntityIterator(dispatcher);
   }

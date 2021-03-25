@@ -1,15 +1,15 @@
-import {component, Component, componentTypes, Entity, prop, System, Type, World} from '../src';
+import {component, componentTypes, Entity, prop, System, Type, World} from '../src';
 
-@component class A extends Component {
+@component class A {
   @prop(Type.uint8) declare byte: number;
 }
 
-@component class B extends Component {
+@component class B {
   @prop(Type.ref) declare a: Entity;
 }
 
 class SystemA extends System {
-  private readonly things = this.query(q => q.all.with(B).read.also(A).write);
+  private readonly things = this.query(q => q.all.with(B).and.using(A).write);
 
   execute() {
     for (const thing of this.things.all) {

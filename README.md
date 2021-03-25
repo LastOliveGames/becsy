@@ -18,9 +18,10 @@ Then we add:
 - [ ] entity references that can be traversed in either direction
 - [ ] declarative system ordering based on data dependencies
 - [ ] built-in support for representing state machines (per [Sander Mertens](https://ajmmertens.medium.com/why-storing-state-machines-in-ecs-is-a-bad-idea-742de7a18e59))
-- [ ] multithreaded system execution!
+- [ ] multithreaded system execution
+- [ ] an optional but nicely integrated networked data replication system
 
-Overall, becsy aims to be feature rich without sacrificing too much performance.  The goal is to be 5x faster than ECSY when single-threaded, and much faster than bitecs when multithreaded as long as the problem is parallelizable.  Here's a snapshot of current performance per [ecs-benchmark](https://github.com/noctjs/ecs-benchmark) -- obviously not quite there yet:
+Overall, becsy aims to be feature rich without sacrificing too much performance.  The goal is to be 10x faster than ECSY when single-threaded, and faster than bitecs when multithreaded as long as the problem is parallelizable.  Here's a snapshot of current performance per [ecs-benchmark](https://github.com/noctjs/ecs-benchmark) -- obviously not quite there yet:
 
 |     | packed_1 | packed_5 | simple_iter | frag_iter | entity_cycle | add_remove |
 | --- | --: |--: |--: |--: |--: |--: |

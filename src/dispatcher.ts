@@ -1,20 +1,15 @@
-import type {Component, ComponentType} from './component';
-import {Entities, Entity, EntityId, MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES, ReadWriteMasks} from './entity';
+import type {ComponentType} from './component';
+import {
+  Entities, Entity, EntityId, MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES, ReadWriteMasks
+} from './entity';
 import {Indexer} from './indexer';
 import {Log, LogPointer} from './datastructures';
-import {Pool} from './pool';
+import type {Pool} from './pool';
 import type {System, SystemType} from './system';
 
 
 const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
   performance.now.bind(performance) : Date.now.bind(Date);
-
-
-export class Tag {
-  entityId: EntityId;
-  offset: number;
-  mutable: boolean;
-}
 
 
 type ComponentTypesArray = ComponentType<any>[] | ComponentTypesArray[];
@@ -102,7 +97,6 @@ export class Stats {
 
 export class Dispatcher {
   readonly maxEntities;
-  readonly maxEntityId;
   readonly indexer;
   readonly entities;
   readonly systems;
@@ -110,8 +104,6 @@ export class Dispatcher {
   private lastTime = now() / 1000;
   private executing: boolean;
   rwMasks: ReadWriteMasks | undefined;
-  readonly tagPool = new Pool(Tag);
-  readonly tagMap = new Map<Component, Tag>();
   readonly shapeLog: Log;
   readonly writeLog: Log;
   private readonly shapeLogFramePointer: LogPointer;
@@ -137,9 +129,7 @@ export class Dispatcher {
     this.indexer = new Indexer(maxRefs);
     this.entities =
       new Entities(maxEntities, maxLimboEntities, componentTypes.flat(Infinity), this);
-    this.maxEntityId = this.entities.maxNum;
     this.systems = this.normalizeAndInitSystems(systems);
-    this.addPool(this.tagPool);
   }
 
   private normalizeAndInitSystems(userSystems: SystemsArray): System[] {
@@ -209,15 +199,5 @@ export class Dispatcher {
 
   bindEntity(id: EntityId): Entity {
     return this.entities.bind(id);
-  }
-
-  tag(
-    component: Component, id: EntityId, offset: number, mutable: boolean, ephemeral = false
-  ): void {
-    const tag = this.tagPool.borrow(ephemeral);
-    this.tagMap.set(component, tag);
-    tag.entityId = id;
-    tag.offset = offset;
-    tag.mutable = mutable;
   }
 }

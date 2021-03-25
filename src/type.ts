@@ -1,22 +1,25 @@
-import type {Component, Controller} from './component';
+import type {Component, ComponentType} from './component';
 import type {Entity} from './entity';
 import {TextEncoder, TextDecoder} from 'util';
-import type {Tag} from './dispatcher';
+import {config} from './config';
+import type {Dispatcher} from './dispatcher';
 
 
-function tagFor(ctrl: Controller<any>, component: Component, write = false): Tag {
-  const tag = ctrl.dispatcher.tagMap.get(component);
-  if (!tag) throw new Error('Component has been released');
-  if (write && !tag.mutable) {
+function checkWritable(component: Component) {
+  if (!component.__writable) {
     throw new Error(
-      'Component is not mutable; use entity.write(Component) to acquire a mutable version');
+      'Component is not writable; use entity.write(Component) to acquire a writable version');
   }
-  return tag;
 }
 
+
 export abstract class Type<JSType> {
-  constructor(readonly byteSize: number, readonly defaultValue: JSType) { }
-  abstract define<C>(ctrl: Controller<C>, name: string, fieldOffset: number, mask?: number): void;
+  constructor(readonly defaultValue: JSType) {}
+
+  abstract define<C extends Component>(
+    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
+    buffer?: SharedArrayBuffer
+  ): SharedArrayBuffer;
 
   static boolean: Type<boolean>;
   static uint8: Type<number>;
@@ -33,296 +36,197 @@ export abstract class Type<JSType> {
 }
 
 class BooleanType extends Type<boolean> {
-  constructor() {
-    super(0.125, false);
-  }
+  constructor() {super(false);}
 
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number, mask: number): void {
-    Object.defineProperty(ctrl.type.prototype, name, {
+  define<C extends Component>(
+    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
+    buffer?: SharedArrayBuffer
+  ): SharedArrayBuffer {
+    if (!buffer) buffer = new SharedArrayBuffer(maxEntities);
+    const data = new Uint8Array(buffer);
+    Object.defineProperty(type.prototype, name, {
       enumerable: true,
-      get(this: Component) {
-        const offset = tagFor(ctrl, this).offset + fieldOffset;
-        return (ctrl.data.getUint8(offset) & mask) !== 0;
+      get(this: Component): boolean {
+        return Boolean(data[this.__index!]);
       },
-      set(this: Component, value: boolean) {
-        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
-        let byte = ctrl.data.getUint8(offset);
-        if (value) byte |= mask; else byte &= ~mask;
-        ctrl.data.setUint8(offset, byte);
+      set(this: Component, value: boolean): void {
+        if (config.DEBUG) checkWritable(this);
+        data[this.__index!] = value ? 1 : 0;
       }
     });
+    return buffer;
   }
 }
 
-class Uint8Type extends Type<number> {
-  constructor() {
-    super(1, 0);
-  }
+type TypedNumberArray =
+  Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array |
+  Float32Array | Float64Array;
 
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
-    Object.defineProperty(ctrl.type.prototype, name, {
-      enumerable: true,
-      get(this: Component) {
-        const offset = tagFor(ctrl, this).offset + fieldOffset;
-        return ctrl.data.getUint8(offset);
-      },
-      set(this: Component, value: number) {
-        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
-        ctrl.data.setUint8(offset, value);
-      }
-    });
-  }
+interface TypeNumberArrayConstructor {
+ new (buffer: SharedArrayBuffer): TypedNumberArray;
+ BYTES_PER_ELEMENT: number;
 }
 
-class Int8Type extends Type<number> {
-  constructor() {
-    super(1, 0);
+class NumberType extends Type<number> {
+  constructor(private readonly NumberArray: TypeNumberArrayConstructor) {
+    super(0);
   }
 
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
-    Object.defineProperty(ctrl.type.prototype, name, {
+  define<C extends Component>(
+    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
+    buffer?: SharedArrayBuffer
+  ): SharedArrayBuffer {
+    if (!buffer) {
+      buffer = new SharedArrayBuffer(maxEntities * this.NumberArray.BYTES_PER_ELEMENT);
+    }
+    const data = new this.NumberArray(buffer);
+    Object.defineProperty(type.prototype, name, {
       enumerable: true,
-      get(this: Component) {
-        const offset = tagFor(ctrl, this).offset + fieldOffset;
-        return ctrl.data.getInt8(offset);
+      get(this: Component): number {
+        return data[this.__index!];
       },
-      set(this: Component, value: number) {
-        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
-        ctrl.data.setInt8(offset, value);
+      set(this: Component, value: number): void {
+        if (config.DEBUG) checkWritable(this);
+        data[this.__index!] = value;
       }
     });
+    return buffer;
   }
 }
-
-class Uint16Type extends Type<number> {
-  constructor() {
-    super(2, 0);
-  }
-
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
-    Object.defineProperty(ctrl.type.prototype, name, {
-      enumerable: true,
-      get(this: Component) {
-        const offset = tagFor(ctrl, this).offset + fieldOffset;
-        return ctrl.data.getUint16(offset);
-      },
-      set(this: Component, value: number) {
-        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
-        ctrl.data.setUint16(offset, value);
-      }
-    });
-  }
-}
-
-class Int16Type extends Type<number> {
-  constructor() {
-    super(2, 0);
-  }
-
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
-    Object.defineProperty(ctrl.type.prototype, name, {
-      enumerable: true,
-      get(this: Component) {
-        const offset = tagFor(ctrl, this).offset + fieldOffset;
-        return ctrl.data.getInt16(offset);
-      },
-      set(this: Component, value: number) {
-        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
-        ctrl.data.setInt16(offset, value);
-      }
-    });
-  }
-}
-
-class Uint32Type extends Type<number> {
-  constructor() {
-    super(4, 0);
-  }
-
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
-    Object.defineProperty(ctrl.type.prototype, name, {
-      enumerable: true,
-      get(this: Component) {
-        const offset = tagFor(ctrl, this).offset + fieldOffset;
-        return ctrl.data.getUint32(offset);
-      },
-      set(this: Component, value: number) {
-        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
-        ctrl.data.setUint32(offset, value);
-      }
-    });
-  }
-}
-
-class Int32Type extends Type<number> {
-  constructor() {
-    super(4, 0);
-  }
-
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
-    Object.defineProperty(ctrl.type.prototype, name, {
-      enumerable: true,
-      get(this: Component) {
-        const offset = tagFor(ctrl, this).offset + fieldOffset;
-        return ctrl.data.getInt32(offset);
-      },
-      set(this: Component, value: number) {
-        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
-        ctrl.data.setInt32(offset, value);
-      }
-    });
-  }
-}
-
-class Float32Type extends Type<number> {
-  constructor() {
-    super(4, 0);
-  }
-
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
-    Object.defineProperty(ctrl.type.prototype, name, {
-      enumerable: true,
-      get(this: Component) {
-        const offset = tagFor(ctrl, this).offset + fieldOffset;
-        return ctrl.data.getFloat32(offset);
-      },
-      set(this: Component, value: number) {
-        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
-        ctrl.data.setFloat32(offset, value);
-      }
-    });
-  }
-}
-
-class Float64Type extends Type<number> {
-  constructor() {
-    super(8, 0);
-  }
-
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
-    Object.defineProperty(ctrl.type.prototype, name, {
-      enumerable: true,
-      get(this: Component) {
-        const offset = tagFor(ctrl, this).offset + fieldOffset;
-        return ctrl.data.getFloat64(offset);
-      },
-      set(this: Component, value: number) {
-        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
-        ctrl.data.setFloat64(offset, value);
-      }
-    });
-  }
-}
-
 
 class StaticStringType extends Type<string> {
-  private getter: (this: DataView, offset: number) => number;
-  private setter: (this: DataView, offset: number, value: number) => void;
   private choicesIndex = new Map<string, number>();
+  private TypedArray: typeof Uint8Array | typeof Uint16Array | typeof Uint32Array;
 
   constructor(private readonly choices: string[]) {
-    super(choices.length < 1 << 8 ? 1 : choices.length < 1 << 16 ? 2 : 4, '');
-    const accessor = this.byteSize === 1 ? 'Uint8' : this.byteSize === 2 ? 'Uint16' : 'Uint32';
-    this.getter = (DataView.prototype as any)[`get${accessor}`];
-    this.setter = (DataView.prototype as any)[`set${accessor}`];
+    super(choices[0]);
+    if (config.DEBUG && !choices?.length) {
+      throw new Error('No choices specified for Type.staticString');
+    }
+    if (choices.length < 1 << 8) this.TypedArray = Uint8Array;
+    else if (choices.length < 1 << 16) this.TypedArray = Uint16Array;
+    else this.TypedArray = Uint32Array;
     for (let i = 0; i < choices.length; i++) this.choicesIndex.set(choices[i], i);
   }
 
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
-    const getter = this.getter, setter = this.setter;
+  define<C extends Component>(
+    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
+    buffer?: SharedArrayBuffer
+  ): SharedArrayBuffer {
+    if (!buffer) {
+      buffer = new SharedArrayBuffer(maxEntities * this.TypedArray.BYTES_PER_ELEMENT);
+    }
+    const data = new this.TypedArray(buffer);
     const choices = this.choices, choicesIndex = this.choicesIndex;
-    Object.defineProperty(ctrl.type.prototype, name, {
+    Object.defineProperty(type.prototype, name, {
       enumerable: true,
-      get(this: Component) {
-        const offset = tagFor(ctrl, this).offset + fieldOffset;
-        const index = getter.call(ctrl.data, offset);
+      get(this: Component): string {
+        const index = data[this.__index!];
         const result = choices[index];
-        if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
+        if (config.DEBUG && result === undefined) {
+          throw new Error(`Invalid static string index: ${index}`);
+        }
         return result;
       },
-      set(this: Component, value: string) {
-        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
+      set(this: Component, value: string): void {
+        if (config.DEBUG) checkWritable(this);
         const index = choicesIndex.get(value);
-        if (index === undefined) throw new Error(`Static string not in set: "${value}"`);
-        setter.call(ctrl.data, offset, index);
+        if (config.DEBUG && index === undefined) {
+          throw new Error(`Static string not in set: "${value}"`);
+        }
+        data[this.__index!] = index!;
       }
     });
+    return buffer;
   }
 }
 
 class DynamicStringType extends Type<string> {
+  private readonly maxUtf8Length: number;
+  private readonly lengthsStride: number;
+  private readonly bytesStride: number;
   private static readonly decoder = new TextDecoder();
   private static readonly encoder = new TextEncoder();
 
-  constructor(private readonly maxUtf8Length: number) {
-    // TODO: round max string length to next closest 2 to preserve alignment
-    super(maxUtf8Length + 2, '');
+  constructor(maxUtf8Length: number) {
+    super('');
+    this.maxUtf8Length = maxUtf8Length + (maxUtf8Length % 2);
+    this.lengthsStride = maxUtf8Length / 2 + 1;
+    this.bytesStride = this.maxUtf8Length + 2;  // account for length field
   }
 
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
+  define<C extends Component>(
+    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
+    buffer?: SharedArrayBuffer
+  ): SharedArrayBuffer {
+    if (!buffer) buffer = new SharedArrayBuffer(maxEntities * (this.maxUtf8Length + 2));
+    const lengths = new Uint16Array(buffer);
+    const bytes = new Uint8Array(buffer);
     const maxUtf8Length = this.maxUtf8Length;
-    Object.defineProperty(ctrl.type.prototype, name, {
+    const lengthsStride = this.lengthsStride, bytesStride = this.bytesStride;
+    Object.defineProperty(type.prototype, name, {
       enumerable: true,
-      get(this: Component) {
-        const offset = tagFor(ctrl, this).offset + fieldOffset;
-        const length = ctrl.data.getUint16(offset);
+      get(this: Component): string {
+        const length = lengths[this.__index! * lengthsStride];
         return DynamicStringType.decoder.decode(
-          new Uint8Array(ctrl.data.buffer, offset + 2, length));
+          new Uint8Array(bytes.buffer, this.__index! * bytesStride + 2, length));
       },
-      set(this: Component, value: string) {
-        const offset = tagFor(ctrl, this, true).offset + fieldOffset;
+      set(this: Component, value: string): void {
+        if (config.DEBUG) checkWritable(this);
         const encodedString = DynamicStringType.encoder.encode(value);
         if (encodedString.byteLength > maxUtf8Length) {
           throw new Error(`Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
         }
-        ctrl.data.setUint16(offset, encodedString.byteLength);
-        ctrl.bytes.set(encodedString, offset + 2);
+        lengths[this.__index! * lengthsStride] = encodedString.byteLength;
+        bytes.set(encodedString, this.__index! * bytesStride + 2);
       }
     });
+    return buffer;
   }
 }
 
 class RefType extends Type<Entity | null> {
   constructor() {
-    super(4, null);
+    super(null);
   }
 
-  define<C>(ctrl: Controller<C>, name: string, fieldOffset: number): void {
-    Object.defineProperty(ctrl.type.prototype, name, {
+  define<C extends Component>(
+    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
+    buffer?: SharedArrayBuffer
+  ): SharedArrayBuffer {
+    if (!buffer) buffer = new SharedArrayBuffer(maxEntities * 4);
+    const data = new Int32Array(buffer);
+    Object.defineProperty(type.prototype, name, {
       enumerable: true,
-      get(this: Component) {
-        const tag = tagFor(ctrl, this);
-        const offset = tag.offset + fieldOffset;
-        const id = ctrl.data.getUint32(offset);
-        if (id === 0) return null;
-        return ctrl.dispatcher.bindEntity(id);
+      get(this: Component): Entity | null {
+        const id = data[this.__index!];
+        if (id === -1) return null;
+        return dispatcher.bindEntity(id);
       },
-      set(this: Component, value: Entity) {
-        const tag = tagFor(ctrl, this, true);
-        const offset = tag.offset + fieldOffset;
-        const oldId = ctrl.data.getUint32(offset);
-        const newId = value?.__id ?? 0;
+      set(this: Component, value: Entity | null): void {
+        if (config.DEBUG) checkWritable(this);
+        const oldId = data[this.__index!];
+        const newId = value?.__id ?? -1;
         if (oldId === newId) return;
-        const indexer = ctrl.dispatcher.indexer;
-        if (!indexer) throw new Error('Unable to reference an entity in this context');
-        if (oldId !== 0) indexer.remove(oldId, tag.entityId);
-        ctrl.data.setUint32(offset, newId);
-        if (newId !== 0) indexer.insert(newId, tag.entityId);
+        const indexer = dispatcher.indexer;
+        if (oldId !== 0) indexer.remove(oldId, this.__entityId!);
+        data[this.__index!] = newId;
+        if (newId !== 0) indexer.insert(newId, this.__entityId!);
       }
     });
-
+    return buffer;
   }
 }
 
 Type.boolean = new BooleanType();
-Type.uint8 = new Uint8Type();
-Type.int8 = new Int8Type();
-Type.uint16 = new Uint16Type();
-Type.int16 = new Int16Type();
-Type.uint32 = new Uint32Type();
-Type.int32 = new Int32Type();
-Type.float32 = new Float32Type();
-Type.float64 = new Float64Type();
+Type.uint8 = new NumberType(Uint8Array);
+Type.int8 = new NumberType(Int8Array);
+Type.uint16 = new NumberType(Uint16Array);
+Type.int16 = new NumberType(Int16Array);
+Type.uint32 = new NumberType(Uint32Array);
+Type.int32 = new NumberType(Int32Array);
+Type.float32 = new NumberType(Float32Array);
+Type.float64 = new NumberType(Float64Array);
 Type.staticString = (choices: string[]) => new StaticStringType(choices);
 Type.dynamicString = (maxUtf8Length: number) => new DynamicStringType(maxUtf8Length);
 Type.ref = new RefType();
