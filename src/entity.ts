@@ -1,4 +1,4 @@
-import {Controller, ComponentType, Field} from './component';
+import {ComponentType, decorateComponentType, initComponent} from './component';
 import {config} from './config';
 import {Log, LogPointer, SharedAtomicPool} from './datastructures';
 import type {Dispatcher} from './dispatcher';
@@ -33,7 +33,7 @@ export class Entity {
       throw new Error(`Entity already has a ${type.name} component`);
     }
     this.__entities.setFlag(this.__id, type);
-    this.__entities.initComponent(type, this.__id, values);
+    initComponent(type, this.__id, values);
     return this;
   }
 
@@ -120,7 +120,7 @@ export class Entity {
   }
 
   private __deindexOutboundRefs(type: ComponentType<any>): void {
-    const fields = this.__entities.getFields(type);
+    const fields = type.__fields!;
     if (fields.some(field => field.type === Type.ref)) {
       const component = this.write(type);
       for (const field of fields) {
@@ -190,7 +190,6 @@ export class EntityPool {
 export class Entities {
   private readonly stride: number;
   private readonly shapes: Uint32Array;
-  private readonly controllers: Map<ComponentType<any>, Controller<any>> = new Map();
   private readonly entityIdPool: SharedAtomicPool;
   readonly pool: EntityPool;
   executingSystem: System | undefined;
@@ -203,10 +202,8 @@ export class Entities {
     readonly types: ComponentType<any>[], readonly dispatcher: Dispatcher
   ) {
     let componentId = 0;
-    for (const type of types) {
-      this.controllers.set(type, new Controller(componentId++, type, this.dispatcher));
-    }
-    this.stride = Math.ceil(this.controllers.size / 32);
+    for (const type of types) decorateComponentType(componentId++, type, this.dispatcher);
+    this.stride = Math.ceil(types.length / 32);
     const size = maxEntities * this.stride * 4;
     this.shapes = new Uint32Array(new SharedArrayBuffer(size));
     this.entityIdPool = new SharedAtomicPool(maxEntities, 'maxEntities');
@@ -253,10 +250,6 @@ export class Entities {
     return ((mask[type.__flagOffset!] ?? 0) & type.__flagMask!) !== 0;
   }
 
-  getFields(type: ComponentType<any>): Field<any>[] {
-    return this.controllers.get(type)!.fields;
-  }
-
   hasFlag(id: EntityId, type: ComponentType<any>, allowRemoved = false): boolean {
     const index = id * this.stride + type.__flagOffset!;
     if ((this.shapes[index] & type.__flagMask!) !== 0) return true;
@@ -286,11 +279,7 @@ export class Entities {
   }
 
   markMutated(id: EntityId, type: ComponentType<any>): void {
-    this.dispatcher.writeLog.push(id | (type.__id! << ENTITY_ID_BITS));
-  }
-
-  initComponent(type: ComponentType<any>, id: EntityId, values: any): void {
-    this.controllers.get(type)!.init(id, values);
+    this.dispatcher.writeLog?.push(id | (type.__id! << ENTITY_ID_BITS));
   }
 
   matchShape(id: EntityId, positiveMask?: number[], negativeMask?: number[]): boolean {

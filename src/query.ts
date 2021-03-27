@@ -197,10 +197,11 @@ export class TopQuery extends Query {
     Partial<Record<QueryFlavorName, EntityList>> & {all?: PackedArrayEntityList} = {};
 
   private __hasTransientResults: boolean;
+  __hasChangedResults: boolean;
   private __processedEntities: Bitset;
   private __currentEntities: Bitset | undefined;
   private __shapeLogPointer: LogPointer;
-  private __writeLogPointer: LogPointer;
+  private __writeLogPointer: LogPointer | undefined;
 
   __startFrame(): void {
     if (!this.__flavors) return;
@@ -217,8 +218,9 @@ export class TopQuery extends Query {
   __init(): void {
     const dispatcher = this.__system.__dispatcher;
     this.__hasTransientResults = Boolean(this.__flavors & transientFlavorsMask);
+    this.__hasChangedResults = Boolean(this.__flavors & changedFlavorsMask);
     this.__shapeLogPointer = dispatcher.shapeLog.createPointer();
-    this.__writeLogPointer = dispatcher.writeLog.createPointer();
+    this.__writeLogPointer = dispatcher.writeLog?.createPointer();
     this.__processedEntities = new Bitset(dispatcher.maxEntities);
     if (this.__flavors & QueryFlavor.all) {
       this.__results.all =
@@ -256,7 +258,8 @@ export class TopQuery extends Query {
 
   private __computeShapeResults(): void {
     const entities = this.__system.__dispatcher.entities;
-    for (const id of this.__system.__dispatcher.shapeLog.processSince(this.__shapeLogPointer)) {
+    const shapeLog = this.__system.__dispatcher.shapeLog;
+    for (const id of shapeLog.processSince(this.__shapeLogPointer)) {
       if (!this.__processedEntities.get(id)) {
         this.__processedEntities.set(id);
         const oldMatch = this.__results.all?.has(id) ?? this.__currentEntities!.get(id);
@@ -281,7 +284,8 @@ export class TopQuery extends Query {
 
   private __computeWriteResults(): void {
     if (!(this.__flavors & changedFlavorsMask) || !this.__trackMask) return;
-    for (const entry of this.__system.__dispatcher.writeLog.processSince(this.__writeLogPointer)) {
+    const writeLog = this.__system.__dispatcher.writeLog!;
+    for (const entry of writeLog.processSince(this.__writeLogPointer!)) {
       const entityId = entry & ENTITY_ID_MASK;
       if (!this.__processedEntities.get(entityId)) {
         const componentId = entry >>> ENTITY_ID_BITS;

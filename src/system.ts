@@ -16,6 +16,7 @@ export abstract class System {
   private __queryBuilders: TopQueryBuilder[] | null = [];
   private __queries: TopQuery[] = [];
   __removedEntities: Bitset;
+  __needsWriteLog: boolean;
   time: number;
   delta: number;
 
@@ -25,11 +26,11 @@ export abstract class System {
     const query = new TopQuery(this);
     this.__queries.push(query);
     const builder = new TopQueryBuilder(buildCallback, query, this);
-    if (this.__queryBuilders) {
-      this.__queryBuilders.push(builder);
-    } else {
-      builder.__build();
+    if (!this.__queryBuilders) {
+      throw new Error(
+        `Attempt to create a new query after world initialized in system ${this.name}`);
     }
+    this.__queryBuilders.push(builder);
     return query;
   }
 
@@ -48,6 +49,7 @@ export abstract class System {
     this.__removedEntities = new Bitset(dispatcher.maxEntities);
     for (const builder of this.__queryBuilders!) builder.__build();
     this.__queryBuilders = null;
+    this.__needsWriteLog = this.__queries.some(query => query.__hasChangedResults);
   }
 
   __run(time: number, delta: number): void {

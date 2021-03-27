@@ -97,13 +97,13 @@ export class Dispatcher {
   readonly maxEntities;
   readonly indexer;
   readonly entities;
-  readonly systems;
+  readonly systems: System[];
   private lastTime = now() / 1000;
   private executing: boolean;
   readonly shapeLog: Log;
-  readonly writeLog: Log;
+  readonly writeLog: Log | undefined;
   private readonly shapeLogFramePointer: LogPointer;
-  private readonly writeLogFramePointer: LogPointer;
+  private readonly writeLogFramePointer: LogPointer | undefined;
   readonly stats = new Stats();
 
   constructor({
@@ -119,13 +119,15 @@ export class Dispatcher {
     }
     this.maxEntities = maxEntities;
     this.shapeLog = new Log(maxShapeChangesPerFrame, false, 'maxShapeChangesPerFrame');
-    this.writeLog = new Log(maxWritesPerFrame, false, 'maxWritesPerFrame');
     this.shapeLogFramePointer = this.shapeLog.createPointer();
-    this.writeLogFramePointer = this.writeLog.createPointer();
     this.indexer = new Indexer(maxRefs);
     this.entities =
       new Entities(maxEntities, maxLimboEntities, componentTypes.flat(Infinity), this);
     this.systems = this.normalizeAndInitSystems(systems);
+    if (this.systems.some(system => system.__needsWriteLog)) {
+      this.writeLog = new Log(maxWritesPerFrame, false, 'maxWritesPerFrame');
+      this.writeLogFramePointer = this.writeLog.createPointer();
+    }
   }
 
   private normalizeAndInitSystems(userSystems: SystemsArray): System[] {
@@ -168,15 +170,15 @@ export class Dispatcher {
   private gatherFrameStats(): void {
     this.stats.frames += 1;
     this.stats.maxShapeChangesPerFrame = this.shapeLog.countSince(this.shapeLogFramePointer);
-    this.stats.maxWritesPerFrame = this.writeLog.countSince(this.writeLogFramePointer);
+    this.stats.maxWritesPerFrame = this.writeLog?.countSince(this.writeLogFramePointer!) ?? 0;
     this.shapeLog.createPointer(this.shapeLogFramePointer);
-    this.writeLog.createPointer(this.writeLogFramePointer);
+    this.writeLog?.createPointer(this.writeLogFramePointer);
   }
 
   flush(): void {
     this.entities.pool.returnTemporaryBorrows();
     this.shapeLog.commit();
-    this.writeLog.commit();
+    this.writeLog?.commit();
   }
 
   createEntity(initialComponents: (ComponentType<any> | any)[]): Entity {

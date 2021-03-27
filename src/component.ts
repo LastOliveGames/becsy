@@ -23,10 +23,11 @@ export interface ComponentType<C extends Component> {
   new(): C;
   schema?: Schema;
   maxEntities?: number;
-  __bind?(entityId: number, writable: boolean): C;
   __id?: number;
   __flagOffset?: number;
   __flagMask?: number;
+  __fields?: Field<any>[];
+  __bind?(id: EntityId, writable: boolean): C;
 }
 
 export interface Component {
@@ -36,79 +37,62 @@ export interface Component {
 }
 
 
-export class Controller<C extends Component> {
-  private readonly maxEntities: number;
-  fields: Field<any>[];
-  flagOffset: number;
-  flagMask: number;
-
-  constructor(
-    readonly id: number,
-    readonly type: ComponentType<C>,
-    readonly dispatcher: Dispatcher
-  ) {
-    if (config.DEBUG && (type.maxEntities ?? 0) > dispatcher.maxEntities) {
-      throw new Error(
-        `Component type ${type.name} maxEntities higher than world maxEntities; ` +
-        `reduce ${type.maxEntities} to or below ${dispatcher.maxEntities}`);
-    }
-    this.maxEntities = Math.min(type.maxEntities ?? dispatcher.maxEntities, dispatcher.maxEntities);
-    if (this.maxEntities < dispatcher.maxEntities) {
-      // TODO: enable packed array mode
-    }
-    type.__id = id;
-    type.__flagOffset = this.flagOffset = id >> 5;
-    type.__flagMask = this.flagMask = 1 << (id & 31);
-    // eslint-disable-next-line new-cap
-    const instance = new type();
-    type.__bind = (entityId: number, writable: boolean) => {
-      instance.__entityId = entityId;
-      instance.__index = entityId;
-      instance.__writable = writable;
-      return instance;
-    };
-    this.fields = this.gatherFields();
-    this.defineComponentProperties();
-  }
-
-  get name(): string {
-    return this.type.name;
-  }
-
-  init(id: EntityId, values: any): void {
-    if (config.DEBUG && values !== undefined) {
-      for (const key in values) {
-        if (!this.type.schema?.[key]) {
-          throw new Error(`Property ${key} not defined for component ${this.name}`);
-        }
+export function initComponent(type: ComponentType<any>, id: EntityId, values: any): void {
+  if (config.DEBUG && values !== undefined) {
+    for (const key in values) {
+      if (!type.schema?.[key]) {
+        throw new Error(`Property ${key} not defined for component ${type.name}`);
       }
     }
-    // TODO: in packed array mode, allocate a new index
-    const component = this.type.__bind!(id, true);
-    for (const field of this.fields) {
-      (component as any)[field.name] = values?.[field.name] ?? field.default;
-    }
   }
-
-  private defineComponentProperties(): void {
-    for (const field of this.fields) {
-      field.type.define(this.type, field.name, this.dispatcher, this.maxEntities);
-    }
-  }
-
-  private gatherFields(): Field<any>[] {
-    const schema = this.type.schema;
-    const fields: Field<any>[] = [];
-    for (const name in schema) {
-      const entry = schema[name];
-      let field;
-      if (entry instanceof Type) {
-        field = {name, default: entry.defaultValue, type: entry};
-      } else {
-        field = Object.assign({name, default: entry.type.defaultValue}, entry);
-      }
-      fields.push(field);
-    }
-    return fields;
+  // TODO: in packed array mode, allocate a new index
+  const component = type.__bind!(id, true);
+  for (const field of type.__fields!) {
+    (component as any)[field.name] = values?.[field.name] ?? field.default;
   }
 }
+
+
+function gatherFields(type: ComponentType<any>): Field<any>[] {
+  const schema = type.schema;
+  const fields: Field<any>[] = [];
+  for (const name in schema) {
+    const entry = schema[name];
+    let field;
+    if (entry instanceof Type) {
+      field = {name, default: entry.defaultValue, type: entry};
+    } else {
+      field = Object.assign({name, default: entry.type.defaultValue}, entry);
+    }
+    fields.push(field);
+  }
+  return fields;
+}
+
+
+export function decorateComponentType(
+  typeId: number, type: ComponentType<any>, dispatcher: Dispatcher
+): void {
+  if (config.DEBUG && (type.maxEntities ?? 0) > dispatcher.maxEntities) {
+    throw new Error(
+      `Component type ${type.name} maxEntities higher than world maxEntities; ` +
+      `reduce ${type.maxEntities} to or below ${dispatcher.maxEntities}`);
+  }
+  const maxEntities = Math.min(type.maxEntities ?? dispatcher.maxEntities, dispatcher.maxEntities);
+  if (maxEntities < dispatcher.maxEntities) {
+    // TODO: enable packed array mode
+  }
+  type.__id = typeId;
+  type.__flagOffset = typeId >> 5;
+  type.__flagMask = 1 << (typeId & 31);
+  const instance = new type();  // eslint-disable-line new-cap
+  type.__bind = (id: EntityId, writable: boolean) => {
+    instance.__entityId = id;
+    instance.__index = id;
+    instance.__writable = writable;
+    return instance;
+  };
+  type.__fields = gatherFields(type);
+  for (const field of type.__fields!) field.type.define(type, field.name, dispatcher, maxEntities);
+}
+
