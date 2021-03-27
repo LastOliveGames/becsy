@@ -19,7 +19,7 @@ export interface Field<JSType> {
   default: JSType;
 }
 
-export interface ComponentType<C extends Component> {
+export interface ComponentType<C> {
   new(): C;
   schema?: Schema;
   maxEntities?: number;
@@ -30,10 +30,13 @@ export interface ComponentType<C extends Component> {
   __bind?(id: EntityId, writable: boolean): C;
 }
 
-export interface Component {
-  __entityId?: number;
-  __index?: number;
-  __writable?: boolean;
+export interface Binding<C> {
+  type: ComponentType<C>;
+  instance: C;
+  dispatcher: Dispatcher;
+  entityId: number;
+  index: number;
+  writable: boolean;
 }
 
 
@@ -70,8 +73,8 @@ function gatherFields(type: ComponentType<any>): Field<any>[] {
 }
 
 
-export function decorateComponentType(
-  typeId: number, type: ComponentType<any>, dispatcher: Dispatcher
+export function decorateComponentType<C>(
+  typeId: number, type: ComponentType<C>, dispatcher: Dispatcher
 ): void {
   if (config.DEBUG && (type.maxEntities ?? 0) > dispatcher.maxEntities) {
     throw new Error(
@@ -85,14 +88,17 @@ export function decorateComponentType(
   type.__id = typeId;
   type.__flagOffset = typeId >> 5;
   type.__flagMask = 1 << (typeId & 31);
-  const instance = new type();  // eslint-disable-line new-cap
+  const binding: Binding<C> = {
+    // eslint-disable-next-line new-cap
+    type, instance: new type(), dispatcher, entityId: 0, index: 0, writable: false
+  };
   type.__bind = (id: EntityId, writable: boolean) => {
-    instance.__entityId = id;
-    instance.__index = id;
-    instance.__writable = writable;
-    return instance;
+    binding.entityId = id;
+    binding.index = id;
+    binding.writable = writable;
+    return binding.instance;
   };
   type.__fields = gatherFields(type);
-  for (const field of type.__fields!) field.type.define(type, field.name, dispatcher, maxEntities);
+  for (const field of type.__fields!) field.type.define(binding, field.name, maxEntities);
 }
 

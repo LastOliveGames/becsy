@@ -203,14 +203,14 @@ export class TopQuery extends Query {
   private __shapeLogPointer: LogPointer;
   private __writeLogPointer: LogPointer | undefined;
 
-  __startFrame(): void {
+  __execute(): void {
     if (!this.__flavors) return;
     this.__clearTransientResults();
     this.__computeShapeResults();
     this.__computeWriteResults();
   }
 
-  __endFrame(): void {
+  __cleanup(): void {
     this.__processedEntities.clear();
     if (this.__hasTransientResults) this.__clearTransientResults();
   }

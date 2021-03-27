@@ -14,7 +14,7 @@ export abstract class System {
   readonly __rwMasks : ReadWriteMasks = {read: [], write: []};
   __dispatcher: Dispatcher;
   private __queryBuilders: TopQueryBuilder[] | null = [];
-  private __queries: TopQuery[] = [];
+  __queries: TopQuery[] = [];
   __removedEntities: Bitset;
   __needsWriteLog: boolean;
   time: number;
@@ -50,13 +50,5 @@ export abstract class System {
     for (const builder of this.__queryBuilders!) builder.__build();
     this.__queryBuilders = null;
     this.__needsWriteLog = this.__queries.some(query => query.__hasChangedResults);
-  }
-
-  __run(time: number, delta: number): void {
-    this.time = time;
-    this.delta = delta;
-    for (const query of this.__queries) query.__startFrame();
-    this.execute();
-    for (const query of this.__queries) query.__endFrame();
   }
 }

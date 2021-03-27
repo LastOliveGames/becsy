@@ -9,35 +9,67 @@ class A {
 }
 
 class B {
-  static schema = {
-    value: Type.int32
-  };
+  @prop(Type.int32) declare value: number;
 }
 
 class C {
-  static schema = {
-    value: Type.int32
-  };
+  @prop(Type.int32) declare value: number;
 }
 
 class D {
-  static schema = {
-    value: Type.int32
-  };
+  @prop(Type.int32) declare value: number;
 }
 
 class E {
-  static schema = {
-    value: Type.int32
-  };
+  @prop(Type.int32) declare value: number;
 }
 
-class ASystem extends System {
+class SystemA extends System {
   entities = this.query(q => q.all.with(A).write);
 
   execute() {
     for (const entity of this.entities.all) {
       entity.write(A).value *= 2;
+    }
+  }
+}
+
+class SystemB extends System {
+  entities = this.query(q => q.all.with(B).write);
+
+  execute() {
+    for (const entity of this.entities.all) {
+      entity.write(B).value *= 2;
+    }
+  }
+}
+
+class SystemC extends System {
+  entities = this.query(q => q.all.with(C).write);
+
+  execute() {
+    for (const entity of this.entities.all) {
+      entity.write(C).value *= 2;
+    }
+  }
+}
+
+class SystemD extends System {
+  entities = this.query(q => q.all.with(D).write);
+
+  execute() {
+    for (const entity of this.entities.all) {
+      entity.write(D).value *= 2;
+    }
+  }
+}
+
+class SystemE extends System {
+  entities = this.query(q => q.all.with(E).write);
+
+  execute() {
+    for (const entity of this.entities.all) {
+      entity.write(E).value *= 2;
     }
   }
 }
@@ -48,7 +80,8 @@ function setup(count: number): World {
     maxEntities: count,
     maxShapeChangesPerFrame: 30000,
     componentTypes: [A, B, C, D, E],
-    systems: [ASystem]
+    // systems: [SystemA]
+    systems: [SystemA, SystemB, SystemC, SystemD, SystemE]
   });
 
   for (let i = 0; i < count; i++) {
@@ -65,8 +98,8 @@ function run(count: number) {
 }
 
 const PROFILE_SETUP = 0;
-const PROFILE_RUN = 0;
-const SIZE = 5000;
+const PROFILE_RUN = 1;
+const SIZE = 1000;
 const RUNS = 5000;
 
 console.log('setup');

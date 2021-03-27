@@ -139,32 +139,26 @@ export class Dispatcher {
     });
   }
 
-  execute(time?: number, delta?: number): void {
+  execute(time?: number, delta?: number, systems?: System[]): void {
     if (config.DEBUG && this.executing) throw new Error('Recursive system execution not allowed');
     this.executing = true;
-    if (!time) time = now() / 1000;
-    if (!delta) delta = time - this.lastTime;
+    if (time === undefined) time = now() / 1000;
+    if (delta === undefined) delta = time - this.lastTime;
     this.lastTime = time;
-    for (const system of this.systems) {
+    for (const system of systems ?? this.systems) {
       this.entities.executingSystem = system;
-      system.__run(time, delta);
+      // Manually inlined the following from System for performance
+      system.time = time;
+      system.delta = delta;
+      for (const query of system.__queries) query.__execute();
+      system.execute();
+      for (const query of system.__queries) query.__cleanup();
       this.flush();
     }
     this.entities.executingSystem = undefined;
     this.entities.processEndOfFrame();
     this.executing = false;
     this.gatherFrameStats();
-  }
-
-  executeOne(system: System): void {
-    if (config.DEBUG && this.executing) throw new Error('Recursive system execution not allowed');
-    this.executing = true;
-    system.__init(this);
-    // Don't set rwMasks -- give full power when executing a single system out of band.
-    system.__run(0, 0);
-    this.flush();
-    this.entities.processEndOfFrame();
-    this.executing = false;
   }
 
   private gatherFrameStats(): void {
@@ -175,7 +169,7 @@ export class Dispatcher {
     this.writeLog?.createPointer(this.writeLogFramePointer);
   }
 
-  flush(): void {
+  private flush(): void {
     this.entities.pool.returnTemporaryBorrows();
     this.shapeLog.commit();
     this.writeLog?.commit();

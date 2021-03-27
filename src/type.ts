@@ -1,12 +1,11 @@
-import type {Component, ComponentType} from './component';
+import type {Binding} from './component';
 import type {Entity} from './entity';
 import {TextEncoder, TextDecoder} from 'util';
 import {config} from './config';
-import type {Dispatcher} from './dispatcher';
 
 
-function checkWritable(component: Component) {
-  if (!component.__writable) {
+function checkWritable<C>(binding: Binding<C>) {
+  if (!binding.writable) {
     throw new Error(
       'Component is not writable; use entity.write(Component) to acquire a writable version');
   }
@@ -16,9 +15,8 @@ function checkWritable(component: Component) {
 export abstract class Type<JSType> {
   constructor(readonly defaultValue: JSType) {}
 
-  abstract define<C extends Component>(
-    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
-    buffer?: SharedArrayBuffer
+  abstract define<C>(
+    binding: Binding<C>, name: string, maxEntities: number, buffer?: SharedArrayBuffer
   ): SharedArrayBuffer;
 
   static boolean: Type<boolean>;
@@ -38,20 +36,19 @@ export abstract class Type<JSType> {
 class BooleanType extends Type<boolean> {
   constructor() {super(false);}
 
-  define<C extends Component>(
-    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
-    buffer?: SharedArrayBuffer
+  define<C>(
+    binding: Binding<C>, name: string, maxEntities: number, buffer?: SharedArrayBuffer
   ): SharedArrayBuffer {
     if (!buffer) buffer = new SharedArrayBuffer(maxEntities);
     const data = new Uint8Array(buffer);
-    Object.defineProperty(type.prototype, name, {
+    Object.defineProperty(binding.type.prototype, name, {
       enumerable: true,
-      get(this: Component): boolean {
-        return Boolean(data[this.__index!]);
+      get(this: C): boolean {
+        return Boolean(data[binding.index]);
       },
-      set(this: Component, value: boolean): void {
-        if (config.DEBUG) checkWritable(this);
-        data[this.__index!] = value ? 1 : 0;
+      set(this: C, value: boolean): void {
+        if (config.DEBUG) checkWritable(binding);
+        data[binding.index] = value ? 1 : 0;
       }
     });
     return buffer;
@@ -72,22 +69,21 @@ class NumberType extends Type<number> {
     super(0);
   }
 
-  define<C extends Component>(
-    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
-    buffer?: SharedArrayBuffer
+  define<C>(
+    binding: Binding<C>, name: string, maxEntities: number, buffer?: SharedArrayBuffer
   ): SharedArrayBuffer {
     if (!buffer) {
       buffer = new SharedArrayBuffer(maxEntities * this.NumberArray.BYTES_PER_ELEMENT);
     }
     const data = new this.NumberArray(buffer);
-    Object.defineProperty(type.prototype, name, {
+    Object.defineProperty(binding.type.prototype, name, {
       enumerable: true,
-      get(this: Component): number {
-        return data[this.__index!];
+      get(this: C): number {
+        return data[binding.index];
       },
-      set(this: Component, value: number): void {
-        if (config.DEBUG) checkWritable(this);
-        data[this.__index!] = value;
+      set(this: C, value: number): void {
+        if (config.DEBUG) checkWritable(binding);
+        data[binding.index] = value;
       }
     });
     return buffer;
@@ -109,32 +105,31 @@ class StaticStringType extends Type<string> {
     for (let i = 0; i < choices.length; i++) this.choicesIndex.set(choices[i], i);
   }
 
-  define<C extends Component>(
-    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
-    buffer?: SharedArrayBuffer
+  define<C>(
+    binding: Binding<C>, name: string, maxEntities: number, buffer?: SharedArrayBuffer
   ): SharedArrayBuffer {
     if (!buffer) {
       buffer = new SharedArrayBuffer(maxEntities * this.TypedArray.BYTES_PER_ELEMENT);
     }
     const data = new this.TypedArray(buffer);
     const choices = this.choices, choicesIndex = this.choicesIndex;
-    Object.defineProperty(type.prototype, name, {
+    Object.defineProperty(binding.type.prototype, name, {
       enumerable: true,
-      get(this: Component): string {
-        const index = data[this.__index!];
+      get(this: C): string {
+        const index = data[binding.index];
         const result = choices[index];
         if (config.DEBUG && result === undefined) {
           throw new Error(`Invalid static string index: ${index}`);
         }
         return result;
       },
-      set(this: Component, value: string): void {
-        if (config.DEBUG) checkWritable(this);
+      set(this: C, value: string): void {
+        if (config.DEBUG) checkWritable(binding);
         const index = choicesIndex.get(value);
         if (config.DEBUG && index === undefined) {
           throw new Error(`Static string not in set: "${value}"`);
         }
-        data[this.__index!] = index!;
+        data[binding.index] = index!;
       }
     });
     return buffer;
@@ -155,30 +150,29 @@ class DynamicStringType extends Type<string> {
     this.bytesStride = this.maxUtf8Length + 2;  // account for length field
   }
 
-  define<C extends Component>(
-    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
-    buffer?: SharedArrayBuffer
+  define<C>(
+    binding: Binding<C>, name: string, maxEntities: number, buffer?: SharedArrayBuffer
   ): SharedArrayBuffer {
     if (!buffer) buffer = new SharedArrayBuffer(maxEntities * (this.maxUtf8Length + 2));
     const lengths = new Uint16Array(buffer);
     const bytes = new Uint8Array(buffer);
     const maxUtf8Length = this.maxUtf8Length;
     const lengthsStride = this.lengthsStride, bytesStride = this.bytesStride;
-    Object.defineProperty(type.prototype, name, {
+    Object.defineProperty(binding.type.prototype, name, {
       enumerable: true,
-      get(this: Component): string {
-        const length = lengths[this.__index! * lengthsStride];
+      get(this: C): string {
+        const length = lengths[binding.index * lengthsStride];
         return DynamicStringType.decoder.decode(
-          new Uint8Array(bytes.buffer, this.__index! * bytesStride + 2, length));
+          new Uint8Array(bytes.buffer, binding.index * bytesStride + 2, length));
       },
-      set(this: Component, value: string): void {
-        if (config.DEBUG) checkWritable(this);
+      set(this: C, value: string): void {
+        if (config.DEBUG) checkWritable(binding);
         const encodedString = DynamicStringType.encoder.encode(value);
         if (encodedString.byteLength > maxUtf8Length) {
           throw new Error(`Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
         }
-        lengths[this.__index! * lengthsStride] = encodedString.byteLength;
-        bytes.set(encodedString, this.__index! * bytesStride + 2);
+        lengths[binding.index * lengthsStride] = encodedString.byteLength;
+        bytes.set(encodedString, binding.index * bytesStride + 2);
       }
     });
     return buffer;
@@ -190,28 +184,27 @@ class RefType extends Type<Entity | null> {
     super(null);
   }
 
-  define<C extends Component>(
-    type: ComponentType<C>, name: string, dispatcher: Dispatcher, maxEntities: number,
-    buffer?: SharedArrayBuffer
+  define<C>(
+    binding: Binding<C>, name: string, maxEntities: number, buffer?: SharedArrayBuffer
   ): SharedArrayBuffer {
     if (!buffer) buffer = new SharedArrayBuffer(maxEntities * 4);
     const data = new Int32Array(buffer);
-    Object.defineProperty(type.prototype, name, {
+    Object.defineProperty(binding.type.prototype, name, {
       enumerable: true,
-      get(this: Component): Entity | null {
-        const id = data[this.__index!];
+      get(this: C): Entity | null {
+        const id = data[binding.index];
         if (id === -1) return null;
-        return dispatcher.entities.pool.borrowTemporarily(id);
+        return binding.dispatcher.entities.pool.borrowTemporarily(id);
       },
-      set(this: Component, value: Entity | null): void {
-        if (config.DEBUG) checkWritable(this);
-        const oldId = data[this.__index!];
+      set(this: C, value: Entity | null): void {
+        if (config.DEBUG) checkWritable(binding);
+        const oldId = data[binding.index];
         const newId = value?.__id ?? -1;
         if (oldId === newId) return;
-        const indexer = dispatcher.indexer;
-        if (oldId !== 0) indexer.remove(oldId, this.__entityId!);
-        data[this.__index!] = newId;
-        if (newId !== 0) indexer.insert(newId, this.__entityId!);
+        const indexer = binding.dispatcher.indexer;
+        if (oldId !== 0) indexer.remove(oldId, binding.entityId);
+        data[binding.index] = newId;
+        if (newId !== 0) indexer.insert(newId, binding.entityId);
       }
     });
     return buffer;
