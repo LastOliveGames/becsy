@@ -1,7 +1,8 @@
 import type {ComponentType} from './component';
+import {Bitset} from './datastructures';
 import type {Dispatcher} from './dispatcher';
 import type {Entity, ReadWriteMasks} from './entity';
-import {MainQuery, MainQueryBuilder} from './query';
+import {TopQuery, TopQueryBuilder} from './query';
 
 
 export interface SystemType {
@@ -12,15 +13,18 @@ export interface SystemType {
 export abstract class System {
   readonly __rwMasks : ReadWriteMasks = {read: [], write: []};
   __dispatcher: Dispatcher;
-  private __queryBuilders: MainQueryBuilder[] | null = [];
+  private __queryBuilders: TopQueryBuilder[] | null = [];
+  private __queries: TopQuery[] = [];
+  __removedEntities: Bitset;
   time: number;
   delta: number;
 
   get name(): string {return this.constructor.name;}
 
-  query(buildCallback: (q: MainQueryBuilder) => void): MainQuery {
-    const query = new MainQuery(this);
-    const builder = new MainQueryBuilder(buildCallback, query, this);
+  query(buildCallback: (q: TopQueryBuilder) => void): TopQuery {
+    const query = new TopQuery(this);
+    this.__queries.push(query);
+    const builder = new TopQueryBuilder(buildCallback, query, this);
     if (this.__queryBuilders) {
       this.__queryBuilders.push(builder);
     } else {
@@ -33,9 +37,7 @@ export abstract class System {
     return this.__dispatcher.createEntity(initialComponents);
   }
 
-  execute(): void {
-    // do nothing by default
-  }
+  abstract execute(): void;
 
   __init(dispatcher: Dispatcher): void {
     if (dispatcher === this.__dispatcher) return;
@@ -43,7 +45,16 @@ export abstract class System {
       throw new Error(`You can't reuse an instance of system ${this.name} in different worlds`);
     }
     this.__dispatcher = dispatcher;
+    this.__removedEntities = new Bitset(dispatcher.maxEntities);
     for (const builder of this.__queryBuilders!) builder.__build();
     this.__queryBuilders = null;
+  }
+
+  __run(time: number, delta: number): void {
+    this.time = time;
+    this.delta = delta;
+    for (const query of this.__queries) query.__startFrame();
+    this.execute();
+    for (const query of this.__queries) query.__endFrame();
   }
 }

@@ -65,13 +65,12 @@ function run(count: number) {
 }
 
 const PROFILE_SETUP = 0;
-const PROFILE_RUN = 1;
+const PROFILE_RUN = 0;
 const SIZE = 5000;
 const RUNS = 5000;
 
 console.log('setup');
 if (PROFILE_SETUP) world = await profile(async() => setup(SIZE)); else world = setup(SIZE);
-console.log(world.stats.toString());
 console.log('run');
 const start = performance.now();
 if (PROFILE_RUN) await profile(async() => run(RUNS)); else run(RUNS);

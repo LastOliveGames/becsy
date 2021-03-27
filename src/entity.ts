@@ -1,7 +1,8 @@
 import {Controller, ComponentType, Field} from './component';
+import {config} from './config';
 import {Log, LogPointer, SharedAtomicPool} from './datastructures';
 import type {Dispatcher} from './dispatcher';
-import {Pool} from './pool';
+import type {System} from './system';
 import {Type} from './type';
 
 
@@ -15,21 +16,19 @@ export const MAX_NUM_COMPONENTS = 2 ** (32 - ENTITY_ID_BITS);
 
 
 export class Entity {
-  __entities: Entities;
   __id: EntityId;
-  __forcedComponentsMask: number[] | undefined;
   joined: {[name: string]: Iterable<Entity>} | undefined;
 
-  __reset(entities: Entities, id: EntityId, forcedComponentsMask: number[] | undefined): void {
-    this.__entities = entities;
+  constructor(private readonly __entities: Entities) {}
+
+  __reset(id: EntityId): void {
     this.__id = id;
-    this.__forcedComponentsMask = forcedComponentsMask;
     this.joined = undefined;
   }
 
   add(type: ComponentType<any>, values: any): this {
     // TODO: prevent add when component has been deleted
-    this.__checkMask(type, true);
+    if (config.DEBUG) this.__checkMask(type, true);
     if (this.__entities.hasFlag(this.__id, type)) {
       throw new Error(`Entity already has a ${type.name} component`);
     }
@@ -52,7 +51,7 @@ export class Entity {
   }
 
   remove(type: ComponentType<any>): boolean {
-    this.__checkMask(type, true);
+    if (config.DEBUG) this.__checkMask(type, true);
     if (!this.__entities.hasFlag(this.__id, type)) return false;
     this.__remove(type);
     return true;
@@ -63,25 +62,36 @@ export class Entity {
   }
 
   has(type: ComponentType<any>): boolean {
-    this.__checkMask(type, false);
-    return this.__has(type, false);
+    if (config.DEBUG) this.__checkMask(type, false);
+    return this.__entities.hasFlag(this.__id, type);
   }
 
   read<C>(type: ComponentType<C>): Readonly<C> {
-    this.__checkMask(type, false);
-    const component = this.__get(type, false);
-    if (component === undefined) throw new Error(`Entity doesn't have a ${type.name} component`);
-    return component;
+    if (config.DEBUG) this.__checkMask(type, false);
+    const component = this.__get(type, false, false);
+    if (config.DEBUG && component === undefined) {
+      throw new Error(`Entity doesn't have a ${type.name} component`);
+    }
+    return component!;
   }
 
   readIfPresent<C>(type: ComponentType<C>): Readonly<C> | undefined {
-    this.__checkMask(type, false);
-    return this.__get(type, false);
+    if (config.DEBUG) this.__checkMask(type, false);
+    return this.__get(type, false, false);
+  }
+
+  readRecentlyRemoved<C>(type: ComponentType<C>): Readonly<C> {
+    if (config.DEBUG) this.__checkMask(type, false);
+    const component = this.__get(type, false, true);
+    if (config.DEBUG && component === undefined) {
+      throw new Error(`Entity doesn't have a ${type.name} component`);
+    }
+    return component!;
   }
 
   write<C>(type: ComponentType<C>): C {
-    this.__checkMask(type, true);
-    const component = this.__get(type, true);
+    if (config.DEBUG) this.__checkMask(type, true);
+    const component = this.__get(type, true, false);
     if (component === undefined) throw new Error(`Entity doesn't have a ${type.name} component`);
     this.__entities.markMutated(this.__id, type);
     return component;
@@ -90,21 +100,18 @@ export class Entity {
   delete(): void {
     for (const type of this.__entities.types) {
       if (!this.__entities.hasFlag(this.__id, type)) continue;
-      this.__checkMask(type, true);
+      if (config.DEBUG) this.__checkMask(type, true);
       this.__remove(type);
     }
     this.__entities.queueDeletion(this.__id);
     this.__wipeInboundRefs();
   }
 
-  private __get<C>(type: ComponentType<C>, allowWrite: boolean): C | undefined {
-    if (!this.__has(type, allowWrite)) return;
-    return this.__entities.bindComponent(type, this.__id, allowWrite);
-  }
-
-  private __has(type: ComponentType<any>, allowWrite: boolean): boolean {
-    return this.__entities.hasFlag(
-      this.__id, type, allowWrite ? undefined : this.__forcedComponentsMask);
+  private __get<C>(
+    type: ComponentType<C>, allowWrite: boolean, allowRemoved: boolean
+  ): C | undefined {
+    if (!this.__entities.hasFlag(this.__id, type, allowRemoved)) return;
+    return type.__bind!(this.__id, allowWrite);
   }
 
   private __remove(type: ComponentType<any>): void {
@@ -127,7 +134,7 @@ export class Entity {
   }
 
   private __checkMask(type: ComponentType<any>, write: boolean): void {
-    const rwMasks = this.__entities.dispatcher.rwMasks;
+    const rwMasks = this.__entities.executingSystem?.__rwMasks;
     if (rwMasks && !this.__entities.maskHasFlag(write ? rwMasks.write : rwMasks.read, type)) {
       throw new Error(
         `System didn't mark component ${type.name} as ${write ? 'writable' : 'readable'}`);
@@ -136,12 +143,57 @@ export class Entity {
 }
 
 
+export class EntityPool {
+  private readonly borrowed: (Entity | undefined)[];  // indexed by id
+  private readonly borrowCounts: Int32Array;  // indexed by id
+  private readonly spares: Entity[] = [];
+  private readonly temporarilyBorrowedIds: number[] = [];
+
+  constructor(private readonly entities: Entities, maxEntities: number) {
+    this.borrowed = Array.from({length: maxEntities});
+    this.borrowCounts = new Int32Array(maxEntities);
+  }
+
+  borrow(id: number): Entity {
+    this.borrowCounts[id] += 1;
+    let entity = this.borrowed[id];
+    if (!entity) {
+      entity = this.borrowed[id] = this.spares.pop() ?? new Entity(this.entities);
+      entity.__reset(id);
+    }
+    return entity;
+  }
+
+  borrowTemporarily(id: number): Entity {
+    const entity = this.borrow(id);
+    this.temporarilyBorrowedIds.push(id);
+    return entity;
+  }
+
+  returnTemporaryBorrows(): void {
+    for (const id of this.temporarilyBorrowedIds) this.return(id);
+    this.temporarilyBorrowedIds.splice(0, Infinity);
+  }
+
+  return(id: number): void {
+    if (config.DEBUG && !this.borrowCounts[id]) {
+      throw new Error('Internal error, returning entity with no borrows');
+    }
+    if (--this.borrowCounts[id] <= 0) {
+      this.spares.push(this.borrowed[id]!);
+      this.borrowed[id] = undefined;
+    }
+  }
+}
+
+
 export class Entities {
   private readonly stride: number;
   private readonly shapes: Uint32Array;
-  private readonly pool = new Pool(Entity);
   private readonly controllers: Map<ComponentType<any>, Controller<any>> = new Map();
   private readonly entityIdPool: SharedAtomicPool;
+  readonly pool: EntityPool;
+  executingSystem: System | undefined;
   private readonly deletionLog: Log;
   private readonly prevDeletionPointer: LogPointer;
   private readonly oldDeletionPointer: LogPointer;
@@ -150,7 +202,6 @@ export class Entities {
     maxEntities: number, maxLimboEntities: number,
     readonly types: ComponentType<any>[], readonly dispatcher: Dispatcher
   ) {
-    dispatcher.addPool(this.pool);
     let componentId = 0;
     for (const type of types) {
       this.controllers.set(type, new Controller(componentId++, type, this.dispatcher));
@@ -159,7 +210,8 @@ export class Entities {
     const size = maxEntities * this.stride * 4;
     this.shapes = new Uint32Array(new SharedArrayBuffer(size));
     this.entityIdPool = new SharedAtomicPool(maxEntities, 'maxEntities');
-    this.entityIdPool.fillWithDescendingIntegers(1);
+    this.entityIdPool.fillWithDescendingIntegers(0);
+    this.pool = new EntityPool(this, maxEntities);
     this.deletionLog = new Log(maxLimboEntities, false, 'maxLimboEntities');
     this.prevDeletionPointer = this.deletionLog.createPointer();
     this.oldDeletionPointer = this.deletionLog.createPointer();
@@ -169,15 +221,9 @@ export class Entities {
     const id = this.entityIdPool.take();
     this.shapes.fill(0, id * this.stride, (id + 1) * this.stride);
     // for (let i = id * this.stride; i < (id + 1) * this.stride; i++) this.shapes[i] = 0;
-    const entity = this.bind(id);
+    const entity = this.pool.borrowTemporarily(id);
     if (initialComponents) entity.addAll(...initialComponents);
     this.dispatcher.stats.numEntities += 1;
-    return entity;
-  }
-
-  bind(id: EntityId, forcedComponentsMask?: number[]): Entity {
-    const entity = this.pool.borrow();
-    entity.__reset(this, id, forcedComponentsMask);
     return entity;
   }
 
@@ -186,47 +232,48 @@ export class Entities {
   }
 
   processEndOfFrame(): void {
-    this.dispatcher.stats.maxLimboEntities = this.deletionLog.countSince(this.oldDeletionPointer);
+    const numDeletedEntities = this.deletionLog.countSince(this.oldDeletionPointer);
+    this.dispatcher.stats.numEntities -= numDeletedEntities;
+    this.dispatcher.stats.maxLimboEntities = numDeletedEntities;
     this.deletionLog.copySince(
       this.oldDeletionPointer, this.prevDeletionPointer, data => this.entityIdPool.refill(data));
     this.deletionLog.createPointer(this.prevDeletionPointer);
   }
 
   extendMaskAndSetFlag(mask: number[], type: ComponentType<any>): void {
-    const ctrl = this.controllers.get(type)!;
-    const flagOffset = ctrl.flagOffset;
+    const flagOffset = type.__flagOffset!;
     if (flagOffset >= mask.length) {
       mask.length = flagOffset + 1;
       mask.fill(0, mask.length, flagOffset);
     }
-    mask[flagOffset] |= ctrl.flagMask;
+    mask[flagOffset] |= type.__flagMask!;
   }
 
   maskHasFlag(mask: number[], type: ComponentType<any>): boolean {
-    const ctrl = this.controllers.get(type)!;
-    return ((mask[ctrl.flagOffset] ?? 0) & ctrl.flagMask) !== 0;
+    return ((mask[type.__flagOffset!] ?? 0) & type.__flagMask!) !== 0;
   }
 
   getFields(type: ComponentType<any>): Field<any>[] {
     return this.controllers.get(type)!.fields;
   }
 
-  hasFlag(id: EntityId, type: ComponentType<any>, extraMask?: number[]): boolean {
-    const ctrl = this.controllers.get(type)!;
-    if ((this.shapes[id * this.stride + ctrl.flagOffset] & ctrl.flagMask) !== 0) return true;
-    if (extraMask && ((extraMask[ctrl.flagOffset] ?? 0) & ctrl.flagMask) !== 0) return true;
+  hasFlag(id: EntityId, type: ComponentType<any>, allowRemoved = false): boolean {
+    const index = id * this.stride + type.__flagOffset!;
+    if ((this.shapes[index] & type.__flagMask!) !== 0) return true;
+    if (allowRemoved && this.executingSystem?.__removedEntities.get(id) &&
+        (this.executingSystem.__rwMasks.read[type.__flagOffset!] & type.__flagMask!) !== 0) {
+      return true;
+    }
     return false;
   }
 
   setFlag(id: EntityId, type: ComponentType<any>): void {
-    const ctrl = this.controllers.get(type)!;
-    this.shapes[id * this.stride + ctrl.flagOffset] |= ctrl.flagMask;
+    this.shapes[id * this.stride + type.__flagOffset!] |= type.__flagMask!;
     this.dispatcher.shapeLog.push(id);
   }
 
   clearFlag(id: EntityId, type: ComponentType<any>): void {
-    const ctrl = this.controllers.get(type)!;
-    this.shapes[id * this.stride + ctrl.flagOffset] &= ~ctrl.flagMask;
+    this.shapes[id * this.stride + type.__flagOffset!] &= ~type.__flagMask!;
     this.dispatcher.shapeLog.push(id);
   }
 
@@ -239,19 +286,11 @@ export class Entities {
   }
 
   markMutated(id: EntityId, type: ComponentType<any>): void {
-    const ctrl = this.controllers.get(type)!;
-    this.dispatcher.writeLog.push(id | (ctrl.id << ENTITY_ID_BITS));
+    this.dispatcher.writeLog.push(id | (type.__id! << ENTITY_ID_BITS));
   }
 
   initComponent(type: ComponentType<any>, id: EntityId, values: any): void {
     this.controllers.get(type)!.init(id, values);
-  }
-
-  bindComponent<C, M extends boolean>(
-    type: ComponentType<C>, id: EntityId, allowWrite: M): M extends true ? C : Readonly<C>;
-
-  bindComponent<C>(type: ComponentType<C>, id: EntityId, allowWrite: boolean): C {
-    return this.controllers.get(type)!.bind(id, allowWrite);
   }
 
   matchShape(id: EntityId, positiveMask?: number[], negativeMask?: number[]): boolean {

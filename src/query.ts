@@ -2,7 +2,7 @@ import {Bitset, LogPointer} from './datastructures';
 import type {ComponentType} from './component';
 import {Entity, ENTITY_ID_BITS, ENTITY_ID_MASK} from './entity';
 import type {System} from './system';
-import {ArrayEntityList, EntityList, SparseArrayEntityList} from './entitylists';
+import {ArrayEntityList, EntityList, PackedArrayEntityList} from './entitylists';
 
 type MaskKind = '__withMask' | '__withoutMask' | '__trackMask' | '__refMask';
 
@@ -12,7 +12,12 @@ const enum QueryFlavor {
 }
 
 type QueryFlavorName = keyof typeof QueryFlavor;
+type TransientQueryFlavorName =
+  'added' | 'removed' | 'changed' | 'addedOrChanged' | 'changedOrRemoved' | 'addedChangedOrRemoved';
 
+const transientFlavorsMask =
+  QueryFlavor.added | QueryFlavor.removed | QueryFlavor.changed | QueryFlavor.addedOrChanged |
+  QueryFlavor.changedOrRemoved | QueryFlavor.addedChangedOrRemoved;
 const changedFlavorsMask =
   QueryFlavor.changed | QueryFlavor.addedOrChanged | QueryFlavor.changedOrRemoved |
   QueryFlavor.addedChangedOrRemoved;
@@ -129,10 +134,10 @@ class QueryBuilder {
 }
 
 
-export class MainQueryBuilder extends QueryBuilder {
+export class TopQueryBuilder extends QueryBuilder {
   private joinBuilders: {[name: string]: JoinQueryBuilder} = {};
 
-  constructor(callback: (q: MainQueryBuilder) => void, query: MainQuery, system: System) {
+  constructor(callback: (q: TopQueryBuilder) => void, query: TopQuery, system: System) {
     super(callback as any, query, system);
   }
 
@@ -149,7 +154,7 @@ export class MainQueryBuilder extends QueryBuilder {
   join(name: string, joinCallback: (q: JoinQueryBuilder) => void): this {
     // eslint-disable-next-line @typescript-eslint/no-use-before-define
     const joinQuery = new JoinQuery(this.__system);
-    (this.__query as MainQuery).__joins[name] = joinQuery;
+    (this.__query as TopQuery).__joins[name] = joinQuery;
     this.joinBuilders[name] =
       // eslint-disable-next-line @typescript-eslint/no-use-before-define
       new JoinQueryBuilder(joinCallback, joinQuery, this.__system);
@@ -172,7 +177,7 @@ class JoinQueryBuilder extends QueryBuilder {
 }
 
 
-abstract class Query {
+export abstract class Query {
   __flavors = 0;
   __withMask: number[] | undefined;
   __withoutMask: number[] | undefined;
@@ -185,142 +190,149 @@ abstract class Query {
 
 }
 
-export class MainQuery extends Query {
+export class TopQuery extends Query {
   readonly __joins: {[name: string]: JoinQuery} = {};
-  private lastExecutionTime: number;
 
-  private results: Partial<Record<QueryFlavorName, EntityList>> = {};
-  private processedEntities: Bitset;
-  private currentEntities: Bitset;
-  private shapeLogPointer: LogPointer;
-  private writeLogPointer: LogPointer;
+  private __results:
+    Partial<Record<QueryFlavorName, EntityList>> & {all?: PackedArrayEntityList} = {};
 
-  private executeQueries(): void {
-    if (!this.__flavors ||
-        this.lastExecutionTime && this.lastExecutionTime === this.__system.time) return;
-    this.lastExecutionTime = this.__system.time;
-    this.clearTransientResults();
-    this.computeShapeResults();
-    this.computeWriteResults();
+  private __hasTransientResults: boolean;
+  private __processedEntities: Bitset;
+  private __currentEntities: Bitset | undefined;
+  private __shapeLogPointer: LogPointer;
+  private __writeLogPointer: LogPointer;
+
+  __startFrame(): void {
+    if (!this.__flavors) return;
+    this.__clearTransientResults();
+    this.__computeShapeResults();
+    this.__computeWriteResults();
+  }
+
+  __endFrame(): void {
+    this.__processedEntities.clear();
+    if (this.__hasTransientResults) this.__clearTransientResults();
   }
 
   __init(): void {
-    this.initPointers();
-    this.allocateBuffers();
+    const dispatcher = this.__system.__dispatcher;
+    this.__hasTransientResults = Boolean(this.__flavors & transientFlavorsMask);
+    this.__shapeLogPointer = dispatcher.shapeLog.createPointer();
+    this.__writeLogPointer = dispatcher.writeLog.createPointer();
+    this.__processedEntities = new Bitset(dispatcher.maxEntities);
+    if (this.__flavors & QueryFlavor.all) {
+      this.__results.all =
+        new PackedArrayEntityList(dispatcher.entities.pool, dispatcher.maxEntities);
+    } else {
+      this.__currentEntities = new Bitset(dispatcher.maxEntities);
+    }
+    if (this.__hasTransientResults) this.__allocateTransientResultLists();
   }
 
-  private initPointers(): void {
-    const dispatcher = this.__system.__dispatcher;
-    this.shapeLogPointer = dispatcher.shapeLog.createPointer();
-    this.writeLogPointer = dispatcher.writeLog.createPointer();
-  }
-
-  private allocateBuffers(): void {
-    const dispatcher = this.__system.__dispatcher;
-    this.processedEntities = new Bitset(dispatcher.maxEntities);
-    this.currentEntities = new Bitset(dispatcher.maxEntities);
-    if (this.__flavors & QueryFlavor.all) this.results.all = new SparseArrayEntityList(dispatcher);
-    // TODO: use pooled result buffers
-    if (this.__flavors & QueryFlavor.added) this.allocateResult('added');
-    if (this.__flavors & QueryFlavor.removed) this.allocateResult('removed', true);
-    if (this.__flavors & QueryFlavor.changed) this.allocateResult('changed');
-    if (this.__flavors & QueryFlavor.addedOrChanged) this.allocateResult('addedOrChanged');
-    if (this.__flavors & QueryFlavor.changedOrRemoved) this.allocateResult('changedOrRemoved');
+  private __allocateTransientResultLists(): void {
+    if (this.__flavors & QueryFlavor.added) this.__allocateResult('added');
+    if (this.__flavors & QueryFlavor.removed) this.__allocateResult('removed');
+    if (this.__flavors & QueryFlavor.changed) this.__allocateResult('changed');
+    if (this.__flavors & QueryFlavor.addedOrChanged) this.__allocateResult('addedOrChanged');
+    if (this.__flavors & QueryFlavor.changedOrRemoved) this.__allocateResult('changedOrRemoved');
     if (this.__flavors & QueryFlavor.addedChangedOrRemoved) {
-      this.allocateResult('addedChangedOrRemoved', true);
+      this.__allocateResult('addedChangedOrRemoved');
     }
   }
 
-  private allocateResult(name: keyof typeof QueryFlavor, includeRemovedComponents?: boolean): void {
+  private __allocateResult(name: TransientQueryFlavorName): void {
     const dispatcher = this.__system.__dispatcher;
-    this.results[name] = new ArrayEntityList(dispatcher);
+    this.__results[name] = new ArrayEntityList(dispatcher.entities.pool);
   }
 
-  private clearTransientResults(): void {
-    this.processedEntities.clear();
-    if (this.results.added) this.results.added.clear();
-    if (this.results.removed) this.results.removed.clear();
-    if (this.results.changed) this.results.changed.clear();
-    if (this.results.addedOrChanged) this.results.addedOrChanged.clear();
-    if (this.results.changedOrRemoved) this.results.changedOrRemoved.clear();
-    if (this.results.addedChangedOrRemoved) this.results.addedChangedOrRemoved.clear();
+  private __clearTransientResults(): void {
+    this.__results.added?.clear();
+    this.__results.removed?.clear();
+    this.__results.changed?.clear();
+    this.__results.addedOrChanged?.clear();
+    this.__results.changedOrRemoved?.clear();
+    this.__results.addedChangedOrRemoved?.clear();
   }
 
-  private computeShapeResults(): void {
+  private __computeShapeResults(): void {
     const entities = this.__system.__dispatcher.entities;
-    for (const id of this.__system.__dispatcher.shapeLog.processSince(this.shapeLogPointer)) {
-      if (!this.processedEntities.get(id)) {
-        this.processedEntities.set(id);
-        const oldMatch = this.currentEntities.get(id);
+    for (const id of this.__system.__dispatcher.shapeLog.processSince(this.__shapeLogPointer)) {
+      if (!this.__processedEntities.get(id)) {
+        this.__processedEntities.set(id);
+        const oldMatch = this.__results.all?.has(id) ?? this.__currentEntities!.get(id);
         const newMatch = entities.matchShape(id, this.__withMask, this.__withoutMask);
         if (newMatch && !oldMatch) {
-          this.currentEntities.set(id);
-          this.results.all?.add(id);
-          this.results.added?.add(id);
-          this.results.addedOrChanged?.add(id);
-          this.results.addedChangedOrRemoved?.add(id);
+          this.__currentEntities?.set(id);
+          this.__results.all?.add(id);
+          this.__results.added?.add(id);
+          this.__results.addedOrChanged?.add(id);
+          this.__results.addedChangedOrRemoved?.add(id);
         } else if (!newMatch && oldMatch) {
-          this.currentEntities.unset(id);
-          this.results.all?.remove(id);
-          this.results.removed?.add(id);
-          this.results.changedOrRemoved?.add(id);
-          this.results.addedChangedOrRemoved?.add(id);
+          this.__currentEntities?.unset(id);
+          this.__system.__removedEntities.set(id);
+          this.__results.all?.remove(id);
+          this.__results.removed?.add(id);
+          this.__results.changedOrRemoved?.add(id);
+          this.__results.addedChangedOrRemoved?.add(id);
         }
       }
     }
   }
 
-  private computeWriteResults(): void {
+  private __computeWriteResults(): void {
     if (!(this.__flavors & changedFlavorsMask) || !this.__trackMask) return;
-    for (const entry of this.__system.__dispatcher.writeLog.processSince(this.writeLogPointer)) {
+    for (const entry of this.__system.__dispatcher.writeLog.processSince(this.__writeLogPointer)) {
       const entityId = entry & ENTITY_ID_MASK;
-      if (!this.processedEntities.get(entityId)) {
+      if (!this.__processedEntities.get(entityId)) {
         const componentId = entry >>> ENTITY_ID_BITS;
         // Manually recompute offset and mask instead of looking up controller.
         if ((this.__trackMask[componentId >> 5] ?? 0) & (1 << (componentId & 31))) {
-          this.processedEntities.set(entityId);
-          this.results.changed?.add(entityId);
-          this.results.addedOrChanged?.add(entityId);
-          this.results.changedOrRemoved?.add(entityId);
-          this.results.addedChangedOrRemoved?.add(entityId);
+          this.__processedEntities.set(entityId);
+          this.__results.changed?.add(entityId);
+          this.__results.addedOrChanged?.add(entityId);
+          this.__results.changedOrRemoved?.add(entityId);
+          this.__results.addedChangedOrRemoved?.add(entityId);
         }
       }
     }
   }
 
-  get all(): Iterable<Entity> {
-    return this.iterate('all');
+  get all(): Entity[] {
+    return this.__iterate('all');
   }
 
-  get added(): Iterable<Entity> {
-    return this.iterate('added');
+  get added(): Entity[] {
+    return this.__iterate('added');
   }
 
-  get removed(): Iterable<Entity> {
-    return this.iterate('removed', true);
+  get removed(): Entity[] {
+    return this.__iterate('removed');
   }
 
-  get changed(): Iterable<Entity> {
-    return this.iterate('changed');
+  get changed(): Entity[] {
+    return this.__iterate('changed');
   }
 
-  get addedOrChanged(): Iterable<Entity> {
-    return this.iterate('addedOrChanged');
+  get addedOrChanged(): Entity[] {
+    return this.__iterate('addedOrChanged');
   }
 
-  get addedChangedOrRemoved(): Iterable<Entity> {
-    return this.iterate('addedChangedOrRemoved', true);
+  get changedOrRemoved(): Entity[] {
+    return this.__iterate('changedOrRemoved');
   }
 
-  private iterate(flavor: QueryFlavorName, includeRemovedComponents?: boolean): Iterable<Entity> {
-    this.executeQueries();
-    const list = this.results[flavor];
+  get addedChangedOrRemoved(): Entity[] {
+    return this.__iterate('addedChangedOrRemoved');
+  }
+
+  private __iterate(flavor: QueryFlavorName): Entity[] {
+    const list = this.__results[flavor];
     if (!list) {
       throw new Error(
         `Query '${flavor}' not configured, please add .${flavor} to your query definition in ` +
         `system ${this.__system.name}`);
     }
-    return list.iterate(includeRemovedComponents ? this.__withMask : undefined);
+    return list.entities;
   }
 
 }

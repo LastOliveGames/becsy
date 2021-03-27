@@ -201,7 +201,7 @@ class RefType extends Type<Entity | null> {
       get(this: Component): Entity | null {
         const id = data[this.__index!];
         if (id === -1) return null;
-        return dispatcher.bindEntity(id);
+        return dispatcher.entities.pool.borrowTemporarily(id);
       },
       set(this: Component, value: Entity | null): void {
         if (config.DEBUG) checkWritable(this);

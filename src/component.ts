@@ -1,4 +1,3 @@
-import {Pool} from './pool';
 import {Type} from './type';
 import type {EntityId} from './entity';
 import {config} from './config';
@@ -24,6 +23,10 @@ export interface ComponentType<C extends Component> {
   new(): C;
   schema?: Schema;
   maxEntities?: number;
+  __bind?(entityId: number, writable: boolean): C;
+  __id?: number;
+  __flagOffset?: number;
+  __flagMask?: number;
 }
 
 export interface Component {
@@ -35,7 +38,6 @@ export interface Component {
 
 export class Controller<C extends Component> {
   private readonly maxEntities: number;
-  private readonly pool: Pool<C>;
   fields: Field<any>[];
   flagOffset: number;
   flagMask: number;
@@ -54,10 +56,17 @@ export class Controller<C extends Component> {
     if (this.maxEntities < dispatcher.maxEntities) {
       // TODO: enable packed array mode
     }
-    this.flagOffset = id >> 5;
-    this.flagMask = 1 << (id & 31);
-    this.pool = new Pool(type);
-    dispatcher.addPool(this.pool);
+    type.__id = id;
+    type.__flagOffset = this.flagOffset = id >> 5;
+    type.__flagMask = this.flagMask = 1 << (id & 31);
+    // eslint-disable-next-line new-cap
+    const instance = new type();
+    type.__bind = (entityId: number, writable: boolean) => {
+      instance.__entityId = entityId;
+      instance.__index = entityId;
+      instance.__writable = writable;
+      return instance;
+    };
     this.fields = this.gatherFields();
     this.defineComponentProperties();
   }
@@ -75,19 +84,10 @@ export class Controller<C extends Component> {
       }
     }
     // TODO: in packed array mode, allocate a new index
-    const component = this.bind(id, true, true);
+    const component = this.type.__bind!(id, true);
     for (const field of this.fields) {
       (component as any)[field.name] = values?.[field.name] ?? field.default;
     }
-  }
-
-  bind(id: EntityId, writable: boolean, ephemeral?: boolean): C {
-    const component = this.pool.borrow(ephemeral);
-    component.__entityId = id;
-    // TODO: in packed array mode, look up the index
-    component.__index = id;
-    component.__writable = writable;
-    return component;
   }
 
   private defineComponentProperties(): void {

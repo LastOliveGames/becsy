@@ -1,11 +1,9 @@
 import type {ComponentType} from './component';
-import {
-  Entities, Entity, EntityId, MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES, ReadWriteMasks
-} from './entity';
+import {Entities, Entity, MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './entity';
 import {Indexer} from './indexer';
 import {Log, LogPointer} from './datastructures';
-import type {Pool} from './pool';
 import type {System, SystemType} from './system';
+import {config} from './config';
 
 
 const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
@@ -100,10 +98,8 @@ export class Dispatcher {
   readonly indexer;
   readonly entities;
   readonly systems;
-  private readonly pools: Pool<any>[] = [];
   private lastTime = now() / 1000;
   private executing: boolean;
-  rwMasks: ReadWriteMasks | undefined;
   readonly shapeLog: Log;
   readonly writeLog: Log;
   private readonly shapeLogFramePointer: LogPointer;
@@ -142,32 +138,28 @@ export class Dispatcher {
   }
 
   execute(time?: number, delta?: number): void {
-    if (this.executing) throw new Error('Recursive system execution not allowed');
+    if (config.DEBUG && this.executing) throw new Error('Recursive system execution not allowed');
     this.executing = true;
     if (!time) time = now() / 1000;
     if (!delta) delta = time - this.lastTime;
     this.lastTime = time;
     for (const system of this.systems) {
-      this.rwMasks = system.__rwMasks;
-      system.time = time;
-      system.delta = delta;
-      system.execute();
+      this.entities.executingSystem = system;
+      system.__run(time, delta);
       this.flush();
     }
-    this.rwMasks = undefined;
+    this.entities.executingSystem = undefined;
     this.entities.processEndOfFrame();
     this.executing = false;
     this.gatherFrameStats();
   }
 
   executeOne(system: System): void {
-    if (this.executing) throw new Error('Recursive system execution not allowed');
+    if (config.DEBUG && this.executing) throw new Error('Recursive system execution not allowed');
     this.executing = true;
     system.__init(this);
     // Don't set rwMasks -- give full power when executing a single system out of band.
-    system.time = 0;
-    system.delta = 0;
-    system.execute();
+    system.__run(0, 0);
     this.flush();
     this.entities.processEndOfFrame();
     this.executing = false;
@@ -181,12 +173,8 @@ export class Dispatcher {
     this.writeLog.createPointer(this.writeLogFramePointer);
   }
 
-  addPool(pool: Pool<any>): void {
-    this.pools.push(pool);
-  }
-
   flush(): void {
-    for (const pool of this.pools) pool.reset();
+    this.entities.pool.returnTemporaryBorrows();
     this.shapeLog.commit();
     this.writeLog.commit();
   }
@@ -195,9 +183,5 @@ export class Dispatcher {
     const entity = this.entities.createEntity(initialComponents);
     if (!this.executing) this.flush();
     return entity;
-  }
-
-  bindEntity(id: EntityId): Entity {
-    return this.entities.bind(id);
   }
 }
