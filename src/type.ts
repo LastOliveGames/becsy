@@ -42,7 +42,7 @@ class BooleanType extends Type<boolean> {
     if (!buffer) buffer = new SharedArrayBuffer(maxEntities);
     const data = new Uint8Array(buffer);
     Object.defineProperty(binding.type.prototype, name, {
-      enumerable: true,
+      enumerable: true, configurable: true,
       get(this: C): boolean {
         return Boolean(data[binding.index]);
       },
@@ -77,7 +77,7 @@ class NumberType extends Type<number> {
     }
     const data = new this.NumberArray(buffer);
     Object.defineProperty(binding.type.prototype, name, {
-      enumerable: true,
+      enumerable: true, configurable: true,
       get(this: C): number {
         return data[binding.index];
       },
@@ -114,7 +114,7 @@ class StaticStringType extends Type<string> {
     const data = new this.TypedArray(buffer);
     const choices = this.choices, choicesIndex = this.choicesIndex;
     Object.defineProperty(binding.type.prototype, name, {
-      enumerable: true,
+      enumerable: true, configurable: true,
       get(this: C): string {
         const index = data[binding.index];
         const result = choices[index];
@@ -159,7 +159,7 @@ class DynamicStringType extends Type<string> {
     const maxUtf8Length = this.maxUtf8Length;
     const lengthsStride = this.lengthsStride, bytesStride = this.bytesStride;
     Object.defineProperty(binding.type.prototype, name, {
-      enumerable: true,
+      enumerable: true, configurable: true,
       get(this: C): string {
         const length = lengths[binding.index * lengthsStride];
         return DynamicStringType.decoder.decode(
@@ -190,11 +190,11 @@ class RefType extends Type<Entity | null> {
     if (!buffer) buffer = new SharedArrayBuffer(maxEntities * 4);
     const data = new Int32Array(buffer);
     Object.defineProperty(binding.type.prototype, name, {
-      enumerable: true,
+      enumerable: true, configurable: true,
       get(this: C): Entity | null {
         const id = data[binding.index];
         if (id === -1) return null;
-        return binding.dispatcher.entities.pool.borrowTemporarily(id);
+        return binding.dispatcher.registry.pool.borrowTemporarily(id);
       },
       set(this: C, value: Entity | null): void {
         if (config.DEBUG) checkWritable(binding);

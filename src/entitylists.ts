@@ -1,4 +1,5 @@
-import type {Entity, EntityId, EntityPool} from './entity';
+import type {Entity, EntityId} from './entity';
+import type {EntityPool} from './registry';
 
 
 export interface EntityList {

@@ -21,7 +21,7 @@ export class World {
 
   build(callback: (system: System) => void): void {
     this.__buildSystem.__callback = callback;
-    this.__dispatcher.execute(0, 0, [this.__buildSystem]);
+    this.__dispatcher.executeAdHoc(this.__buildSystem);
   }
 
   createEntity(...initialComponents: (ComponentType<any> | any)[]): void {

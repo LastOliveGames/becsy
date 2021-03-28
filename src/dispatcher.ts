@@ -1,17 +1,18 @@
 import type {ComponentType} from './component';
-import {Entities, Entity, MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './entity';
+import {Entity, MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './entity';
 import {Indexer} from './indexer';
 import {Log, LogPointer} from './datastructures';
 import type {System, SystemType} from './system';
 import {config} from './config';
+import {Registry} from './registry';
 
 
 const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
   performance.now.bind(performance) : Date.now.bind(Date);
 
 
-type ComponentTypesArray = ComponentType<any>[] | ComponentTypesArray[];
-type SystemsArray = (System | SystemType)[] | SystemsArray[];
+type ComponentTypesArray = (ComponentType<any> | ComponentTypesArray)[];
+type SystemTypesArray = (SystemType | SystemTypesArray)[];
 
 export interface WorldOptions {
   maxEntities?: number;
@@ -20,7 +21,7 @@ export interface WorldOptions {
   maxShapeChangesPerFrame?: number;
   maxWritesPerFrame?: number;
   componentTypes: ComponentTypesArray;
-  systems: SystemsArray;
+  systems: SystemTypesArray;
 }
 
 
@@ -96,7 +97,7 @@ export class Stats {
 export class Dispatcher {
   readonly maxEntities;
   readonly indexer;
-  readonly entities;
+  readonly registry;
   readonly systems: System[];
   private lastTime = now() / 1000;
   private executing: boolean;
@@ -121,8 +122,8 @@ export class Dispatcher {
     this.shapeLog = new Log(maxShapeChangesPerFrame, false, 'maxShapeChangesPerFrame');
     this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.indexer = new Indexer(maxRefs);
-    this.entities =
-      new Entities(maxEntities, maxLimboEntities, componentTypes.flat(Infinity), this);
+    this.registry =
+      new Registry(maxEntities, maxLimboEntities, componentTypes.flat(Infinity), this);
     this.systems = this.normalizeAndInitSystems(systems);
     if (this.systems.some(system => system.__needsWriteLog)) {
       this.writeLog = new Log(maxWritesPerFrame, false, 'maxWritesPerFrame');
@@ -130,7 +131,7 @@ export class Dispatcher {
     }
   }
 
-  private normalizeAndInitSystems(userSystems: SystemsArray): System[] {
+  private normalizeAndInitSystems(userSystems: SystemTypesArray): System[] {
     return userSystems.flat(Infinity).map((userSystem: System | SystemType) => {
       // eslint-disable-next-line new-cap
       const system = typeof userSystem === 'function' ? new userSystem() : userSystem;
@@ -146,7 +147,7 @@ export class Dispatcher {
     if (delta === undefined) delta = time - this.lastTime;
     this.lastTime = time;
     for (const system of systems ?? this.systems) {
-      this.entities.executingSystem = system;
+      this.registry.executingSystem = system;
       // Manually inlined the following from System for performance
       system.time = time;
       system.delta = delta;
@@ -155,10 +156,18 @@ export class Dispatcher {
       for (const query of system.__queries) query.__cleanup();
       this.flush();
     }
-    this.entities.executingSystem = undefined;
-    this.entities.processEndOfFrame();
+    this.registry.executingSystem = undefined;
+    this.registry.processEndOfFrame();
     this.executing = false;
     this.gatherFrameStats();
+  }
+
+  executeAdHoc(system: System): void {
+    system.__init(this);
+    if (config.DEBUG && system.__needsWriteLog && !this.writeLog) {
+      throw new Error('Internal error, ad hoc system needs write log');
+    }
+    this.execute(0, 0, [system]);
   }
 
   private gatherFrameStats(): void {
@@ -170,13 +179,13 @@ export class Dispatcher {
   }
 
   private flush(): void {
-    this.entities.pool.returnTemporaryBorrows();
+    this.registry.pool.returnTemporaryBorrows();
     this.shapeLog.commit();
     this.writeLog?.commit();
   }
 
   createEntity(initialComponents: (ComponentType<any> | any)[]): Entity {
-    const entity = this.entities.createEntity(initialComponents);
+    const entity = this.registry.createEntity(initialComponents);
     if (!this.executing) this.flush();
     return entity;
   }

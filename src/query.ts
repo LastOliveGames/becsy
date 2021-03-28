@@ -50,6 +50,10 @@ class QueryBuilder {
     return this;
   }
 
+  get also(): this {
+    return this;
+  }
+
   get all(): this {
     this.__query.__flavors |= QueryFlavor.all;
     return this;
@@ -129,7 +133,7 @@ class QueryBuilder {
     } else if (onlyOne && mask.some(n => n !== 0)) {
       throw new Error(`Only one ${onlyOne} allowed`);
     }
-    for (const type of types) this.__system.__dispatcher.entities.extendMaskAndSetFlag(mask, type);
+    for (const type of types) this.__system.__dispatcher.registry.extendMaskAndSetFlag(mask, type);
   }
 }
 
@@ -224,7 +228,7 @@ export class TopQuery extends Query {
     this.__processedEntities = new Bitset(dispatcher.maxEntities);
     if (this.__flavors & QueryFlavor.all) {
       this.__results.all =
-        new PackedArrayEntityList(dispatcher.entities.pool, dispatcher.maxEntities);
+        new PackedArrayEntityList(dispatcher.registry.pool, dispatcher.maxEntities);
     } else {
       this.__currentEntities = new Bitset(dispatcher.maxEntities);
     }
@@ -244,7 +248,7 @@ export class TopQuery extends Query {
 
   private __allocateResult(name: TransientQueryFlavorName): void {
     const dispatcher = this.__system.__dispatcher;
-    this.__results[name] = new ArrayEntityList(dispatcher.entities.pool);
+    this.__results[name] = new ArrayEntityList(dispatcher.registry.pool);
   }
 
   private __clearTransientResults(): void {
@@ -257,13 +261,13 @@ export class TopQuery extends Query {
   }
 
   private __computeShapeResults(): void {
-    const entities = this.__system.__dispatcher.entities;
+    const registry = this.__system.__dispatcher.registry;
     const shapeLog = this.__system.__dispatcher.shapeLog;
     for (const id of shapeLog.processSince(this.__shapeLogPointer)) {
       if (!this.__processedEntities.get(id)) {
         this.__processedEntities.set(id);
         const oldMatch = this.__results.all?.has(id) ?? this.__currentEntities!.get(id);
-        const newMatch = entities.matchShape(id, this.__withMask, this.__withoutMask);
+        const newMatch = registry.matchShape(id, this.__withMask, this.__withoutMask);
         if (newMatch && !oldMatch) {
           this.__currentEntities?.set(id);
           this.__results.all?.add(id);
