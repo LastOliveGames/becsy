@@ -2,7 +2,7 @@ import {config, prop, System, Type, World} from '../src';
 import {profile} from '../src/profile';
 import {performance} from 'perf_hooks';
 
-config.DEBUG = true;
+config.DEBUG = false;
 
 class A {
   @prop(Type.int32) declare value: number;
@@ -165,16 +165,19 @@ function setup(count: number): World {
     maxLimboEntities: count * 4,
     maxShapeChangesPerFrame: count * 5,
     componentTypes: [A, B, C, D, E],
-    // systems: [SystemA]
+    systems: [SystemA]
     // systems: [SystemA, SystemB, SystemC, SystemD, SystemE]
     // systems: [ABSystem, CDSystem, CESystem]
     // systems: [AddB, RemoveB]
-    systems: [SpawnB, KillB]
+    // systems: [SpawnB, KillB]
   });
 
+  // const entities = (world as any).__dispatcher.systems[0].__queries[0].__results.all.entities;
+  // const pool = (world as any).__dispatcher.registry.pool;
   for (let i = 0; i < count; i++) {
-    // world.createEntity(A, {value: 0}, B, {value: 0}, C, {value: 0}, D, {value: 0}, E, {value: 0});
-    world.createEntity(A, {value: i});
+    world.createEntity(A, {value: 0}, B, {value: 0}, C, {value: 0}, D, {value: 0}, E, {value: 0});
+    // world.createEntity(A, {value: i});
+    // entities.push(pool.borrow(i));
   }
 
   return world;
@@ -188,8 +191,8 @@ function run(count: number) {
 
 const PROFILE_SETUP = 0;
 const PROFILE_RUN = 0;
-const SIZE = 1000;
-const RUNS = 1000;
+const SIZE = 5000;
+const RUNS = 5000;
 
 console.log('setup');
 if (PROFILE_SETUP) world = await profile(async() => setup(SIZE)); else world = setup(SIZE);

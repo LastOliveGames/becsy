@@ -12,7 +12,7 @@ const now = typeof window !== 'undefined' && typeof window.performance !== 'unde
 
 
 type ComponentTypesArray = (ComponentType<any> | ComponentTypesArray)[];
-type SystemTypesArray = (SystemType | SystemTypesArray)[];
+type SystemTypesArray = (SystemType | any | SystemTypesArray)[];
 
 export interface WorldOptions {
   maxEntities?: number;
@@ -135,12 +135,19 @@ export class Dispatcher {
   }
 
   private normalizeAndInitSystems(userSystems: SystemTypesArray): System[] {
-    return userSystems.flat(Infinity).map((userSystem: System | SystemType) => {
-      // eslint-disable-next-line new-cap
-      const system = typeof userSystem === 'function' ? new userSystem() : userSystem;
+    const systems = [];
+    const flatUserSystems = userSystems.flat(Infinity);
+    for (let i = 0; i < flatUserSystems.length; i++) {
+      const system = new flatUserSystems[i]();
+      const props = flatUserSystems[i + 1];
+      if (props && typeof props !== 'function') {
+        Object.assign(system, props);
+        i++;
+      }
       system.__init(this);
-      return system;
-    });
+      systems.push(system);
+    }
+    return systems;
   }
 
   execute(time?: number, delta?: number, systems?: System[]): void {
