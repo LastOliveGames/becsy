@@ -11,7 +11,7 @@ export interface SystemType {
 
 
 export abstract class System {
-  readonly __rwMasks : ReadWriteMasks = {read: [], write: []};
+  readonly __rwMasks: ReadWriteMasks = {read: [], write: []};
   __dispatcher: Dispatcher;
   private __queryBuilders: TopQueryBuilder[] | null = [];
   __queries: TopQuery[] = [];

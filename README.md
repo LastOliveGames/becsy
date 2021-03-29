@@ -25,6 +25,6 @@ Overall, becsy aims to be feature rich without sacrificing too much performance.
 
 |     | packed_1 | packed_5 | simple_iter | frag_iter | entity_cycle | add_remove |
 | --- | --: |--: |--: |--: |--: |--: |
-| becsy | 1,079 op/s | 912 op/s | 488 op/s | 1,671 op/s | 717 op/s | 1,737 op/s |
-| bitecs | 237,562 op/s | 225,574 op/s | 107,462 op/s | 281,957 op/s | 1,530 op/s | 2,908 op/s |
-| ecsy | 4,679 op/s | 3,055 op/s | 2,214 op/s | 14,055 op/s | 17 op/s | 317 op/s |
+| becsy | 12,405 op/s | 4,787 op/s | 1,773 op/s | 31,431 op/s | 1,466 op/s | 9,146 op/s |
+| bitecs | 254,677 op/s | 239,702 op/s | 144,676 op/s | 473,416 op/s | 2,245 op/s | 4,670 op/s |
+| ecsy | 6,254 op/s | 3,192 op/s | 2,212 op/s | 14,905 op/s | 18 op/s | 450 op/s |

@@ -1,29 +1,6 @@
 import {config} from './config';
 
 
-class Mutex {
-  private readonly cell: Int32Array;
-
-  constructor(buffer: SharedArrayBuffer, offset: number) {
-    this.cell = new Int32Array(buffer, offset, 1);
-  }
-
-  lock(): void {
-    while (true) {
-      if (Atomics.compareExchange(this.cell, 0, 0, 1) === 0) return;
-      Atomics.wait(this.cell, 0, 1);
-    }
-  }
-
-  unlock(): void {
-    if (Atomics.compareExchange(this.cell, 0, 1, 0) !== 1) {
-      throw new Error('Unmatched mutex unlock');
-    }
-    Atomics.notify(this.cell, 0, 1);
-  }
-}
-
-
 /**
  * A fixed but arbitrary size bitset.
  */
@@ -70,10 +47,12 @@ export class Bitset {
 export interface LogPointer {
   index: number;
   generation: number;
+  corralIndex: number;
 }
 
 
-const LOG_HEADER_LENGTH = 3;
+const LOG_HEADER_LENGTH = 2;
+const EMPTY_TUPLE: [] = [];
 
 
 /**
@@ -81,126 +60,97 @@ const LOG_HEADER_LENGTH = 3;
  * increments a generation counter so you can tell if your pointer got lapped and is now invalid.
  */
 export class Log {
-  /* layout: [index, generation, mutex, ...entries] */
+  /* layout: [index, generation, ...entries] */
   private readonly data: Uint32Array;
-  private readonly mutex?: Mutex;
-  private corral?: Uint32Array;
-  private corralLength = 0;
+  /* layout: [length, ...entries] */
+  private readonly corral: Uint32Array;
 
   constructor(
-    private readonly numItems: number, threadsafe: boolean,
-    private readonly configParamName: string
+    private readonly maxEntries: number, private readonly configParamName: string
   ) {
-    const buffer = new SharedArrayBuffer((numItems + LOG_HEADER_LENGTH) * 4);
+    const buffer =
+      new SharedArrayBuffer((maxEntries + LOG_HEADER_LENGTH) * Uint32Array.BYTES_PER_ELEMENT);
     this.data = new Uint32Array(buffer);
-    if (threadsafe) {
-      this.mutex = new Mutex(buffer, 8);
-      this.corral = new Uint32Array(numItems);
-    }
+    this.corral =
+      new Uint32Array(new SharedArrayBuffer((maxEntries + 1) * Uint32Array.BYTES_PER_ELEMENT));
   }
 
   push(value: number): void {
-    if (this.corral) {
-      if (config.DEBUG && this.corralLength >= this.numItems) this.throwCapacityExceeded();
-      if (this.corralLength && this.corral[this.corralLength - 1] === value) return;
-      this.corral[this.corralLength++] = value;
-    } else {
-      let index = this.data[0];
-      this.data[index + LOG_HEADER_LENGTH] = value;
-      index += 1;
-      if (index >= this.numItems) {
-        index = 0;
-        this.data[1] += 1;
-      }
-      this.data[0] = index;
-    }
+    const corralLength = this.corral[0];
+    if (config.DEBUG && corralLength >= this.maxEntries) this.throwCapacityExceeded();
+    if (corralLength && this.corral[corralLength] === value) return;
+    this.corral[corralLength + 1] = value;
+    this.corral[0] += 1;
   }
 
   commit(): void {
-    if (!this.corral || !this.corralLength) return;
-    this.mutex?.lock();
+    const corralLength = this.corral[0];
+    if (!corralLength) return;
     let index = this.data[0];
-    const firstSegmentLength = Math.min(this.corralLength, this.numItems - index);
-    this.data.set(this.corral.subarray(0, firstSegmentLength), index + LOG_HEADER_LENGTH);
-    if (firstSegmentLength < this.corralLength) {
+    const firstSegmentLength = Math.min(corralLength, this.maxEntries - index);
+    this.data.set(this.corral.subarray(1, firstSegmentLength + 1), index + LOG_HEADER_LENGTH);
+    if (firstSegmentLength < corralLength) {
       this.data.set(
-        this.corral.subarray(firstSegmentLength, this.corralLength), LOG_HEADER_LENGTH);
+        this.corral.subarray(firstSegmentLength + 1, corralLength + 1), LOG_HEADER_LENGTH);
     }
-    index += this.corralLength;
-    if (index >= this.numItems) {
-      index = 0;
+    index += corralLength;
+    while (index >= this.maxEntries) {
+      index -= this.maxEntries;
       this.data[1] += 1;
     }
     this.data[0] = index;
-    this.mutex?.unlock();
-    this.corralLength = 0;
+    this.corral[0] = 0;
   }
 
   createPointer(pointer?: LogPointer): LogPointer {
-    if (!pointer) return {index: this.data[0], generation: this.data[1]};
+    if (!pointer) {
+      return {index: this.data[0], generation: this.data[1], corralIndex: this.corral[0]};
+    }
     pointer.index = this.data[0];
     pointer.generation = this.data[1];
+    pointer.corralIndex = this.corral[0];
     return pointer;
   }
 
-  processSince(startPointer: LogPointer, endPointer?: LogPointer): Iterable<number> {
-    return {
-      [Symbol.iterator]: () => {
-        this.mutex?.lock();
-        if (config.DEBUG) this.checkPointers(startPointer, endPointer);
-        let index = startPointer.index;
-        const startGeneration = startPointer.generation;
-        const endIndex = endPointer?.index ?? this.data[0];
-        const endGeneration = endPointer?.generation ?? this.data[1];
-        this.mutex?.unlock();
-        return {
-          next: () => {
-            if (index === endIndex && startGeneration === endGeneration) {
-              if (config.DEBUG) this.checkPointer(startPointer);
-              startPointer.index = endIndex;
-              startPointer.generation = endGeneration;
-              return {done: true, value: undefined};
-            }
-            const value = this.data[index + LOG_HEADER_LENGTH];
-            index += 1;
-            if (index === this.numItems) index = 0;
-            return {value};
-          }
-        };
-      }
-    };
-  }
-
-  copySince(
-    startPointer: LogPointer, endPointer: LogPointer | undefined,
-    copy: (data: Uint32Array) => void
-  ): void {
-    this.mutex?.lock();
+  processSince(
+    startPointer: LogPointer, endPointer?: LogPointer
+  ): [Uint32Array, number, number] | [] {
     if (config.DEBUG) this.checkPointers(startPointer, endPointer);
-    const startIndex = startPointer.index;
+    let result: [Uint32Array, number, number] | [] = EMPTY_TUPLE;
     const endIndex = endPointer?.index ?? this.data[0];
     const endGeneration = endPointer?.generation ?? this.data[1];
-    if (startIndex < endIndex) {
-      copy(this.data.subarray(startIndex + LOG_HEADER_LENGTH, endIndex + LOG_HEADER_LENGTH));
-    } else if (startIndex > endIndex) {
-      copy(this.data.subarray(startIndex + LOG_HEADER_LENGTH, this.data.length));
-      if (endIndex > 0) copy(this.data.subarray(LOG_HEADER_LENGTH, endIndex + LOG_HEADER_LENGTH));
+    if (startPointer.generation === endGeneration) {
+      if (startPointer.index < endIndex) {
+        result = [this.data, startPointer.index + LOG_HEADER_LENGTH, endIndex + LOG_HEADER_LENGTH];
+        startPointer.index = endIndex;
+      } else {
+        const corralLength = this.corral[0];
+        if (startPointer.corralIndex < corralLength) {
+          result = [this.corral, startPointer.corralIndex + 1, corralLength + 1];
+          startPointer.corralIndex = corralLength;
+        }
+      }
+    } else {
+      result = [this.data, startPointer.index + LOG_HEADER_LENGTH, this.data.length];
+      startPointer.index = 0;
+      startPointer.generation = endGeneration;
     }
-    startPointer.index = endIndex;
-    startPointer.generation = endGeneration;
-    this.mutex?.unlock();
+    return result;
   }
 
   countSince(startPointer: LogPointer, endPointer?: LogPointer): number {
-    if (config.DEBUG) this.checkPointers(startPointer, endPointer);
+    if (config.DEBUG) {
+      this.checkPointers(startPointer, endPointer);
+      if (this.corral[0]) throw new Error(`Internal error, should commit log before counting`);
+    }
     const startIndex = startPointer.index;
-    if (!endPointer) this.mutex?.lock();
     const endIndex = endPointer?.index ?? this.data[0];
     const endGeneration = endPointer?.generation ?? this.data[1];
-    if (!endPointer) this.mutex?.unlock();
+    startPointer.index = endIndex;
+    startPointer.generation = endGeneration;
     if (startIndex === endIndex && startPointer.generation === endGeneration) return 0;
     if (startIndex < endIndex) return endIndex - startIndex;
-    return this.numItems - (startIndex - endIndex);
+    return this.maxEntries - (startIndex - endIndex);
   }
 
   private checkPointers(startPointer: LogPointer, endPointer?: LogPointer): void {
@@ -217,26 +167,34 @@ export class Log {
   private checkPointer(pointer: LogPointer): void {
     const index = this.data[0];
     let generation = pointer.generation;
-    if (pointer.index > index) generation += 1;
-    if (generation !== this.data[1]) this.throwCapacityExceeded();
+    if (pointer.index === index) {
+      if (generation + 1 < this.data[1]) this.throwCapacityExceeded();
+    } else {
+      if (pointer.index > index) generation += 1;
+      if (generation !== this.data[1]) this.throwCapacityExceeded();
+    }
+    if (pointer.corralIndex > this.corral[0]) {
+      throw new Error('Internal error, pointer past end of log corral area');
+    }
   }
 
   private throwCapacityExceeded(): void {
     throw new Error(
-      `Log capacity exceeded, please raise ${this.configParamName} above ${this.numItems}`);
+      `Log capacity exceeded, please raise ${this.configParamName} above ${this.maxEntries}`);
   }
 }
 
 
 /**
  * A shared pool of u32's that uses atomic operations to deconflict concurrent callers of `take`.
- * The `replenish` method is not threadsafe.
+ * The `refill` method is not threadsafe.
  */
 export class SharedAtomicPool {
   private readonly data: Uint32Array;
 
   constructor(private readonly maxItems: number, private readonly configParamName: string) {
-    this.data = new Uint32Array(new SharedArrayBuffer(maxItems * 4 + 4));
+    this.data =
+      new Uint32Array(new SharedArrayBuffer((maxItems + 1) * Uint32Array.BYTES_PER_ELEMENT));
   }
 
   get length(): number {

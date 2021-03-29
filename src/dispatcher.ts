@@ -108,9 +108,12 @@ export class Dispatcher {
   readonly stats = new Stats();
 
   constructor({
-    maxEntities = 10000, maxLimboEntities = 2000, maxRefs = 10000,
-    maxShapeChangesPerFrame = 25000, maxWritesPerFrame = 50000,
-    componentTypes, systems
+    componentTypes, systems,
+    maxEntities = 10000,
+    maxLimboEntities = Math.ceil(maxEntities / 5),
+    maxRefs = maxEntities,
+    maxShapeChangesPerFrame = maxEntities * 2,
+    maxWritesPerFrame = maxEntities * 4,
   }: WorldOptions) {
     if (maxEntities > MAX_NUM_ENTITIES) {
       throw new Error(`maxEntities too high, the limit is ${MAX_NUM_ENTITIES}`);
@@ -119,14 +122,14 @@ export class Dispatcher {
       throw new Error(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
     }
     this.maxEntities = maxEntities;
-    this.shapeLog = new Log(maxShapeChangesPerFrame, false, 'maxShapeChangesPerFrame');
+    this.shapeLog = new Log(maxShapeChangesPerFrame, 'maxShapeChangesPerFrame');
     this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.indexer = new Indexer(maxRefs);
     this.registry =
       new Registry(maxEntities, maxLimboEntities, componentTypes.flat(Infinity), this);
     this.systems = this.normalizeAndInitSystems(systems);
     if (this.systems.some(system => system.__needsWriteLog)) {
-      this.writeLog = new Log(maxWritesPerFrame, false, 'maxWritesPerFrame');
+      this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame');
       this.writeLogFramePointer = this.writeLog.createPointer();
     }
   }
@@ -148,12 +151,10 @@ export class Dispatcher {
     this.lastTime = time;
     for (const system of systems ?? this.systems) {
       this.registry.executingSystem = system;
-      // Manually inlined the following from System for performance
       system.time = time;
       system.delta = delta;
       for (const query of system.__queries) query.__execute();
       system.execute();
-      for (const query of system.__queries) query.__cleanup();
       this.flush();
     }
     this.registry.executingSystem = undefined;
@@ -174,12 +175,10 @@ export class Dispatcher {
     this.stats.frames += 1;
     this.stats.maxShapeChangesPerFrame = this.shapeLog.countSince(this.shapeLogFramePointer);
     this.stats.maxWritesPerFrame = this.writeLog?.countSince(this.writeLogFramePointer!) ?? 0;
-    this.shapeLog.createPointer(this.shapeLogFramePointer);
-    this.writeLog?.createPointer(this.writeLogFramePointer);
   }
 
   private flush(): void {
-    this.registry.pool.returnTemporaryBorrows();
+    this.registry.flush();
     this.shapeLog.commit();
     this.writeLog?.commit();
   }

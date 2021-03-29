@@ -43,7 +43,8 @@ module.exports = {
         '@typescript-eslint/no-invalid-this': 'error',
         '@typescript-eslint/no-non-null-assertion': 'off',
         '@typescript-eslint/no-shadow': 'error',
-        '@typescript-eslint/no-unused-vars': ['error', {args: 'none'}],
+        '@typescript-eslint/no-unused-vars':
+          ['error', {args: 'none', varsIgnorePattern: '[iI]gnored|[uU]nused'}],
         '@typescript-eslint/no-useless-constructor': 'error',
         '@typescript-eslint/no-use-before-define': ['error', {functions: false}],
       }

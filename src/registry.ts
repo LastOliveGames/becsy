@@ -72,7 +72,7 @@ export class Registry {
     this.entityIdPool = new SharedAtomicPool(maxEntities, 'maxEntities');
     this.entityIdPool.fillWithDescendingIntegers(0);
     this.pool = new EntityPool(this, maxEntities);
-    this.deletionLog = new Log(maxLimboEntities, false, 'maxLimboEntities');
+    this.deletionLog = new Log(maxLimboEntities, 'maxLimboEntities');
     this.prevDeletionPointer = this.deletionLog.createPointer();
     this.oldDeletionPointer = this.deletionLog.createPointer();
   }
@@ -91,12 +91,25 @@ export class Registry {
     this.deletionLog.push(id);
   }
 
+  flush(): void {
+    this.pool.returnTemporaryBorrows();
+    this.deletionLog.commit();
+  }
+
   processEndOfFrame(): void {
-    const numDeletedEntities = this.deletionLog.countSince(this.oldDeletionPointer);
+    this.deletionLog.commit();
+    let numDeletedEntities = 0;
+    let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
+    while (true) {
+      [log, startIndex, endIndex] =
+        this.deletionLog.processSince(this.oldDeletionPointer, this.prevDeletionPointer);
+      if (!log) break;
+      const segment = log.subarray(startIndex, endIndex);
+      this.entityIdPool.refill(segment);
+      numDeletedEntities += segment.length;
+    }
     this.dispatcher.stats.numEntities -= numDeletedEntities;
     this.dispatcher.stats.maxLimboEntities = numDeletedEntities;
-    this.deletionLog.copySince(
-      this.oldDeletionPointer, this.prevDeletionPointer, data => this.entityIdPool.refill(data));
     this.deletionLog.createPointer(this.prevDeletionPointer);
   }
 
@@ -109,15 +122,15 @@ export class Registry {
     mask[flagOffset] |= type.__flagMask!;
   }
 
-  maskHasFlag(mask: number[], type: ComponentType<any>): boolean {
-    return ((mask[type.__flagOffset!] ?? 0) & type.__flagMask!) !== 0;
+  maskHasFlag(mask: number[] | undefined, type: ComponentType<any>): boolean {
+    return ((mask?.[type.__flagOffset!] ?? 0) & type.__flagMask!) !== 0;
   }
 
   hasFlag(id: EntityId, type: ComponentType<any>, allowRemoved = false): boolean {
     const index = id * this.stride + type.__flagOffset!;
     if ((this.shapes[index] & type.__flagMask!) !== 0) return true;
     if (allowRemoved && this.executingSystem?.__removedEntities.get(id) &&
-      (this.executingSystem.__rwMasks.read[type.__flagOffset!] & type.__flagMask!) !== 0) {
+      ((this.executingSystem.__rwMasks.read?.[type.__flagOffset!] ?? 0) & type.__flagMask!) !== 0) {
       return true;
     }
     return false;

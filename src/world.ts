@@ -5,6 +5,13 @@ import {System} from './system';
 
 class BuildSystem extends System {
   __callback: (system: System) => void;
+
+  constructor() {
+    super();
+    this.__rwMasks.read = undefined;
+    this.__rwMasks.write = undefined;
+  }
+
   execute() {
     this.__callback(this);
   }

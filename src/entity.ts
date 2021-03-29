@@ -5,7 +5,7 @@ import {Type} from './type';
 
 
 export type EntityId = number;
-export type ReadWriteMasks = {read: number[], write: number[]};
+export type ReadWriteMasks = {read: number[] | undefined, write: number[] | undefined};
 
 export const ENTITY_ID_BITS = 22;
 export const MAX_NUM_ENTITIES = 2 ** ENTITY_ID_BITS - 1;  // ID 0 is reserved
@@ -26,10 +26,10 @@ export class Entity {
     this.joined = EMPTY_JOIN;
   }
 
-  add(type: ComponentType<any>, values: any): this {
-    // TODO: prevent add when component has been deleted
+  add(type: ComponentType<any>, values?: any): this {
+    // TODO: prevent add when entity has been deleted
     if (config.DEBUG) this.__checkMask(type, true);
-    if (this.__registry.hasFlag(this.__id, type)) {
+    if (config.DEBUG && this.__registry.hasFlag(this.__id, type)) {
       throw new Error(`Entity already has a ${type.name} component`);
     }
     this.__registry.setFlag(this.__id, type);
@@ -40,7 +40,7 @@ export class Entity {
   addAll(...args: (ComponentType<any> | any)[]): this {
     for (let i = 0; i < args.length; i++) {
       const type = args[i];
-      if (typeof type !== 'function') {
+      if (config.DEBUG && typeof type !== 'function') {
         throw new Error(`Bad arguments to bulk add: expected component type, got: ${type}`);
       }
       let value = args[i + 1];
@@ -135,7 +135,8 @@ export class Entity {
 
   private __checkMask(type: ComponentType<any>, write: boolean): void {
     const rwMasks = this.__registry.executingSystem?.__rwMasks;
-    if (rwMasks && !this.__registry.maskHasFlag(write ? rwMasks.write : rwMasks.read, type)) {
+    const mask = write ? rwMasks?.write : rwMasks?.read;
+    if (mask && !this.__registry.maskHasFlag(mask, type)) {
       throw new Error(
         `System didn't mark component ${type.name} as ${write ? 'writable' : 'readable'}`);
     }
