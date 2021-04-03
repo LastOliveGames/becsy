@@ -4,7 +4,7 @@
   "version": "0.0.2",
   "scripts": {
     "test": "jest --watch --config jestconfig.json tests/basic.test.ts",
-    "perf": "tsc-watch --onSuccess \"node --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js\"",
+    "perf": "tsc-watch --onSuccess \"node --enable-source-maps --es-module-specifier-resolution=node lib/tests/bottom-up.test.js\"",
     "deopt": "rm *.log && node --trace-ic --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js && mv *.log v8.pre.log && node striplog.cjs && deoptigate",
     "flame": "clinic flame -- node --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js",
     "build": "tsc && rollup --config",
