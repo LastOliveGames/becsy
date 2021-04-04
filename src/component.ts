@@ -30,13 +30,18 @@ export interface ComponentType<C> {
   __bind?(id: EntityId, writable: boolean): C;
 }
 
-export interface Binding<C> {
-  type: ComponentType<C>;
-  instance: C;
-  dispatcher: Dispatcher;
-  entityId: number;
-  index: number;
-  writable: boolean;
+export class Binding<C> {
+  readonly readonlyInstance: C;
+  readonly writableInstance: C;
+  entityId = 0;
+  index = 0;
+
+  constructor(
+    readonly type: ComponentType<C>, readonly dispatcher: Dispatcher, readonly maxEntities: number
+  ) {
+    this.readonlyInstance = new type();  // eslint-disable-line new-cap
+    this.writableInstance = new type();  // eslint-disable-line new-cap
+  }
 }
 
 
@@ -88,17 +93,13 @@ export function decorateComponentType<C>(
   type.__id = typeId;
   type.__flagOffset = typeId >> 5;
   type.__flagMask = 1 << (typeId & 31);
-  const binding: Binding<C> = {
-    // eslint-disable-next-line new-cap
-    type, instance: new type(), dispatcher, entityId: 0, index: 0, writable: false
-  };
+  const binding = new Binding<C>(type, dispatcher, maxEntities);
   type.__bind = (id: EntityId, writable: boolean) => {
     binding.entityId = id;
     binding.index = id;
-    binding.writable = writable;
-    return binding.instance;
+    return writable ? binding.writableInstance : binding.readonlyInstance;
   };
   type.__fields = gatherFields(type);
-  for (const field of type.__fields!) field.type.define(binding, field.name, maxEntities);
+  for (const field of type.__fields!) field.type.define(binding, field.name);
 }
 

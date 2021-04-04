@@ -3,6 +3,7 @@ import {performance} from 'perf_hooks';
 import {ComponentType, decorateComponentType} from '../src/component';
 import type {Dispatcher} from '../src/dispatcher';
 
+
 // interface ComponentType < C extends Component > {
 //   new(): C;
 //   instance: C;
