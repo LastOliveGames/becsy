@@ -1,13 +1,11 @@
-import fs from 'fs';
-import inspector from 'inspector';
-import util from 'util';
-
-const writeFile = util.promisify(fs.writeFile);
+import {writeFile} from 'fs/promises';
+import {Session} from 'inspector';
+import {promisify} from 'util';
 
 export async function profile(fn: () => Promise<any>): Promise<any> {
-  const session = new inspector.Session();
+  const session = new Session();
   session.connect();
-  const post = util.promisify(session.post.bind(session)) as (cmd: string) => Promise<any>;
+  const post = promisify(session.post.bind(session)) as (cmd: string) => Promise<any>;
   await post('Profiler.enable');
   await post('Profiler.start');
 

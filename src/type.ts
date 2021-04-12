@@ -1,6 +1,8 @@
 import type {Binding} from './component';
 import type {Entity} from './entity';
-import {TextEncoder, TextDecoder} from 'util';
+
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
 
 function throwNotWritable(binding: Binding<any>) {
@@ -158,8 +160,6 @@ class DynamicStringType extends Type<string> {
   private readonly maxUtf8Length: number;
   private readonly lengthsStride: number;
   private readonly bytesStride: number;
-  private static readonly decoder = new TextDecoder();
-  private static readonly encoder = new TextEncoder();
 
   constructor(maxUtf8Length: number) {
     super('');
@@ -183,11 +183,11 @@ class DynamicStringType extends Type<string> {
       enumerable: true, configurable: true,
       get(this: C): string {
         const length = lengths[binding.index * lengthsStride];
-        return DynamicStringType.decoder.decode(
+        return decoder.decode(
           new Uint8Array(bytes.buffer, binding.index * bytesStride + 2, length));
       },
       set(this: C, value: string): void {
-        const encodedString = DynamicStringType.encoder.encode(value);
+        const encodedString = encoder.encode(value);
         if (encodedString.byteLength > maxUtf8Length) {
           throw new Error(`Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
         }
@@ -199,7 +199,7 @@ class DynamicStringType extends Type<string> {
       enumerable: true, configurable: true,
       get(this: C): string {
         const length = lengths[binding.index * lengthsStride];
-        return DynamicStringType.decoder.decode(
+        return decoder.decode(
           new Uint8Array(bytes.buffer, binding.index * bytesStride + 2, length));
       },
       set(this: C, value: string): void {

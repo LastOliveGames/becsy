@@ -1,5 +1,4 @@
 import {ComponentType, initComponent} from './component';
-import {config} from './config';
 import type {Registry} from './registry';
 import {Type} from './type';
 
@@ -28,9 +27,11 @@ export class Entity {
 
   add(type: ComponentType<any>, values?: any): this {
     // TODO: prevent add when entity has been deleted
-    if (config.DEBUG) this.__checkMask(type, true);
-    if (config.DEBUG && this.__registry.hasFlag(this.__id, type)) {
-      throw new Error(`Entity already has a ${type.name} component`);
+    CHECK: {
+      this.__checkMask(type, true);
+      if (this.__registry.hasFlag(this.__id, type)) {
+        throw new Error(`Entity already has a ${type.name} component`);
+      }
     }
     this.__registry.setFlag(this.__id, type);
     initComponent(type, this.__id, values);
@@ -40,8 +41,10 @@ export class Entity {
   addAll(...args: (ComponentType<any> | any)[]): this {
     for (let i = 0; i < args.length; i++) {
       const type = args[i];
-      if (config.DEBUG && typeof type !== 'function') {
-        throw new Error(`Bad arguments to bulk add: expected component type, got: ${type}`);
+      CHECK: {
+        if (typeof type !== 'function') {
+          throw new Error(`Bad arguments to bulk add: expected component type, got: ${type}`);
+        }
       }
       let value = args[i + 1];
       if (typeof value === 'function') value = undefined; else i++;
@@ -50,68 +53,53 @@ export class Entity {
     return this;
   }
 
-  remove(type: ComponentType<any>): boolean {
-    if (config.DEBUG) this.__checkMask(type, true);
-    if (!this.__registry.hasFlag(this.__id, type)) return false;
+  remove(type: ComponentType<any>): void {
+    CHECK: {
+      if (!this.has(type)) throw new Error(`Entity doesn't have a ${type.name} component`);
+    }
     this.__remove(type);
-    return true;
   }
 
   removeAll(...types: ComponentType<any>[]): void {
     for (const type of types) this.remove(type);
   }
 
-  has(type: ComponentType<any>): boolean {
-    if (config.DEBUG) this.__checkMask(type, false);
-    return this.__registry.hasFlag(this.__id, type);
+  has(type: ComponentType<any>, allowRemoved = false): boolean {
+    CHECK: this.__checkMask(type, false);
+    return this.__registry.hasFlag(this.__id, type, allowRemoved);
   }
 
   read<C>(type: ComponentType<C>): Readonly<C> {
-    if (config.DEBUG) this.__checkMask(type, false);
-    const component = this.__get(type, false, false);
-    if (config.DEBUG && component === undefined) {
-      throw new Error(`Entity doesn't have a ${type.name} component`);
+    CHECK: {
+      if (!this.has(type)) throw new Error(`Entity doesn't have a ${type.name} component`);
     }
-    return component!;
-  }
-
-  readIfPresent<C>(type: ComponentType<C>): Readonly<C> | undefined {
-    if (config.DEBUG) this.__checkMask(type, false);
-    return this.__get(type, false, false);
+    return type.__bind!(this.__id, false);
   }
 
   readRecentlyRemoved<C>(type: ComponentType<C>): Readonly<C> {
-    if (config.DEBUG) this.__checkMask(type, false);
-    const component = this.__get(type, false, true);
-    if (config.DEBUG && component === undefined) {
-      throw new Error(`Entity doesn't have a ${type.name} component`);
+    CHECK: {
+      if (!this.has(type, true)) throw new Error(`Entity doesn't have a ${type.name} component`);
     }
-    return component!;
+    return type.__bind!(this.__id, false);
   }
 
   write<C>(type: ComponentType<C>): C {
-    if (config.DEBUG) this.__checkMask(type, true);
-    const component = this.__get(type, true, false);
-    if (component === undefined) throw new Error(`Entity doesn't have a ${type.name} component`);
+    CHECK: {
+      if (!this.has(type, true)) throw new Error(`Entity doesn't have a ${type.name} component`);
+    }
+    // TODO: only mark mutation if type has change tracking enabled
     this.__registry.markMutated(this.__id, type);
-    return component;
+    return type.__bind!(this.__id, true);
   }
 
   delete(): void {
     for (const type of this.__registry.types) {
       if (!this.__registry.hasFlag(this.__id, type)) continue;
-      if (config.DEBUG) this.__checkMask(type, true);
+      CHECK: this.__checkMask(type, true);
       this.__remove(type);
     }
     this.__registry.queueDeletion(this.__id);
     this.__wipeInboundRefs();
-  }
-
-  private __get<C>(
-    type: ComponentType<C>, allowWrite: boolean, allowRemoved: boolean
-  ): C | undefined {
-    if (!this.__registry.hasFlag(this.__id, type, allowRemoved)) return;
-    return type.__bind!(this.__id, allowWrite);
   }
 
   private __remove(type: ComponentType<any>): void {

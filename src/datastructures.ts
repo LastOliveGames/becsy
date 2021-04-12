@@ -1,6 +1,3 @@
-import {config} from './config';
-
-
 /**
  * A fixed but arbitrary size bitset.
  */
@@ -12,7 +9,7 @@ export class Bitset {
   }
 
   get(index: number): boolean {
-    if (config.DEBUG) {
+    DEBUG: {
       if (index < 0 || index >= this.size) {
         throw new Error(`Bit index out of bounds: ${index}`);
       }
@@ -21,7 +18,7 @@ export class Bitset {
   }
 
   set(index: number): void {
-    if (config.DEBUG) {
+    DEBUG: {
       if (index < 0 || index >= this.size) {
         throw new Error(`Bit index out of bounds: ${index}`);
       }
@@ -30,7 +27,7 @@ export class Bitset {
   }
 
   unset(index: number): void {
-    if (config.DEBUG) {
+    DEBUG: {
       if (index < 0 || index >= this.size) {
         throw new Error(`Bit index out of bounds: ${index}`);
       }
@@ -77,7 +74,9 @@ export class Log {
 
   push(value: number): void {
     const corralLength = this.corral[0];
-    if (config.DEBUG && corralLength >= this.maxEntries) this.throwCapacityExceeded();
+    CHECK: {
+      if (corralLength >= this.maxEntries) this.throwCapacityExceeded();
+    }
     if (corralLength && this.corral[corralLength] === value) return;
     this.corral[corralLength + 1] = value;
     this.corral[0] += 1;
@@ -115,7 +114,9 @@ export class Log {
   processSince(
     startPointer: LogPointer, endPointer?: LogPointer
   ): [Uint32Array, number, number] | [] {
-    if (config.DEBUG) this.checkPointers(startPointer, endPointer);
+    CHECK: {
+      this.checkPointers(startPointer, endPointer);
+    }
     let result: [Uint32Array, number, number] | [] = EMPTY_TUPLE;
     const endIndex = endPointer?.index ?? this.data[0];
     const endGeneration = endPointer?.generation ?? this.data[1];
@@ -139,7 +140,7 @@ export class Log {
   }
 
   countSince(startPointer: LogPointer, endPointer?: LogPointer): number {
-    if (config.DEBUG) {
+    CHECK: {
       this.checkPointers(startPointer, endPointer);
       if (this.corral[0]) throw new Error(`Internal error, should commit log before counting`);
     }
@@ -214,8 +215,10 @@ export class SharedAtomicPool {
     if (!source.length) return;
     const length = this.length;
     const newLength = length + source.length;
-    if (config.DEBUG && newLength > this.maxItems) {
-      throw new Error('Internal error, refill exceeded pool capacity');
+    DEBUG: {
+      if (newLength > this.maxItems) {
+        throw new Error('Internal error, refill exceeded pool capacity');
+      }
     }
     this.data.set(source, length + 1);
     this.data[0] = newLength;

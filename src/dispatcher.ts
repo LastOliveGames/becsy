@@ -3,7 +3,6 @@ import {Entity, MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './entity';
 import {Indexer} from './indexer';
 import {Log, LogPointer} from './datastructures';
 import type {System, SystemType} from './system';
-import {config} from './config';
 import {Registry} from './registry';
 
 
@@ -105,7 +104,7 @@ export class Dispatcher {
   readonly writeLog: Log | undefined;
   private readonly shapeLogFramePointer: LogPointer;
   private readonly writeLogFramePointer: LogPointer | undefined;
-  readonly stats = new Stats();
+  readonly stats;
 
   constructor({
     componentTypes, systems,
@@ -121,6 +120,7 @@ export class Dispatcher {
     if (componentTypes.length > MAX_NUM_COMPONENTS) {
       throw new Error(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
     }
+    STATS: this.stats = new Stats();
     this.maxEntities = maxEntities;
     this.shapeLog = new Log(maxShapeChangesPerFrame, 'maxShapeChangesPerFrame');
     this.shapeLogFramePointer = this.shapeLog.createPointer();
@@ -151,7 +151,9 @@ export class Dispatcher {
   }
 
   execute(time?: number, delta?: number, systems?: System[]): void {
-    if (config.DEBUG && this.executing) throw new Error('Recursive system execution not allowed');
+    CHECK: {
+      if (this.executing) throw new Error('Recursive system execution not allowed');
+    }
     this.executing = true;
     if (time === undefined) time = now() / 1000;
     if (delta === undefined) delta = time - this.lastTime;
@@ -167,13 +169,15 @@ export class Dispatcher {
     this.registry.executingSystem = undefined;
     this.registry.processEndOfFrame();
     this.executing = false;
-    this.gatherFrameStats();
+    STATS: this.gatherFrameStats();
   }
 
   executeAdHoc(system: System): void {
     system.__init(this);
-    if (config.DEBUG && system.__needsWriteLog && !this.writeLog) {
-      throw new Error('Internal error, ad hoc system needs write log');
+    DEBUG: {
+      if (system.__needsWriteLog && !this.writeLog) {
+        throw new Error('Internal error, ad hoc system needs write log');
+      }
     }
     this.execute(0, 0, [system]);
   }

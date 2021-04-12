@@ -139,6 +139,7 @@ module.exports = {
     'no-unmodified-loop-condition': 'error',
     'no-unneeded-ternary': 'error',
     'no-unused-expressions': 'error',
+    'no-unused-labels': 'off',
     'no-unused-vars': ['error', {args: 'none'}],
     'no-use-before-define': ['error', {functions: false}],
     'no-useless-call': 'error',

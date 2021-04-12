@@ -7,7 +7,7 @@
     "perf": "tsc-watch --onSuccess \"node --enable-source-maps --es-module-specifier-resolution=node lib/tests/bottom-up.test.js\"",
     "deopt": "rm *.log && node --trace-ic --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js && mv *.log v8.pre.log && node striplog.cjs && deoptigate",
     "flame": "clinic flame -- node --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js",
-    "build": "tsc && rollup --config",
+    "build": "rollup --config",
     "prepare": "yarn build",
     "lint": "eslint src tests"
   },
@@ -22,6 +22,7 @@
     "@types/node": "^14.14.34",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "@typescript-eslint/parser": "^4.17.0",
+    "@wessberg/rollup-plugin-ts": "^1.3.11",
     "eslint": "^7.22.0",
     "eslint-plugin-disable": "^2.0.1",
     "eslint-plugin-import": "^2.22.1",

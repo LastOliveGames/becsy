@@ -1,5 +1,4 @@
 import {ComponentType, decorateComponentType} from './component';
-import {config} from './config';
 import {Log, LogPointer, SharedAtomicPool} from './datastructures';
 import type {Dispatcher} from './dispatcher';
 import {Entity, EntityId, ENTITY_ID_BITS} from './entity';
@@ -39,8 +38,10 @@ export class EntityPool {
   }
 
   return(id: number): void {
-    if (config.DEBUG && !this.borrowCounts[id]) {
-      throw new Error('Internal error, returning entity with no borrows');
+    DEBUG: {
+      if (!this.borrowCounts[id]) {
+        throw new Error('Internal error, returning entity with no borrows');
+      }
     }
     if (--this.borrowCounts[id] <= 0) {
       this.spares.push(this.borrowed[id]!);
@@ -83,7 +84,7 @@ export class Registry {
     // for (let i = id * this.stride; i < (id + 1) * this.stride; i++) this.shapes[i] = 0;
     const entity = this.pool.borrowTemporarily(id);
     if (initialComponents) entity.addAll(...initialComponents);
-    this.dispatcher.stats.numEntities += 1;
+    STATS: this.dispatcher.stats.numEntities += 1;
     return entity;
   }
 
@@ -108,8 +109,10 @@ export class Registry {
       this.entityIdPool.refill(segment);
       numDeletedEntities += segment.length;
     }
-    this.dispatcher.stats.numEntities -= numDeletedEntities;
-    this.dispatcher.stats.maxLimboEntities = numDeletedEntities;
+    STATS: {
+      this.dispatcher.stats.numEntities -= numDeletedEntities;
+      this.dispatcher.stats.maxLimboEntities = numDeletedEntities;
+    }
     this.deletionLog.createPointer(this.prevDeletionPointer);
   }
 

@@ -1,8 +1,6 @@
-import {config, prop, System, Type, World} from '../src';
+import {prop, System, Type, World} from '../src';
 import {profile} from '../src/profile';
 import {performance} from 'perf_hooks';
-
-config.DEBUG = false;
 
 class A {
   @prop(Type.int32) declare value: number;

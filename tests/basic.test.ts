@@ -1,9 +1,6 @@
 import {
   component, ComponentType, componentTypes, Entity, prop, TopQuery, System, SystemType, Type, World,
-  config
 } from '../src';
-
-config.DEBUG = true;
 
 
 @component class A {

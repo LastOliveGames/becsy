@@ -1,24 +1,7 @@
 import {System, Type} from '../src';
 import {performance} from 'perf_hooks';
 import {ComponentType, decorateComponentType} from '../src/component';
-import type {Dispatcher} from '../src/dispatcher';
 
-
-// interface ComponentType < C extends Component > {
-//   new(): C;
-//   instance: C;
-// }
-
-// class Component {
-//   declare id: number;
-//   declare mutable: boolean;
-
-//   reset(id: number, mutable: boolean) {
-//     this.id = id;
-//     this.mutable = mutable;
-//   }
-
-// }
 
 function setup(count: number): () => void {
   const entities = [];
@@ -37,24 +20,17 @@ function setup(count: number): () => void {
   //   get() {return aValue[this.id];},
   //   set(x) {if (!this.mutable) throw new Error('not mutable'); aValue[this.id] = x;}
   // });
-  decorateComponentType(1, A, {maxEntities: 5000} as Dispatcher);
+  decorateComponentType(1, A, {maxEntities: 5000} as any);
 
   class Entity {
-    declare id: number;
+    constructor(readonly id: number) {}
 
-    constructor(id: number) {this.id = id;}
     write<C>(type: ComponentType<C>): C {
       return type.__bind!(this.id, true);
-      // const x = type.instance;
-      // x.reset(this.id, true);
-      // return x;
     }
 
     read<C>(type: ComponentType<C>): C {
       return type.__bind!(this.id, false);
-      // const x = type.instance;
-      // x.reset(this.id, true);
-      // return x;
     }
   }
 

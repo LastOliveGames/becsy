@@ -1,6 +1,5 @@
 import {Type} from './type';
 import type {EntityId} from './entity';
-import {config} from './config';
 import type {Dispatcher} from './dispatcher';
 
 
@@ -46,10 +45,12 @@ export class Binding<C> {
 
 
 export function initComponent(type: ComponentType<any>, id: EntityId, values: any): void {
-  if (config.DEBUG && values !== undefined) {
-    for (const key in values) {
-      if (!type.schema?.[key]) {
-        throw new Error(`Property ${key} not defined for component ${type.name}`);
+  CHECK: {
+    if (values !== undefined) {
+      for (const key in values) {
+        if (!type.schema?.[key]) {
+          throw new Error(`Property ${key} not defined for component ${type.name}`);
+        }
       }
     }
   }
@@ -81,10 +82,12 @@ function gatherFields(type: ComponentType<any>): Field<any>[] {
 export function decorateComponentType<C>(
   typeId: number, type: ComponentType<C>, dispatcher: Dispatcher
 ): void {
-  if (config.DEBUG && (type.maxEntities ?? 0) > dispatcher.maxEntities) {
-    throw new Error(
-      `Component type ${type.name} maxEntities higher than world maxEntities; ` +
-      `reduce ${type.maxEntities} to or below ${dispatcher.maxEntities}`);
+  CHECK: {
+    if ((type.maxEntities ?? 0) > dispatcher.maxEntities) {
+      throw new Error(
+        `Component type ${type.name} maxEntities higher than world maxEntities; ` +
+        `reduce ${type.maxEntities} to or below ${dispatcher.maxEntities}`);
+    }
   }
   const maxEntities = Math.min(type.maxEntities ?? dispatcher.maxEntities, dispatcher.maxEntities);
   if (maxEntities < dispatcher.maxEntities) {
