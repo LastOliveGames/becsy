@@ -12,9 +12,14 @@
     "lint": "eslint src tests"
   },
   "files": [
-    "dist/**/*"
+    "index.js", "index.js.map", "index.d.ts", "index.d.ts.map",
+    "umd/index.js", "umd/index.js.map", "umd/index.d.ts", "umd/index.d.ts.map",
+    "perf/index.js", "perf/index.js.map", "perf/index.d.ts", "perf/index.d.ts.map",
+    "perf/umd/index.js", "perf/umd/index.js.map", "perf/umd/index.d.ts", "perf/umd/index.d.ts.map",
+    "src"
   ],
-  "main": "dist/index.cjs",
+  "main": "umd/index.js",
+  "module": "index.js",
   "author": "Piotr Kaminski <piotr@lastolive.games>",
   "license": "MIT",
   "devDependencies": {

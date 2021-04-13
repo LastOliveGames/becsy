@@ -19,13 +19,13 @@ export default [
     input: 'src/index.ts',
     output: [
       {
-        file: 'dist/index.cjs',
+        file: 'umd/index.js',
         name: 'becsy',
         format: 'umd',
         sourcemap: true,
       },
       {
-        file: 'dist/index.mjs',
+        file: 'index.js',
         format: 'esm',
         sourcemap: true,
       },
@@ -40,13 +40,13 @@ export default [
     input: 'src/index.ts',
     output: [
       {
-        file: 'dist/perf/index.cjs',
+        file: 'perf/umd/index.js',
         name: 'becsy',
         format: 'umd',
         sourcemap: true,
       },
       {
-        file: 'dist/perf/index.mjs',
+        file: 'perf/index.js',
         format: 'esm',
         sourcemap: true,
       },

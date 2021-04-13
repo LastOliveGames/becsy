@@ -1,12 +1,14 @@
-/.env
-/.gitconfig
-/.vscode
-/.clinic
-/dist
-/lib
-/node_modules
-/yarn-error.log
-tsconfig.tsbuildinfo
-traceopt.txt
-v8*.log
+/index.js*
+/index.d.ts*
+/umd/
+/perf/
+/lib/
+/node_modules/
 
+/.gitconfig
+/.vscode/
+/.clinic/
+/yarn-error.log
+/tsconfig.tsbuildinfo
+/traceopt.txt
+/v8*.log
