@@ -1,6 +1,5 @@
-import {System, Type} from '../src';
+import {System, Type, Entity, decorateComponentType} from './index.js';
 import {performance} from 'perf_hooks';
-import {ComponentType, decorateComponentType} from '../src/component';
 
 
 function setup(count: number): () => void {
@@ -22,21 +21,22 @@ function setup(count: number): () => void {
   // });
   decorateComponentType(1, A, {maxEntities: 5000} as any);
 
-  class Entity {
-    constructor(readonly id: number) {}
+  // class Entity {
+  //   constructor(readonly id: number) {}
 
-    write<C>(type: ComponentType<C>): C {
-      return type.__bind!(this.id, true);
-    }
+  //   write<C>(type: ComponentType<C>): C {
+  //     return type.__bind!(this.id, true);
+  //   }
 
-    read<C>(type: ComponentType<C>): C {
-      return type.__bind!(this.id, false);
-    }
-  }
+  //   read<C>(type: ComponentType<C>): C {
+  //     return type.__bind!(this.id, false);
+  //   }
+  // }
 
 
   for (let i = 0; i < count; i++) {
-    entities[i] = new Entity(i);
+    entities[i] = new Entity({markMutated: () => {/* foo */}} as any);
+    entities[i].__reset(i);
     // aIndex[i] = i;
   }
 

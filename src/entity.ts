@@ -87,8 +87,7 @@ export class Entity {
     CHECK: {
       if (!this.has(type, true)) throw new Error(`Entity doesn't have a ${type.name} component`);
     }
-    // TODO: only mark mutation if type has change tracking enabled
-    this.__registry.markMutated(this.__id, type);
+    if (type.__trackedWrites) this.__registry.trackWrite(this.__id, type);
     return type.__bind!(this.__id, true);
   }
 

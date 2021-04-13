@@ -149,8 +149,8 @@ export class Registry {
     this.dispatcher.shapeLog.push(id);
   }
 
-  markMutated(id: EntityId, type: ComponentType<any>): void {
-    this.dispatcher.writeLog?.push(id | (type.__id! << ENTITY_ID_BITS));
+  trackWrite(id: EntityId, type: ComponentType<any>): void {
+    this.dispatcher.writeLog!.push(id | (type.__id! << ENTITY_ID_BITS));
   }
 
   matchShape(id: EntityId, positiveMask?: number[], negativeMask?: number[]): boolean {

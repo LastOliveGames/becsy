@@ -108,6 +108,7 @@ class QueryBuilder {
 
   get track(): this {
     this.set('__trackMask');
+    for (const type of this.__lastTypes) type.__trackedWrites = true;
     return this;
   }
 
@@ -294,7 +295,7 @@ export class TopQuery extends Query {
     const writeLog = this.__system.__dispatcher.writeLog!;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
     while (true) {
-      [log, startIndex, endIndex] = writeLog.processSince(this.__shapeLogPointer);
+      [log, startIndex, endIndex] = writeLog.processSince(this.__writeLogPointer!);
       if (!log) break;
       for (let i = startIndex!; i < endIndex!; i++) {
         const entry = log[i];

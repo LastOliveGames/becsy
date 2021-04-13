@@ -25,6 +25,7 @@ export interface ComponentType<C> {
   __id?: number;
   __flagOffset?: number;
   __flagMask?: number;
+  __trackedWrites?: boolean;
   __fields?: Field<any>[];
   __bind?(id: EntityId, writable: boolean): C;
 }
