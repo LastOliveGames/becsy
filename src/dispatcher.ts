@@ -151,9 +151,7 @@ export class Dispatcher {
   }
 
   execute(time?: number, delta?: number, systems?: System[]): void {
-    CHECK: {
-      if (this.executing) throw new Error('Recursive system execution not allowed');
-    }
+    CHECK: if (this.executing) throw new Error('Recursive system execution not allowed');
     this.executing = true;
     if (time === undefined) time = now() / 1000;
     if (delta === undefined) delta = time - this.lastTime;
@@ -174,10 +172,8 @@ export class Dispatcher {
 
   executeAdHoc(system: System): void {
     system.__init(this);
-    DEBUG: {
-      if (system.__needsWriteLog && !this.writeLog) {
-        throw new Error('Internal error, ad hoc system needs write log');
-      }
+    DEBUG: if (system.__needsWriteLog && !this.writeLog) {
+      throw new Error('Internal error, ad hoc system needs write log');
     }
     this.execute(0, 0, [system]);
   }

@@ -45,10 +45,12 @@ export interface LogPointer {
   index: number;
   generation: number;
   corralIndex: number;
+  corralGeneration: number;
 }
 
 
 const LOG_HEADER_LENGTH = 2;
+const CORRAL_HEADER_LENGTH = 2;
 const EMPTY_TUPLE: [] = [];
 
 
@@ -59,7 +61,7 @@ const EMPTY_TUPLE: [] = [];
 export class Log {
   /* layout: [index, generation, ...entries] */
   private readonly data: Uint32Array;
-  /* layout: [length, ...entries] */
+  /* layout: [length, generation, ...entries] */
   private readonly corral: Uint32Array;
 
   constructor(
@@ -68,17 +70,16 @@ export class Log {
     const buffer =
       new SharedArrayBuffer((maxEntries + LOG_HEADER_LENGTH) * Uint32Array.BYTES_PER_ELEMENT);
     this.data = new Uint32Array(buffer);
-    this.corral =
-      new Uint32Array(new SharedArrayBuffer((maxEntries + 1) * Uint32Array.BYTES_PER_ELEMENT));
+    const corralBuffer =
+      new SharedArrayBuffer((maxEntries + CORRAL_HEADER_LENGTH) * Uint32Array.BYTES_PER_ELEMENT);
+    this.corral = new Uint32Array(corralBuffer);
   }
 
   push(value: number): void {
     const corralLength = this.corral[0];
-    CHECK: {
-      if (corralLength >= this.maxEntries) this.throwCapacityExceeded();
-    }
+    CHECK: if (corralLength >= this.maxEntries) this.throwCapacityExceeded();
     if (corralLength && this.corral[corralLength] === value) return;
-    this.corral[corralLength + 1] = value;
+    this.corral[corralLength + CORRAL_HEADER_LENGTH] = value;
     this.corral[0] += 1;
   }
 
@@ -87,10 +88,14 @@ export class Log {
     if (!corralLength) return;
     let index = this.data[0];
     const firstSegmentLength = Math.min(corralLength, this.maxEntries - index);
-    this.data.set(this.corral.subarray(1, firstSegmentLength + 1), index + LOG_HEADER_LENGTH);
+    this.data.set(
+      this.corral.subarray(CORRAL_HEADER_LENGTH, firstSegmentLength + CORRAL_HEADER_LENGTH),
+      index + LOG_HEADER_LENGTH);
     if (firstSegmentLength < corralLength) {
       this.data.set(
-        this.corral.subarray(firstSegmentLength + 1, corralLength + 1), LOG_HEADER_LENGTH);
+        this.corral.subarray(
+          firstSegmentLength + CORRAL_HEADER_LENGTH, corralLength + CORRAL_HEADER_LENGTH),
+        LOG_HEADER_LENGTH);
     }
     index += corralLength;
     while (index >= this.maxEntries) {
@@ -99,24 +104,36 @@ export class Log {
     }
     this.data[0] = index;
     this.corral[0] = 0;
+    this.corral[1] += 1;
   }
 
   createPointer(pointer?: LogPointer): LogPointer {
     if (!pointer) {
-      return {index: this.data[0], generation: this.data[1], corralIndex: this.corral[0]};
+      return {
+        index: this.data[0], generation: this.data[1],
+        corralIndex: this.corral[0], corralGeneration: this.corral[1]
+      };
     }
     pointer.index = this.data[0];
     pointer.generation = this.data[1];
     pointer.corralIndex = this.corral[0];
+    pointer.corralGeneration = this.corral[1];
     return pointer;
+  }
+
+  hasChangesSince(pointer: LogPointer): boolean {
+    CHECK: this.checkPointer(pointer);
+    return !(
+      pointer.index === this.data[0] && pointer.generation === this.data[1] &&
+      (pointer.corralGeneration === this.corral[1] ?
+        pointer.corralIndex === this.corral[0] : this.corral[0] === 0)
+    );
   }
 
   processSince(
     startPointer: LogPointer, endPointer?: LogPointer
   ): [Uint32Array, number, number] | [] {
-    CHECK: {
-      this.checkPointers(startPointer, endPointer);
-    }
+    CHECK: this.checkPointers(startPointer, endPointer);
     let result: [Uint32Array, number, number] | [] = EMPTY_TUPLE;
     const endIndex = endPointer?.index ?? this.data[0];
     const endGeneration = endPointer?.generation ?? this.data[1];
@@ -126,9 +143,16 @@ export class Log {
         startPointer.index = endIndex;
       } else {
         const corralLength = this.corral[0];
-        if (startPointer.corralIndex < corralLength) {
-          result = [this.corral, startPointer.corralIndex + 1, corralLength + 1];
+        const corralGeneration = this.corral[1];
+        const corralHasNewEntries = startPointer.corralGeneration === corralGeneration ?
+          startPointer.corralIndex < corralLength : corralLength;
+        if (corralHasNewEntries) {
+          result = [
+            this.corral, startPointer.corralIndex + CORRAL_HEADER_LENGTH,
+            corralLength + CORRAL_HEADER_LENGTH
+          ];
           startPointer.corralIndex = corralLength;
+          startPointer.corralGeneration = corralGeneration;
         }
       }
     } else {
@@ -140,10 +164,8 @@ export class Log {
   }
 
   countSince(startPointer: LogPointer, endPointer?: LogPointer): number {
-    CHECK: {
-      this.checkPointers(startPointer, endPointer);
-      if (this.corral[0]) throw new Error(`Internal error, should commit log before counting`);
-    }
+    CHECK: this.checkPointers(startPointer, endPointer);
+    DEBUG: if (this.corral[0]) throw new Error(`Internal error, should commit log before counting`);
     const startIndex = startPointer.index;
     const endIndex = endPointer?.index ?? this.data[0];
     const endGeneration = endPointer?.generation ?? this.data[1];
@@ -158,9 +180,11 @@ export class Log {
     this.checkPointer(startPointer);
     if (endPointer) {
       this.checkPointer(endPointer);
-      if (startPointer.index > endPointer.index &&
-        startPointer.generation >= endPointer.generation) {
-        throw new RangeError(`Internal error, start pointer exceeds end pointer`);
+      DEBUG: {
+        if (startPointer.index > endPointer.index &&
+            startPointer.generation >= endPointer.generation) {
+          throw new RangeError(`Internal error, start pointer exceeds end pointer`);
+        }
       }
     }
   }
@@ -174,8 +198,13 @@ export class Log {
       if (pointer.index > index) generation += 1;
       if (generation !== this.data[1]) this.throwCapacityExceeded();
     }
-    if (pointer.corralIndex > this.corral[0]) {
-      throw new Error('Internal error, pointer past end of log corral area');
+    DEBUG: {
+      if (pointer.corralGeneration > this.corral[1]) {
+        throw new Error('Internal error, pointer corral generation older than corral');
+      }
+      if (pointer.corralGeneration === this.corral[1] && pointer.corralIndex > this.corral[0]) {
+        throw new Error('Internal error, pointer past end of log corral area');
+      }
     }
   }
 

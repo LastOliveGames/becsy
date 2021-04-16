@@ -1,4 +1,4 @@
-import {Bitset, LogPointer} from './datastructures';
+import {Bitset, Log, LogPointer} from './datastructures';
 import type {ComponentType} from './component';
 import {Entity, ENTITY_ID_BITS, ENTITY_ID_MASK} from './entity';
 import type {System} from './system';
@@ -204,23 +204,21 @@ export class TopQuery extends Query {
 
   private __hasTransientResults: boolean;
   __hasChangedResults: boolean;
+  private __tracksWrites: boolean;
   private __processedEntities: Bitset;
   private __currentEntities: Bitset | undefined;
+  private __shapeLog: Log;
+  private __writeLog: Log | undefined;
   private __shapeLogPointer: LogPointer;
   private __writeLogPointer: LogPointer | undefined;
 
-  __execute(): void {
-    if (!this.__flavors) return;
-    this.__processedEntities.clear();
-    if (this.__hasTransientResults) this.__clearTransientResults();
-    this.__computeShapeResults();
-    this.__computeWriteResults();
-  }
-
   __init(): void {
     const dispatcher = this.__system.__dispatcher;
+    this.__shapeLog = dispatcher.shapeLog;
+    this.__writeLog = dispatcher.writeLog;
     this.__hasTransientResults = Boolean(this.__flavors & transientFlavorsMask);
     this.__hasChangedResults = Boolean(this.__flavors & changedFlavorsMask);
+    this.__tracksWrites = (this.__flavors & changedFlavorsMask) !== 0 && !!this.__trackMask;
     this.__shapeLogPointer = dispatcher.shapeLog.createPointer();
     this.__writeLogPointer = dispatcher.writeLog?.createPointer();
     this.__processedEntities = new Bitset(dispatcher.maxEntities);
@@ -250,6 +248,7 @@ export class TopQuery extends Query {
   }
 
   private __clearTransientResults(): void {
+    if (!this.__hasTransientResults) return;
     this.__results.added?.clear();
     this.__results.removed?.clear();
     this.__results.changed?.clear();
@@ -258,12 +257,24 @@ export class TopQuery extends Query {
     this.__results.addedChangedOrRemoved?.clear();
   }
 
+  __execute(): void {
+    if (!this.__flavors) return;
+    const shapesChanged = this.__shapeLog.hasChangesSince(this.__shapeLogPointer);
+    const writesMade =
+      this.__tracksWrites && this.__writeLog!.hasChangesSince(this.__writeLogPointer!);
+    if (shapesChanged || writesMade) {
+      this.__processedEntities.clear();
+      this.__clearTransientResults();
+      if (shapesChanged) this.__computeShapeResults();
+      if (writesMade) this.__computeWriteResults();
+    }
+  }
+
   private __computeShapeResults(): void {
     const registry = this.__system.__dispatcher.registry;
-    const shapeLog = this.__system.__dispatcher.shapeLog;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
     while (true) {
-      [log, startIndex, endIndex] = shapeLog.processSince(this.__shapeLogPointer);
+      [log, startIndex, endIndex] = this.__shapeLog.processSince(this.__shapeLogPointer);
       if (!log) break;
       for (let i = startIndex!; i < endIndex!; i++) {
         const id = log[i];
@@ -291,11 +302,9 @@ export class TopQuery extends Query {
   }
 
   private __computeWriteResults(): void {
-    if (!(this.__flavors & changedFlavorsMask) || !this.__trackMask) return;
-    const writeLog = this.__system.__dispatcher.writeLog!;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
     while (true) {
-      [log, startIndex, endIndex] = writeLog.processSince(this.__writeLogPointer!);
+      [log, startIndex, endIndex] = this.__writeLog!.processSince(this.__writeLogPointer!);
       if (!log) break;
       for (let i = startIndex!; i < endIndex!; i++) {
         const entry = log[i];
@@ -303,7 +312,7 @@ export class TopQuery extends Query {
         if (!this.__processedEntities.get(entityId)) {
           const componentId = entry >>> ENTITY_ID_BITS;
           // Manually recompute offset and mask instead of looking up controller.
-          if ((this.__trackMask[componentId >> 5] ?? 0) & (1 << (componentId & 31))) {
+          if ((this.__trackMask![componentId >> 5] ?? 0) & (1 << (componentId & 31))) {
             this.__processedEntities.set(entityId);
             this.__results.changed?.add(entityId);
             this.__results.addedOrChanged?.add(entityId);
