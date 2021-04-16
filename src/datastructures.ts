@@ -121,7 +121,7 @@ export class Log {
     return pointer;
   }
 
-  hasChangesSince(pointer: LogPointer): boolean {
+  hasUpdatesSince(pointer: LogPointer): boolean {
     CHECK: this.checkPointer(pointer);
     return !(
       pointer.index === this.data[0] && pointer.generation === this.data[1] &&

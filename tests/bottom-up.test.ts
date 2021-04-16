@@ -1,8 +1,6 @@
 import {World, System, Type} from './index.js';
 import {performance} from 'perf_hooks';
 
-const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
-  performance.now.bind(performance) : Date.now.bind(Date);
 
 function setup(count: number): () => void {
   class A {
@@ -55,7 +53,6 @@ function setup(count: number): () => void {
   const world = new World({
     maxEntities: count, componentTypes: [A, B, C, D, E], systems: [SystemA]
   });
-  const dispatcher = (world as any).__dispatcher;
 
   for (let i = 0; i < count; i++) {
     world.createEntity(A);
@@ -63,23 +60,7 @@ function setup(count: number): () => void {
   world.execute();
 
   return () => {
-    let time, delta;
-    dispatcher.executing = true;
-    if (time === undefined) time = now() / 1000;
-    if (delta === undefined) delta = time - dispatcher.lastTime;
-    dispatcher.lastTime = time;
-    for (const system of dispatcher.systems) {
-      dispatcher.registry.executingSystem = system;
-      system.time = time;
-      system.delta = delta;
-      // for (const query of system.__queries) query.__execute();
-      system.__queries[0].__execute();
-      system.execute();
-      dispatcher.flush();
-    }
-    dispatcher.registry.executingSystem = undefined;
-    dispatcher.registry.processEndOfFrame();
-    dispatcher.executing = false;
+    world.execute();
   };
 }
 

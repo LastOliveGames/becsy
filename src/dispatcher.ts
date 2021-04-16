@@ -128,7 +128,7 @@ export class Dispatcher {
     this.registry =
       new Registry(maxEntities, maxLimboEntities, componentTypes.flat(Infinity), this);
     this.systems = this.normalizeAndInitSystems(systems);
-    if (this.systems.some(system => system.__needsWriteLog)) {
+    if (this.systems.some(system => system.__hasWriteQueries)) {
       this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame');
       this.writeLogFramePointer = this.writeLog.createPointer();
     }
@@ -160,7 +160,7 @@ export class Dispatcher {
       this.registry.executingSystem = system;
       system.time = time;
       system.delta = delta;
-      for (const query of system.__queries) query.__execute();
+      system.__runQueries();
       system.execute();
       this.flush();
     }
@@ -172,7 +172,7 @@ export class Dispatcher {
 
   executeAdHoc(system: System): void {
     system.__init(this);
-    DEBUG: if (system.__needsWriteLog && !this.writeLog) {
+    DEBUG: if (system.__hasWriteQueries && !this.writeLog) {
       throw new Error('Internal error, ad hoc system needs write log');
     }
     this.execute(0, 0, [system]);

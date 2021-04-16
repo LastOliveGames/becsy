@@ -1,6 +1,6 @@
-import {Bitset, Log, LogPointer} from './datastructures';
+import {Bitset} from './datastructures';
 import type {ComponentType} from './component';
-import {Entity, ENTITY_ID_BITS, ENTITY_ID_MASK} from './entity';
+import type {Entity, EntityId} from './entity';
 import type {System} from './system';
 import {ArrayEntityList, EntityList, PackedArrayEntityList} from './entitylists';
 
@@ -204,24 +204,16 @@ export class TopQuery extends Query {
 
   private __hasTransientResults: boolean;
   __hasChangedResults: boolean;
-  private __tracksWrites: boolean;
-  private __processedEntities: Bitset;
   private __currentEntities: Bitset | undefined;
-  private __shapeLog: Log;
-  private __writeLog: Log | undefined;
-  private __shapeLogPointer: LogPointer;
-  private __writeLogPointer: LogPointer | undefined;
+  private __changedEntities: Bitset | undefined;
 
   __init(): void {
     const dispatcher = this.__system.__dispatcher;
-    this.__shapeLog = dispatcher.shapeLog;
-    this.__writeLog = dispatcher.writeLog;
     this.__hasTransientResults = Boolean(this.__flavors & transientFlavorsMask);
     this.__hasChangedResults = Boolean(this.__flavors & changedFlavorsMask);
-    this.__tracksWrites = (this.__flavors & changedFlavorsMask) !== 0 && !!this.__trackMask;
-    this.__shapeLogPointer = dispatcher.shapeLog.createPointer();
-    this.__writeLogPointer = dispatcher.writeLog?.createPointer();
-    this.__processedEntities = new Bitset(dispatcher.maxEntities);
+    CHECK: if (this.__hasChangedResults && !this.__trackMask) {
+      throw new Error(`Query for changed entities must track at least one component`);
+    }
     if (this.__flavors & QueryFlavor.all) {
       this.__results.all =
         new PackedArrayEntityList(dispatcher.registry.pool, dispatcher.maxEntities);
@@ -229,6 +221,11 @@ export class TopQuery extends Query {
       this.__currentEntities = new Bitset(dispatcher.maxEntities);
     }
     if (this.__hasTransientResults) this.__allocateTransientResultLists();
+    if (this.__flavors) this.__system.__shapeQueries.push(this);
+    if (this.__hasChangedResults) {
+      this.__changedEntities = new Bitset(dispatcher.maxEntities);
+      this.__system.__writeQueries.push(this);
+    }
   }
 
   private __allocateTransientResultLists(): void {
@@ -247,7 +244,7 @@ export class TopQuery extends Query {
     this.__results[name] = new ArrayEntityList(dispatcher.registry.pool);
   }
 
-  private __clearTransientResults(): void {
+  __clearTransientResults(): void {
     if (!this.__hasTransientResults) return;
     this.__results.added?.clear();
     this.__results.removed?.clear();
@@ -255,72 +252,37 @@ export class TopQuery extends Query {
     this.__results.addedOrChanged?.clear();
     this.__results.changedOrRemoved?.clear();
     this.__results.addedChangedOrRemoved?.clear();
+    this.__changedEntities?.clear();
   }
 
-  __execute(): void {
-    if (!this.__flavors) return;
-    const shapesChanged = this.__shapeLog.hasChangesSince(this.__shapeLogPointer);
-    const writesMade =
-      this.__tracksWrites && this.__writeLog!.hasChangesSince(this.__writeLogPointer!);
-    if (shapesChanged || writesMade) {
-      this.__processedEntities.clear();
-      this.__clearTransientResults();
-      if (shapesChanged) this.__computeShapeResults();
-      if (writesMade) this.__computeWriteResults();
-    }
-  }
-
-  private __computeShapeResults(): void {
+  __updateShape(id: EntityId): void {
     const registry = this.__system.__dispatcher.registry;
-    let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
-    while (true) {
-      [log, startIndex, endIndex] = this.__shapeLog.processSince(this.__shapeLogPointer);
-      if (!log) break;
-      for (let i = startIndex!; i < endIndex!; i++) {
-        const id = log[i];
-        if (!this.__processedEntities.get(id)) {
-          this.__processedEntities.set(id);
-          const oldMatch = this.__results.all?.has(id) ?? this.__currentEntities!.get(id);
-          const newMatch = registry.matchShape(id, this.__withMask, this.__withoutMask);
-          if (newMatch && !oldMatch) {
-            this.__currentEntities?.set(id);
-            this.__results.all?.add(id);
-            this.__results.added?.add(id);
-            this.__results.addedOrChanged?.add(id);
-            this.__results.addedChangedOrRemoved?.add(id);
-          } else if (!newMatch && oldMatch) {
-            this.__currentEntities?.unset(id);
-            this.__system.__removedEntities.set(id);
-            this.__results.all?.remove(id);
-            this.__results.removed?.add(id);
-            this.__results.changedOrRemoved?.add(id);
-            this.__results.addedChangedOrRemoved?.add(id);
-          }
-        }
-      }
+    const oldMatch = this.__results.all?.has(id) ?? this.__currentEntities!.get(id);
+    const newMatch = registry.matchShape(id, this.__withMask, this.__withoutMask);
+    if (newMatch && !oldMatch) {
+      this.__currentEntities?.set(id);
+      this.__results.all?.add(id);
+      this.__results.added?.add(id);
+      this.__results.addedOrChanged?.add(id);
+      this.__results.addedChangedOrRemoved?.add(id);
+    } else if (!newMatch && oldMatch) {
+      this.__currentEntities?.unset(id);
+      this.__system.__removedEntities.set(id);
+      this.__results.all?.remove(id);
+      this.__results.removed?.add(id);
+      this.__results.changedOrRemoved?.add(id);
+      this.__results.addedChangedOrRemoved?.add(id);
     }
   }
 
-  private __computeWriteResults(): void {
-    let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
-    while (true) {
-      [log, startIndex, endIndex] = this.__writeLog!.processSince(this.__writeLogPointer!);
-      if (!log) break;
-      for (let i = startIndex!; i < endIndex!; i++) {
-        const entry = log[i];
-        const entityId = entry & ENTITY_ID_MASK;
-        if (!this.__processedEntities.get(entityId)) {
-          const componentId = entry >>> ENTITY_ID_BITS;
-          // Manually recompute offset and mask instead of looking up controller.
-          if ((this.__trackMask![componentId >> 5] ?? 0) & (1 << (componentId & 31))) {
-            this.__processedEntities.set(entityId);
-            this.__results.changed?.add(entityId);
-            this.__results.addedOrChanged?.add(entityId);
-            this.__results.changedOrRemoved?.add(entityId);
-            this.__results.addedChangedOrRemoved?.add(entityId);
-          }
-        }
-      }
+  __handleWrite(entityId: EntityId, componentFlagOffset: number, componentFlagMask: number): void {
+    if (!this.__changedEntities!.get(entityId) &&
+        (this.__trackMask![componentFlagOffset] ?? 0) & componentFlagMask) {
+      this.__changedEntities!.set(entityId);
+      this.__results.changed?.add(entityId);
+      this.__results.addedOrChanged?.add(entityId);
+      this.__results.changedOrRemoved?.add(entityId);
+      this.__results.addedChangedOrRemoved?.add(entityId);
     }
   }
 
