@@ -89,6 +89,9 @@ export function decorateComponentType<C>(
         `Component type ${type.name} maxEntities higher than world maxEntities; ` +
         `reduce ${type.maxEntities} to or below ${dispatcher.maxEntities}`);
     }
+    if ((typeof process === 'undefined' || process.env.NODE_ENV !== 'test') && type.__bind) {
+      throw new Error(`Component type ${type.name} is already in use in another world`);
+    }
   }
   const maxEntities = Math.min(type.maxEntities ?? dispatcher.maxEntities, dispatcher.maxEntities);
   if (maxEntities < dispatcher.maxEntities) {

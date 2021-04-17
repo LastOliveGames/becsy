@@ -1,4 +1,5 @@
 {
+  "testEnvironment": "node",
   "transform": {
     "^.+\\.ts?$": "ts-jest"
   },
@@ -7,5 +8,12 @@
   "moduleFileExtensions": [
     "ts",
     "js"
-  ]
+  ],
+  "globals": {
+    "ts-jest": {
+      "diagnostics": {
+        "ignoreCodes": [151001]
+      }
+    }
+  }
 }
