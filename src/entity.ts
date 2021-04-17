@@ -121,7 +121,7 @@ export class Entity {
   }
 
   private __checkMask(type: ComponentType<any>, write: boolean): void {
-    const rwMasks = this.__registry.executingSystem?.__rwMasks;
+    const rwMasks = this.__registry.executingSystem?.rwMasks;
     const mask = write ? rwMasks?.write : rwMasks?.read;
     if (mask && !this.__registry.maskHasFlag(mask, type)) {
       throw new Error(

@@ -1,5 +1,5 @@
 import {
-  component, ComponentType, componentTypes, Entity, prop, TopQuery, System, SystemType, Type, World,
+  component, ComponentType, componentTypes, Entity, prop, Query, System, SystemType, Type, World,
 } from '../src';
 
 
@@ -104,21 +104,21 @@ class DoubleARefsFromB extends System {
   }
 }
 
-class IncrementBReferringToA extends System {
-  entities = this.query(q => q.with(A).join('bs', j => j.with(B).write.ref('a')));
-  execute() {
-    for (const entity of this.entities.all) {
-      for (const referrer of entity.joined.bs) {
-        referrer.write(B).value += 1;
-      }
-    }
-  }
-}
+// class IncrementBReferringToA extends System {
+//   entities = this.query(q => q.with(A).join('bs', j => j.with(B).write.ref('a')));
+//   execute() {
+//     for (const entity of this.entities.all) {
+//       for (const referrer of entity.joined.bs) {
+//         referrer.write(B).value += 1;
+//       }
+//     }
+//   }
+// }
 
 let total: {[key: string]: number} = {a: 0, b: 0, c: 0};
 
 class Count extends System {
-  private readonly items: {[key: string]: {type: ComponentType<any>, query: TopQuery}} = {
+  private readonly items: {[key: string]: {type: ComponentType<any>, query: Query}} = {
     a: {type: A, query: this.query(q => q.all.with(A))},
     b: {type: B, query: this.query(q => q.all.with(B))},
     c: {type: C, query: this.query(q => q.all.with(C))}
@@ -257,16 +257,16 @@ describe('references', () => {
     expect(total.a).toBe(7);
   });
 
-  test.skip('join refs', () => {
-    const world = createWorld(IncrementBReferringToA);
-    world.build(sys => {
-      sys.createEntity(A, {value: 5});
-      const a = sys.createEntity(A, {value: 1});
-      sys.createEntity(B, {a});
-      sys.createEntity(B);
-    });
-    world.execute();
-    expect(total.b).toBe(1);
-  });
+  // test.skip('join refs', () => {
+  //   const world = createWorld(IncrementBReferringToA);
+  //   world.build(sys => {
+  //     sys.createEntity(A, {value: 5});
+  //     const a = sys.createEntity(A, {value: 1});
+  //     sys.createEntity(B, {a});
+  //     sys.createEntity(B);
+  //   });
+  //   world.execute();
+  //   expect(total.b).toBe(1);
+  // });
 });
 

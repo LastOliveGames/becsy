@@ -4,5 +4,5 @@ export {Entity} from './entity';
 export {System} from './system';
 export type {SystemType} from './system';
 export {componentTypes, component, prop} from './decorators';
-export {TopQuery} from './query';
+export {Query} from './query';
 export type {ComponentType} from './component';

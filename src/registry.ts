@@ -2,7 +2,7 @@ import {ComponentType, decorateComponentType} from './component';
 import {Log, LogPointer, SharedAtomicPool} from './datastructures';
 import type {Dispatcher} from './dispatcher';
 import {Entity, EntityId, ENTITY_ID_BITS} from './entity';
-import type {System} from './system';
+import type {SystemBox} from './system';
 
 
 export class EntityPool {
@@ -56,7 +56,7 @@ export class Registry {
   private readonly shapes: Uint32Array;
   private readonly entityIdPool: SharedAtomicPool;
   readonly pool: EntityPool;
-  executingSystem: System | undefined;
+  executingSystem: SystemBox | undefined;
   private readonly deletionLog: Log;
   private readonly prevDeletionPointer: LogPointer;
   private readonly oldDeletionPointer: LogPointer;
@@ -132,8 +132,8 @@ export class Registry {
   hasFlag(id: EntityId, type: ComponentType<any>, allowRemoved = false): boolean {
     const index = id * this.stride + type.__flagOffset!;
     if ((this.shapes[index] & type.__flagMask!) !== 0) return true;
-    if (allowRemoved && this.executingSystem?.__removedEntities.get(id) &&
-      ((this.executingSystem.__rwMasks.read?.[type.__flagOffset!] ?? 0) & type.__flagMask!) !== 0) {
+    if (allowRemoved && this.executingSystem?.removedEntities.get(id) &&
+      ((this.executingSystem.rwMasks.read?.[type.__flagOffset!] ?? 0) & type.__flagMask!) !== 0) {
       return true;
     }
     return false;
