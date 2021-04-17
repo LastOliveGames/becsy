@@ -1,5 +1,5 @@
 import {ComponentType, decorateComponentType} from './component';
-import {Log, LogPointer, SharedAtomicPool} from './datastructures';
+import {Log, LogPointer, Uint32Pool, UnsharedPool} from './datastructures';
 import type {Dispatcher} from './dispatcher';
 import {Entity, EntityId, ENTITY_ID_BITS} from './entity';
 import type {SystemBox} from './system';
@@ -54,7 +54,7 @@ export class EntityPool {
 export class Registry {
   private readonly stride: number;
   private readonly shapes: Uint32Array;
-  private readonly entityIdPool: SharedAtomicPool;
+  private readonly entityIdPool: Uint32Pool;
   readonly pool: EntityPool;
   executingSystem: SystemBox | undefined;
   private readonly deletionLog: Log;
@@ -70,7 +70,7 @@ export class Registry {
     this.stride = Math.ceil(types.length / 32);
     const size = maxEntities * this.stride * 4;
     this.shapes = new Uint32Array(new SharedArrayBuffer(size));
-    this.entityIdPool = new SharedAtomicPool(maxEntities, 'maxEntities');
+    this.entityIdPool = new UnsharedPool(maxEntities, 'maxEntities');
     this.entityIdPool.fillWithDescendingIntegers(0);
     this.pool = new EntityPool(this, maxEntities);
     this.deletionLog = new Log(maxLimboEntities, 'maxLimboEntities');
