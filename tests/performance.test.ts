@@ -170,12 +170,8 @@ function setup(count: number): World {
     // systems: [SpawnB, KillB]
   });
 
-  // const entities = (world as any).__dispatcher.systems[0].__queries[0].__results.all.entities;
-  // const pool = (world as any).__dispatcher.registry.pool;
   for (let i = 0; i < count; i++) {
     world.createEntity(A, {value: 0}, B, {value: 0}, C, {value: 0}, D, {value: 0}, E, {value: 0});
-    // world.createEntity(A, {value: i});
-    // entities.push(pool.borrow(i));
   }
 
   return world;
