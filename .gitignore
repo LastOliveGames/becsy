@@ -1,7 +1,5 @@
-/index.js*
-/index.d.ts*
-/umd/
-/perf/
+/index.*
+/perf.*
 /lib/
 /node_modules/
 

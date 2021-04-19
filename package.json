@@ -8,17 +8,15 @@
     "deopt": "rm *.log && node --trace-ic --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js && mv *.log v8.pre.log && node striplog.cjs && deoptigate",
     "flame": "clinic flame -- node --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js",
     "build": "rollup --config",
-    "prepare": "yarn build",
+    "prepublishOnly": "yarn build",
     "lint": "eslint src tests"
   },
   "files": [
-    "index.js", "index.js.map", "index.d.ts", "index.d.ts.map",
-    "umd/index.js", "umd/index.js.map", "umd/index.d.ts", "umd/index.d.ts.map",
-    "perf/index.js", "perf/index.js.map", "perf/index.d.ts", "perf/index.d.ts.map",
-    "perf/umd/index.js", "perf/umd/index.js.map", "perf/umd/index.d.ts", "perf/umd/index.d.ts.map",
+    "index.*",
+    "perf.*",
     "src"
   ],
-  "main": "umd/index.js",
+  "main": "index.umd.js",
   "module": "index.js",
   "author": "Piotr Kaminski <piotr@lastolive.games>",
   "license": "MIT",
@@ -33,6 +31,7 @@
     "eslint-plugin-import": "^2.22.1",
     "jest": "^26.6.3",
     "rollup": "^2.41.2",
+    "rollup-plugin-terser": "^7.0.2",
     "ts-jest": "^26.5.3",
     "tsc-watch": "^4.2.9",
     "typescript": "^4.2.3"

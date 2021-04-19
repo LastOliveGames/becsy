@@ -1,4 +1,5 @@
 import buildTS from '@wessberg/rollup-plugin-ts';
+import {terser} from 'rollup-plugin-terser';
 import ts from 'typescript';
 
 const labeledBlockRemover = labels => {
@@ -19,14 +20,14 @@ export default [
     input: 'src/index.ts',
     output: [
       {
-        file: 'umd/index.js',
-        name: 'becsy',
-        format: 'umd',
+        file: 'index.js',
+        format: 'esm',
         sourcemap: true,
       },
       {
-        file: 'index.js',
-        format: 'esm',
+        file: 'index.umd.js',
+        name: 'becsy',
+        format: 'umd',
         sourcemap: true,
       },
     ],
@@ -40,20 +41,63 @@ export default [
     input: 'src/index.ts',
     output: [
       {
-        file: 'perf/umd/index.js',
-        name: 'becsy',
-        format: 'umd',
+        file: 'perf.js',
+        format: 'esm',
         sourcemap: true,
       },
       {
-        file: 'perf/index.js',
-        format: 'esm',
+        file: 'perf.umd.js',
+        name: 'becsy',
+        format: 'umd',
         sourcemap: true,
       },
     ],
     external: ['util'],
     plugins: [
       buildTS({transformers: {before: [labeledBlockRemover(['CHECK', 'DEBUG', 'STATS'])]}}),
+    ]
+  },
+
+  {
+    input: 'src/index.ts',
+    output: [
+      {
+        file: 'index.min.js',
+        format: 'esm',
+        sourcemap: true,
+      },
+      {
+        file: 'index.umd.min.js',
+        name: 'becsy',
+        format: 'umd',
+        sourcemap: true,
+      },
+    ],
+    external: ['util'],
+    plugins: [
+      buildTS(), terser()
+    ]
+  },
+
+  {
+    input: 'src/index.ts',
+    output: [
+      {
+        file: 'perf.min.js',
+        format: 'esm',
+        sourcemap: true,
+      },
+      {
+        file: 'perf.umd.min.js',
+        name: 'becsy',
+        format: 'umd',
+        sourcemap: true,
+      },
+    ],
+    external: ['util'],
+    plugins: [
+      buildTS({transformers: {before: [labeledBlockRemover(['CHECK', 'DEBUG', 'STATS'])]}}),
+      terser()
     ]
   }
 
