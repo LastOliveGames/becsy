@@ -100,7 +100,7 @@ export default (becsy: Becsy): {[key: string]: () => any} => {
 
     execute() {
       for (const entity of this.entities.all) {
-        entity.add(B, {value: 0});
+        entity.add(B);
       }
     }
   }
@@ -190,7 +190,7 @@ export default (becsy: Becsy): {[key: string]: () => any} => {
   }
 
   return {
-    packed1: () => {
+    packed1() {
       const count = 5000;
       const world = new becsy.World({
         maxEntities: count, componentTypes: [A, B, C, D, E], systems: [SystemA]
@@ -199,7 +199,7 @@ export default (becsy: Becsy): {[key: string]: () => any} => {
       return world;
     },
 
-    packed5: () => {
+    packed5() {
       const count = 1000;
       const world = new becsy.World({
         maxEntities: count, componentTypes: [A, B, C, D, E],
@@ -209,7 +209,7 @@ export default (becsy: Becsy): {[key: string]: () => any} => {
       return world;
     },
 
-    simpleIter: () => {
+    simpleIter() {
       const count = 1000;
       const world = new becsy.World({
         maxEntities: count * 4, componentTypes: [A, B, C, D, E],
@@ -224,7 +224,7 @@ export default (becsy: Becsy): {[key: string]: () => any} => {
       return world;
     },
 
-    fragIter: () => {
+    fragIter() {
       const count = 100;
       const world = new becsy.World({
         maxEntities: count * COMPS.length, componentTypes: [COMPS, Data], systems: [DataSystem]
@@ -235,7 +235,7 @@ export default (becsy: Becsy): {[key: string]: () => any} => {
       return world;
     },
 
-    entityCycle: () => {
+    entityCycle() {
       const count = 1000;
       const world = new becsy.World({
         maxEntities: count * 8, maxLimboEntities: 10000, componentTypes: [A, B],
@@ -245,10 +245,10 @@ export default (becsy: Becsy): {[key: string]: () => any} => {
       return world;
     },
 
-    addRemove: () => {
+    addRemove() {
       const count = 1000;
       const world = new becsy.World({
-        maxEntities: count, maxShapeChangesPerFrame: count * 3, componentTypes: [A],
+        maxEntities: count, maxShapeChangesPerFrame: count * 3, componentTypes: [A, B],
         systems: [AddB, RemoveB]
       });
       for (let i = 0; i < count; i++) world.createEntity(A);
