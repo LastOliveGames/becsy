@@ -6,6 +6,7 @@
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
+    "allowSyntheticDefaultImports": true,
     "allowUnusedLabels": true,
     "importsNotUsedAsValues": "error",
     /* more strict checking for errors that per-file transpilers like `esbuild` would crash */
@@ -24,6 +25,6 @@
     // See: https://github.com/microsoft/TypeScript/issues/25430
     "baseUrl": "./"
   },
-  "include": ["src", "tests"],
+  "include": ["src", "tests", "benchmarks"],
   "exclude": ["node_modules"]
 }
