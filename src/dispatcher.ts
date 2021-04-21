@@ -1,6 +1,5 @@
 import type {ComponentType} from './component';
 import {Entity, MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './entity';
-import {Indexer} from './indexer';
 import {Log, LogPointer} from './datastructures';
 import {System, SystemBox, SystemType} from './system';
 import {Registry} from './registry';
@@ -102,7 +101,6 @@ class CallbackSystem extends System {
 
 export class Dispatcher {
   readonly maxEntities;
-  readonly indexer;
   readonly registry;
   readonly systems: SystemBox[];
   private lastTime = now() / 1000;
@@ -134,7 +132,6 @@ export class Dispatcher {
     this.maxEntities = maxEntities;
     this.shapeLog = new Log(maxShapeChangesPerFrame, 'maxShapeChangesPerFrame');
     this.shapeLogFramePointer = this.shapeLog.createPointer();
-    this.indexer = new Indexer(maxRefs);
     this.registry =
       new Registry(maxEntities, maxLimboEntities, componentTypes.flat(Infinity), this);
     this.systems = this.normalizeAndInitSystems(systemTypes);

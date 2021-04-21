@@ -231,10 +231,10 @@ class RefType extends Type<Entity | null> {
         const oldId = data[binding.index];
         const newId = value?.__id ?? -1;
         if (oldId === newId) return;
-        const indexer = binding.dispatcher.indexer;
-        if (oldId !== 0) indexer.remove(oldId, binding.entityId);
+        // TODO: deindex/reindex ref
+        // if (oldId !== 0) indexer.remove(oldId, binding.entityId);
         data[binding.index] = newId;
-        if (newId !== 0) indexer.insert(newId, binding.entityId);
+        // if (newId !== 0) indexer.insert(newId, binding.entityId);
       }
     });
     Object.defineProperty(binding.readonlyInstance, name, {
