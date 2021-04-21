@@ -2,6 +2,7 @@
 /perf.*
 /lib/
 /node_modules/
+/benchmarks/current_results.json
 
 /.gitconfig
 /.vscode/

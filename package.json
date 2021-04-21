@@ -33,6 +33,7 @@
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "@typescript-eslint/parser": "^4.17.0",
     "@wessberg/rollup-plugin-ts": "^1.3.11",
+    "chalk": "^4.1.0",
     "eslint": "^7.22.0",
     "eslint-plugin-disable": "^2.0.1",
     "eslint-plugin-import": "^2.22.1",

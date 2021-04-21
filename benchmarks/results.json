@@ -1,0 +1,44 @@
+{
+  "baseline": {
+    "devOps": 27655,
+    "devRel": 1,
+    "perfOps": 27655,
+    "perfRel": 1
+  },
+  "ecs-benchmark/packed1": {
+    "devOps": 15576,
+    "devRel": 0.5632254565178088,
+    "perfOps": 51378,
+    "perfRel": 1.8578195624661002
+  },
+  "ecs-benchmark/packed5": {
+    "devOps": 16138,
+    "devRel": 0.5835472789730609,
+    "perfOps": 49734,
+    "perfRel": 1.7983728078105226
+  },
+  "ecs-benchmark/simpleIter": {
+    "devOps": 2953,
+    "devRel": 0.10677996745615621,
+    "perfOps": 39271,
+    "perfRel": 1.4200325438437895
+  },
+  "ecs-benchmark/fragIter": {
+    "devOps": 29496,
+    "devRel": 1.0665702404628459,
+    "perfOps": 115450,
+    "perfRel": 4.174651961670584
+  },
+  "ecs-benchmark/entityCycle": {
+    "devOps": 1166,
+    "devRel": 0.04216235762068342,
+    "perfOps": 1153,
+    "perfRel": 0.04169227987705659
+  },
+  "ecs-benchmark/addRemove": {
+    "devOps": 5863,
+    "devRel": 0.2120050623757006,
+    "perfOps": 8367,
+    "perfRel": 0.30254926776351476
+  }
+}
