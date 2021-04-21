@@ -135,7 +135,7 @@ class Count extends System {
 }
 
 function createWorld(...systems: SystemType[]): World {
-  return new World({maxEntities: 100, componentTypes, systems: [systems, Count]});
+  return new World({maxEntities: 100, defs: [componentTypes, systems, Count]});
 }
 
 
@@ -231,7 +231,7 @@ describe('creating and deleting entities', () => {
 
   test('recycle entity IDs', () => {
     const world = new World({
-      maxEntities: 9, maxLimboEntities: 7, componentTypes, systems: [CreateAForEachC, DeleteA]
+      maxEntities: 9, maxLimboEntities: 7, defs: [componentTypes, CreateAForEachC, DeleteA]
     });
     world.createEntity(C, {value: 1});
     world.createEntity(C, {value: 2});

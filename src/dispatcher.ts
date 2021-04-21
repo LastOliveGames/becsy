@@ -10,8 +10,7 @@ const now = typeof window !== 'undefined' && typeof window.performance !== 'unde
   performance.now.bind(performance) : Date.now.bind(Date);
 
 
-type ComponentTypesArray = (ComponentType<any> | ComponentTypesArray)[];
-type SystemTypesArray = (SystemType | any | SystemTypesArray)[];
+type DefsArray = (ComponentType<any> | SystemType | any | DefsArray)[];
 
 export interface WorldOptions {
   maxEntities?: number;
@@ -19,8 +18,7 @@ export interface WorldOptions {
   maxRefs?: number;
   maxShapeChangesPerFrame?: number;
   maxWritesPerFrame?: number;
-  componentTypes: ComponentTypesArray;
-  systems: SystemTypesArray;
+  defs: DefsArray;
 }
 
 
@@ -118,7 +116,7 @@ export class Dispatcher {
   private readonly callbackSystem;
 
   constructor({
-    componentTypes, systems,
+    defs,
     maxEntities = 10000,
     maxLimboEntities = Math.ceil(maxEntities / 5),
     maxRefs = maxEntities,
@@ -128,6 +126,7 @@ export class Dispatcher {
     if (maxEntities > MAX_NUM_ENTITIES) {
       throw new Error(`maxEntities too high, the limit is ${MAX_NUM_ENTITIES}`);
     }
+    const {componentTypes, systemTypes} = this.splitDefs(defs);
     if (componentTypes.length > MAX_NUM_COMPONENTS) {
       throw new Error(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
     }
@@ -138,7 +137,7 @@ export class Dispatcher {
     this.indexer = new Indexer(maxRefs);
     this.registry =
       new Registry(maxEntities, maxLimboEntities, componentTypes.flat(Infinity), this);
-    this.systems = this.normalizeAndInitSystems(systems);
+    this.systems = this.normalizeAndInitSystems(systemTypes);
     if (this.systems.some(system => system.hasWriteQueries)) {
       this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame');
       this.writeLogFramePointer = this.writeLog.createPointer();
@@ -147,9 +146,9 @@ export class Dispatcher {
     this.callbackSystem = new SystemBox(this.userCallbackSystem, this);
   }
 
-  private normalizeAndInitSystems(userSystems: SystemTypesArray): SystemBox[] {
+  private normalizeAndInitSystems(systemTypes: (SystemType | any)[]): SystemBox[] {
     const systems = [];
-    const flatUserSystems = userSystems.flat(Infinity);
+    const flatUserSystems = systemTypes.flat(Infinity);
     for (let i = 0; i < flatUserSystems.length; i++) {
       const system = new flatUserSystems[i]() as System;
       const props = flatUserSystems[i + 1];
@@ -160,6 +159,24 @@ export class Dispatcher {
       systems.push(new SystemBox(system, this));
     }
     return systems;
+  }
+
+  private splitDefs(defs: DefsArray):
+      {componentTypes: ComponentType<any>[], systemTypes: (SystemType | any)[]} {
+    const componentTypes: ComponentType<any>[] = [];
+    const systemTypes: (SystemType | any)[] = [];
+    let lastDefWasSystem = false;
+    for (const def of defs.flat(Infinity)) {
+      if (typeof def === 'function') {
+        lastDefWasSystem = !def.schema;
+        (lastDefWasSystem ? systemTypes : componentTypes).push(def);
+      } else {
+        CHECK: if (!lastDefWasSystem) throw new Error('Unexpected value in world defs: ' + def);
+        systemTypes.push(def);
+        lastDefWasSystem = false;
+      }
+    }
+    return {componentTypes, systemTypes};
   }
 
   execute(time?: number, delta?: number, systems?: SystemBox[]): void {
