@@ -1,5 +1,5 @@
 {
-  "name": "becsy",
+  "name": "@lastolivegames/becsy",
   "type": "module",
   "version": "0.0.2",
   "scripts": {
@@ -20,6 +20,10 @@
   ],
   "main": "index.umd.js",
   "module": "index.js",
+  "engines": {
+    "node": "^14.10.0"
+  },
+  "repository": "git@github.com:lastolivegames/becsy.git",
   "author": "Piotr Kaminski <piotr@lastolive.games>",
   "license": "MIT",
   "devDependencies": {
