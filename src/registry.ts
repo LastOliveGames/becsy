@@ -1,4 +1,4 @@
-import {ComponentType, decorateComponentType} from './component';
+import {ComponentType, assimilateComponentType} from './component';
 import {Log, LogPointer, Uint32Pool, UnsharedPool} from './datastructures';
 import type {Dispatcher} from './dispatcher';
 import {Entity, EntityId, ENTITY_ID_BITS} from './entity';
@@ -66,7 +66,7 @@ export class Registry {
     readonly types: ComponentType<any>[], readonly dispatcher: Dispatcher
   ) {
     let componentId = 0;
-    for (const type of types) decorateComponentType(componentId++, type, this.dispatcher);
+    for (const type of types) assimilateComponentType(componentId++, type, this.dispatcher);
     this.stride = Math.ceil(types.length / 32);
     const size = maxEntities * this.stride * 4;
     this.shapes = new Uint32Array(new SharedArrayBuffer(size));

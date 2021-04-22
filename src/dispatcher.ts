@@ -1,4 +1,4 @@
-import type {ComponentType} from './component';
+import type {ComponentStorage, ComponentType} from './component';
 import {Entity, MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './entity';
 import {Log, LogPointer} from './datastructures';
 import {System, SystemBox, SystemType} from './system';
@@ -12,12 +12,13 @@ const now = typeof window !== 'undefined' && typeof window.performance !== 'unde
 type DefsArray = (ComponentType<any> | SystemType | any | DefsArray)[];
 
 export interface WorldOptions {
+  defs: DefsArray;
   maxEntities?: number;
   maxLimboEntities?: number;
   maxRefs?: number;
   maxShapeChangesPerFrame?: number;
   maxWritesPerFrame?: number;
-  defs: DefsArray;
+  defaultComponentStorage?: ComponentStorage;
 }
 
 
@@ -101,6 +102,7 @@ class CallbackSystem extends System {
 
 export class Dispatcher {
   readonly maxEntities;
+  readonly defaultComponentStorage;
   readonly registry;
   readonly systems: SystemBox[];
   private lastTime = now() / 1000;
@@ -120,6 +122,7 @@ export class Dispatcher {
     maxRefs = maxEntities,
     maxShapeChangesPerFrame = maxEntities * 2,
     maxWritesPerFrame = maxEntities * 4,
+    defaultComponentStorage = 'sparse'
   }: WorldOptions) {
     if (maxEntities > MAX_NUM_ENTITIES) {
       throw new Error(`maxEntities too high, the limit is ${MAX_NUM_ENTITIES}`);
@@ -130,6 +133,7 @@ export class Dispatcher {
     }
     STATS: this.stats = new Stats();
     this.maxEntities = maxEntities;
+    this.defaultComponentStorage = defaultComponentStorage;
     this.shapeLog = new Log(maxShapeChangesPerFrame, 'maxShapeChangesPerFrame');
     this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.registry =

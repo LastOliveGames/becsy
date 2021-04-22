@@ -13,7 +13,7 @@ type Results = {
 };
 
 const OPS_WIDTH = 14;
-const DIFF_WIDTH = 8;
+const DIFF_WIDTH = 5;
 const COLS = [0, 15, OPS_WIDTH, DIFF_WIDTH + 2, OPS_WIDTH, DIFF_WIDTH + 2];
 const WORKER_FILE = resolveLocalPath('indexworker.js');
 const LAST_RESULTS_FILE = './benchmarks/results.json';
@@ -86,6 +86,6 @@ function formatDiff(diff: number): string {
   if (Math.abs(diff) < 0.05) return ' '.repeat(DIFF_WIDTH + 2);
   const color = diff > 0 ? 'green' : 'red';
   const sign = diff > 0 ? '+' : '';
-  const value = (diff * 100).toFixed(2);
+  const value = (diff * 100).toFixed(0);
   return '(' + chalk[color](`${sign}${value}%`.padStart(DIFF_WIDTH)) + ')';
 }

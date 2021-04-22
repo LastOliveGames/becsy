@@ -103,6 +103,7 @@ export class Entity {
 
   private __remove(type: ComponentType<any>): void {
     this.__deindexOutboundRefs(type);
+    type.__delete!(this.__id);
     this.__registry.clearFlag(this.__id, type);
   }
 

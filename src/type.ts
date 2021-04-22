@@ -1,4 +1,4 @@
-import type {Binding} from './component';
+import type {Binding, Field} from './component';
 import type {Entity} from './entity';
 
 const encoder = new TextEncoder();
@@ -14,9 +14,7 @@ function throwNotWritable(binding: Binding<any>) {
 export abstract class Type<JSType> {
   constructor(readonly defaultValue: JSType) {}
 
-  abstract define<C>(
-    binding: Binding<C>, name: string, buffer?: SharedArrayBuffer
-  ): SharedArrayBuffer;
+  abstract define(binding: Binding<any>, field: Field<any>): void;
 
   static boolean: Type<boolean>;
   static uint8: Type<number>;
@@ -35,12 +33,14 @@ export abstract class Type<JSType> {
 class BooleanType extends Type<boolean> {
   constructor() {super(false);}
 
-  define<C>(
-    binding: Binding<C>, name: string, buffer?: SharedArrayBuffer
-  ): SharedArrayBuffer {
-    if (!buffer) buffer = new SharedArrayBuffer(binding.maxEntities);
+  define<C>(binding: Binding<C>, field: Field<boolean>): void {
+    const capacityChanged = field.buffer?.byteLength !== binding.capacity;
+    const buffer = capacityChanged ? new SharedArrayBuffer(binding.capacity) : field.buffer!;
     const data = new Uint8Array(buffer);
-    Object.defineProperty(binding.writableInstance, name, {
+    if (capacityChanged && field.buffer) data.set(new Uint8Array(field.buffer));
+    field.buffer = buffer;
+
+    Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): boolean {
         return Boolean(data[binding.index]);
@@ -49,7 +49,8 @@ class BooleanType extends Type<boolean> {
         data[binding.index] = value ? 1 : 0;
       }
     });
-    Object.defineProperty(binding.readonlyInstance, name, {
+
+    Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): boolean {
         return Boolean(data[binding.index]);
@@ -58,7 +59,6 @@ class BooleanType extends Type<boolean> {
         throwNotWritable(binding);
       }
     });
-    return buffer;
   }
 }
 
@@ -76,14 +76,15 @@ class NumberType extends Type<number> {
     super(0);
   }
 
-  define<C>(
-    binding: Binding<C>, name: string, buffer?: SharedArrayBuffer
-  ): SharedArrayBuffer {
-    if (!buffer) {
-      buffer = new SharedArrayBuffer(binding.maxEntities * this.NumberArray.BYTES_PER_ELEMENT);
-    }
+  define<C>(binding: Binding<C>, field: Field<number>): void {
+    const size = binding.capacity * this.NumberArray.BYTES_PER_ELEMENT;
+    const capacityChanged = field.buffer?.byteLength !== size;
+    const buffer = capacityChanged ? new SharedArrayBuffer(size) : field.buffer!;
     const data = new this.NumberArray(buffer);
-    Object.defineProperty(binding.writableInstance, name, {
+    if (capacityChanged && field.buffer) data.set(new this.NumberArray(field.buffer));
+    field.buffer = buffer;
+
+    Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): number {
         return data[binding.index];
@@ -92,7 +93,8 @@ class NumberType extends Type<number> {
         data[binding.index] = value;
       }
     });
-    Object.defineProperty(binding.readonlyInstance, name, {
+
+    Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): number {
         return data[binding.index];
@@ -101,7 +103,6 @@ class NumberType extends Type<number> {
         throwNotWritable(binding);
       }
     });
-    return buffer;
   }
 }
 
@@ -118,15 +119,16 @@ class StaticStringType extends Type<string> {
     for (let i = 0; i < choices.length; i++) this.choicesIndex.set(choices[i], i);
   }
 
-  define<C>(
-    binding: Binding<C>, name: string, buffer?: SharedArrayBuffer
-  ): SharedArrayBuffer {
-    if (!buffer) {
-      buffer = new SharedArrayBuffer(binding.maxEntities * this.TypedArray.BYTES_PER_ELEMENT);
-    }
+  define<C>(binding: Binding<C>, field: Field<string>): void {
+    const size = binding.capacity * this.TypedArray.BYTES_PER_ELEMENT;
+    const capacityChanged = field.buffer?.byteLength !== size;
+    const buffer = capacityChanged ? new SharedArrayBuffer(size) : field.buffer!;
     const data = new this.TypedArray(buffer);
+    if (capacityChanged && field.buffer) data.set(new this.TypedArray(field.buffer));
+    field.buffer = buffer;
     const choices = this.choices, choicesIndex = this.choicesIndex;
-    Object.defineProperty(binding.writableInstance, name, {
+
+    Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         const index = data[binding.index];
@@ -140,7 +142,8 @@ class StaticStringType extends Type<string> {
         data[binding.index] = index;
       }
     });
-    Object.defineProperty(binding.readonlyInstance, name, {
+
+    Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         const index = data[binding.index];
@@ -152,7 +155,6 @@ class StaticStringType extends Type<string> {
         throwNotWritable(binding);
       }
     });
-    return buffer;
   }
 }
 
@@ -168,18 +170,18 @@ class DynamicStringType extends Type<string> {
     this.bytesStride = this.maxUtf8Length + 2;  // account for length field
   }
 
-  define<C>(
-    binding: Binding<C>, name: string, buffer?: SharedArrayBuffer
-  ): SharedArrayBuffer {
-    if (!buffer) {
-      const bufferSize = binding.maxEntities * (this.maxUtf8Length + Uint16Array.BYTES_PER_ELEMENT);
-      buffer = new SharedArrayBuffer(bufferSize);
-    }
+  define<C>(binding: Binding<C>, field: Field<string>): void {
+    const size = binding.capacity * (this.maxUtf8Length + Uint16Array.BYTES_PER_ELEMENT);
+    const capacityChanged = field.buffer?.byteLength !== size;
+    const buffer = capacityChanged ? new SharedArrayBuffer(size) : field.buffer!;
     const lengths = new Uint16Array(buffer);
     const bytes = new Uint8Array(buffer);
+    if (capacityChanged && field.buffer) bytes.set(new Uint8Array(field.buffer));
+    field.buffer = buffer;
     const maxUtf8Length = this.maxUtf8Length;
     const lengthsStride = this.lengthsStride, bytesStride = this.bytesStride;
-    Object.defineProperty(binding.writableInstance, name, {
+
+    Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         const length = lengths[binding.index * lengthsStride];
@@ -195,7 +197,8 @@ class DynamicStringType extends Type<string> {
         bytes.set(encodedString, binding.index * bytesStride + 2);
       }
     });
-    Object.defineProperty(binding.readonlyInstance, name, {
+
+    Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         const length = lengths[binding.index * lengthsStride];
@@ -206,7 +209,6 @@ class DynamicStringType extends Type<string> {
         throwNotWritable(binding);
       }
     });
-    return buffer;
   }
 }
 
@@ -215,12 +217,15 @@ class RefType extends Type<Entity | null> {
     super(null);
   }
 
-  define<C>(
-    binding: Binding<C>, name: string, buffer?: SharedArrayBuffer
-  ): SharedArrayBuffer {
-    if (!buffer) buffer = new SharedArrayBuffer(binding.maxEntities * Int32Array.BYTES_PER_ELEMENT);
+  define<C>(binding: Binding<C>, field: Field<Entity | null>): void {
+    const size = binding.capacity * Int32Array.BYTES_PER_ELEMENT;
+    const capacityChanged = field.buffer?.byteLength !== size;
+    const buffer = capacityChanged ? new SharedArrayBuffer(size) : field.buffer!;
     const data = new Int32Array(buffer);
-    Object.defineProperty(binding.writableInstance, name, {
+    if (capacityChanged && field.buffer) data.set(new Int32Array(field.buffer));
+    field.buffer = buffer;
+
+    Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | null {
         const id = data[binding.index];
@@ -237,7 +242,8 @@ class RefType extends Type<Entity | null> {
         // if (newId !== 0) indexer.insert(newId, binding.entityId);
       }
     });
-    Object.defineProperty(binding.readonlyInstance, name, {
+
+    Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | null {
         const id = data[binding.index];
@@ -248,7 +254,6 @@ class RefType extends Type<Entity | null> {
         throwNotWritable(binding);
       }
     });
-    return buffer;
   }
 }
 
