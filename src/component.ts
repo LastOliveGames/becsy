@@ -31,11 +31,15 @@ export interface ComponentType<C> {
   new(): C;
   schema?: Schema;
   options?: ComponentOptions;
-  __id?: number;
-  __flagOffset?: number;
-  __flagMask?: number;
-  __trackedWrites?: boolean;
-  __fields?: Field<any>[];
+
+  /**
+   * A unique, sequential id number for this component type, assigned automatically by becsy.  It
+   * will stay the same across runs as long as the list of defs used to create the world doesn't
+   * change.  Feel free to use this for your own purposes but don't change it.
+   */
+  id?: number;
+
+  __binding?: Binding<C>;
   __bind?(id: EntityId, writable: boolean): C;
   __delete?(id: EntityId): void;
 }
@@ -43,14 +47,20 @@ export interface ComponentType<C> {
 export class Binding<C> {
   readonly readonlyInstance: C;
   readonly writableInstance: C;
+  readonly flagOffset: number;
+  readonly flagMask: number;
+  trackedWrites: boolean;
   entityId = 0;
   index = 0;
 
   constructor(
-    readonly type: ComponentType<C>, readonly dispatcher: Dispatcher, public capacity: number
+    readonly type: ComponentType<C>, readonly fields: Field<any>[], readonly dispatcher: Dispatcher,
+    public capacity: number
   ) {
     this.readonlyInstance = new type();  // eslint-disable-line new-cap
     this.writableInstance = new type();  // eslint-disable-line new-cap
+    this.flagOffset = type.id! >> 5;
+    this.flagMask = 1 << (type.id! & 31);
   }
 }
 
@@ -60,15 +70,6 @@ interface Storage {
   releaseIndex(id: EntityId): void;
 }
 
-class SparseStorage implements Storage {
-  acquireIndex(id: number): number {
-    return id;
-  }
-
-  releaseIndex(id: number): void {
-    // No need to do anything!
-  }
-}
 
 class PackedStorage implements Storage {
   private index: Int8Array | Int16Array | Int32Array;
@@ -163,7 +164,7 @@ export function initComponent(type: ComponentType<any>, id: EntityId, values: an
     }
   }
   const component = type.__bind!(id, true);
-  for (const field of type.__fields!) {
+  for (const field of type.__binding!.fields) {
     (component as any)[field.name] = values?.[field.name] ?? field.default;
   }
 }
@@ -210,34 +211,41 @@ export function assimilateComponentType<C>(
       throw new Error(`Component type ${type.name} is already in use in another world`);
     }
   }
-  type.__id = typeId;
-  type.__flagOffset = typeId >> 5;
-  type.__flagMask = 1 << (typeId & 31);
-  const binding = new Binding<C>(type, dispatcher, capacity);
-  type.__fields = gatherFields(type);
-  for (const field of type.__fields!) field.type.define(binding, field);
+  type.id = typeId;
+  const binding = new Binding<C>(type, gatherFields(type), dispatcher, capacity);
+  type.__binding = binding;
+  for (const field of binding.fields) field.type.define(binding, field);
 
-  let storageManager: Storage;
   switch (storage) {
     case 'sparse':
-      storageManager = new SparseStorage();
+      // Inline the trivial storage manager for performance.
       STATS: dispatcher.stats.for(type).capacity = capacity;  // fixed
+      type.__bind = (id: EntityId, writable: boolean): C => {
+        binding.entityId = id;
+        binding.index = id;
+        return writable ? binding.writableInstance : binding.readonlyInstance;
+      };
+      type.__delete = (id: EntityId): void => {
+        // nothing to do
+      };
       break;
     case 'packed':
-      storageManager = new PackedStorage(dispatcher.maxEntities, binding, type.__fields);
+    case 'compact': {
+      const storageManager = storage === 'packed' ?
+        new PackedStorage(dispatcher.maxEntities, binding, binding.fields) : null;
+      if (!storageManager) throw new Error('Not yet implemented');
+      type.__bind = (id: EntityId, writable: boolean): C => {
+        binding.entityId = id;
+        binding.index = storageManager.acquireIndex(id);
+        return writable ? binding.writableInstance : binding.readonlyInstance;
+      };
+      type.__delete = (id: EntityId): void => {
+        storageManager.releaseIndex(id);
+      };
       break;
-    case 'compact':
-      throw new Error('Not yet implemented');
+    }
     default:
       CHECK: throw new Error(`Invalid storage type "${storage}`);
   }
-  type.__bind = (id: EntityId, writable: boolean): C => {
-    binding.entityId = id;
-    binding.index = storageManager.acquireIndex(id);
-    return writable ? binding.writableInstance : binding.readonlyInstance;
-  };
-  type.__delete = (id: EntityId): void => {
-    storageManager.releaseIndex(id);
-  };
 }
 

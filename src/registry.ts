@@ -117,40 +117,41 @@ export class Registry {
   }
 
   extendMaskAndSetFlag(mask: number[], type: ComponentType<any>): void {
-    const flagOffset = type.__flagOffset!;
+    const flagOffset = type.__binding!.flagOffset!;
     if (flagOffset >= mask.length) {
       mask.length = flagOffset + 1;
       mask.fill(0, mask.length, flagOffset);
     }
-    mask[flagOffset] |= type.__flagMask!;
+    mask[flagOffset] |= type.__binding!.flagMask!;
   }
 
   maskHasFlag(mask: number[] | undefined, type: ComponentType<any>): boolean {
-    return ((mask?.[type.__flagOffset!] ?? 0) & type.__flagMask!) !== 0;
+    return ((mask?.[type.__binding!.flagOffset] ?? 0) & type.__binding!.flagMask) !== 0;
   }
 
   hasFlag(id: EntityId, type: ComponentType<any>, allowRemoved = false): boolean {
-    const index = id * this.stride + type.__flagOffset!;
-    if ((this.shapes[index] & type.__flagMask!) !== 0) return true;
+    const index = id * this.stride + type.__binding!.flagOffset;
+    if ((this.shapes[index] & type.__binding!.flagMask) !== 0) return true;
     if (allowRemoved && this.executingSystem?.removedEntities.get(id) &&
-      ((this.executingSystem.rwMasks.read?.[type.__flagOffset!] ?? 0) & type.__flagMask!) !== 0) {
+      ((this.executingSystem.rwMasks.read?.[type.__binding!.flagOffset] ?? 0) &
+        type.__binding!.flagMask) !== 0) {
       return true;
     }
     return false;
   }
 
   setFlag(id: EntityId, type: ComponentType<any>): void {
-    this.shapes[id * this.stride + type.__flagOffset!] |= type.__flagMask!;
+    this.shapes[id * this.stride + type.__binding!.flagOffset] |= type.__binding!.flagMask;
     this.dispatcher.shapeLog.push(id);
   }
 
   clearFlag(id: EntityId, type: ComponentType<any>): void {
-    this.shapes[id * this.stride + type.__flagOffset!] &= ~type.__flagMask!;
+    this.shapes[id * this.stride + type.__binding!.flagOffset] &= ~type.__binding!.flagMask;
     this.dispatcher.shapeLog.push(id);
   }
 
   trackWrite(id: EntityId, type: ComponentType<any>): void {
-    this.dispatcher.writeLog!.push(id | (type.__id! << ENTITY_ID_BITS));
+    this.dispatcher.writeLog!.push(id | (type.id! << ENTITY_ID_BITS));
   }
 
   matchShape(id: EntityId, positiveMask?: number[], negativeMask?: number[]): boolean {

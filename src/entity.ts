@@ -88,7 +88,7 @@ export class Entity {
     CHECK: {
       if (!this.has(type, true)) throw new Error(`Entity doesn't have a ${type.name} component`);
     }
-    if (type.__trackedWrites) this.__registry.trackWrite(this.__id, type);
+    if (type.__binding!.trackedWrites) this.__registry.trackWrite(this.__id, type);
     return type.__bind!(this.__id, true);
   }
 
@@ -111,7 +111,7 @@ export class Entity {
   }
 
   private __deindexOutboundRefs(type: ComponentType<any>): void {
-    const fields = type.__fields!;
+    const fields = type.__binding!.fields;
     if (fields.some(field => field.type === Type.ref)) {
       const component = this.write(type);
       for (const field of fields) {

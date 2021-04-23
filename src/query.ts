@@ -209,7 +209,7 @@ export class QueryBuilder {
 
   get track(): this {
     this.set('__trackMask');
-    for (const type of this.__lastTypes) type.__trackedWrites = true;
+    for (const type of this.__lastTypes) type.__binding!.trackedWrites = true;
     return this;
   }
 
