@@ -1,5 +1,6 @@
 import type {ComponentType} from './component';
 import {Dispatcher, WorldOptions} from './dispatcher';
+import type {Stats} from './stats';
 import type {System} from './system';
 
 
@@ -22,7 +23,7 @@ export class World {
     this.__dispatcher.execute(time, delta);
   }
 
-  get stats(): any {
+  get stats(): Stats {
     return this.__dispatcher.stats;
   }
 }

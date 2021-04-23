@@ -1,4 +1,4 @@
-import type {ComponentType} from './component';
+import type {ComponentOptions, ComponentType} from './component';
 import type {Type} from './type';
 
 interface PropOptions<JSType> {
@@ -19,6 +19,16 @@ export function prop<JSType>(practicalOptions: PropOptions<JSType> | Type<any>) 
 
 export const componentTypes: ComponentType<any>[] = [];
 
-export function component(constructor: ComponentType<any>): void {
-  componentTypes.push(constructor);
+export function component(constructor: ComponentType<any>): void;
+export function component(options: ComponentOptions): (constructor: ComponentType<any>) => void;
+export function component(arg: ComponentType<any> | ComponentOptions):
+    ((constructor: ComponentType<any>) => void) | void {
+  if (typeof arg === 'function') {
+    componentTypes.push(arg);
+  } else {
+    return (constructor: ComponentType<any>) => {
+      constructor.options = arg;
+      componentTypes.push(constructor);
+    };
+  }
 }

@@ -14,14 +14,9 @@ interface Schema {
 
 export type ComponentStorage = 'sparse' | 'packed' | 'compact';
 
-interface Options {
+export interface ComponentOptions {
   storage?: ComponentStorage;
   capacity?: number;
-}
-
-interface StorageMethods<C> {
-  bind(id: EntityId, writable: boolean): C;
-  delete(id: EntityId): void;
 }
 
 export interface Field<JSType> {
@@ -35,7 +30,7 @@ export interface Field<JSType> {
 export interface ComponentType<C> {
   new(): C;
   schema?: Schema;
-  options?: Options;
+  options?: ComponentOptions;
   __id?: number;
   __flagOffset?: number;
   __flagMask?: number;
@@ -52,10 +47,107 @@ export class Binding<C> {
   index = 0;
 
   constructor(
-    readonly type: ComponentType<C>, readonly dispatcher: Dispatcher, readonly capacity: number
+    readonly type: ComponentType<C>, readonly dispatcher: Dispatcher, public capacity: number
   ) {
     this.readonlyInstance = new type();  // eslint-disable-line new-cap
     this.writableInstance = new type();  // eslint-disable-line new-cap
+  }
+}
+
+
+interface Storage {
+  acquireIndex(id: EntityId): number;
+  releaseIndex(id: EntityId): void;
+}
+
+class SparseStorage implements Storage {
+  acquireIndex(id: number): number {
+    return id;
+  }
+
+  releaseIndex(id: number): void {
+    // No need to do anything!
+  }
+}
+
+class PackedStorage implements Storage {
+  private index: Int8Array | Int16Array | Int32Array;
+  // layout: bytesPerElement, nextIndex, capacity, numSpares, ...spareIndices
+  private spares: Int8Array | Int16Array | Int32Array;
+
+  constructor(
+    private readonly maxEntities: number, private readonly binding: Binding<any>,
+    private readonly fields: Field<any>[]
+  ) {
+    this.growSpares();
+    this.growCapacity();
+  }
+
+  acquireIndex(id: number): number {
+    let index = this.index[id];
+    if (index === -1) {
+      if (this.spares[3] > 0) {
+        index = this.spares[--this.spares[3] + 4];
+      } else {
+        if (this.spares[1] === this.spares[2]) {
+          this.binding.capacity = Math.min(this.maxEntities, this.binding.capacity * 2);
+          this.growCapacity();
+        }
+        index = this.spares[1]++;
+      }
+      this.index[id] = index;
+    }
+    return index;
+  }
+
+  releaseIndex(id: number): void {
+    DEBUG: if (this.index[id] === -1) {
+      throw new Error(`Internal error, index for entity ${id} not allocated`);
+    }
+    if (this.spares[3] === this.spares.length - 4) this.growSpares();
+    this.spares[this.spares[3]++ + 4] = this.index[id];
+    this.index[id] = -1;
+  }
+
+  private growCapacity(): void {
+    STATS: this.binding.dispatcher.stats.for(this.binding.type).capacity = this.binding.capacity;
+    const ArrayType = this.ArrayType;
+    const elementSizeChanged = ArrayType.BYTES_PER_ELEMENT !== this.spares?.[0];
+    if (!this.index || elementSizeChanged) {
+      const buffer = new SharedArrayBuffer(this.maxEntities * ArrayType.BYTES_PER_ELEMENT);
+      const newIndex = new ArrayType(buffer);
+      if (this.index) newIndex.set(this.index); else newIndex.fill(-1);
+      this.index = newIndex;
+    }
+    if (this.spares && elementSizeChanged) {
+      const buffer = new SharedArrayBuffer(this.spares.length * ArrayType.BYTES_PER_ELEMENT);
+      const newSpares = new ArrayType(buffer);
+      newSpares.set(this.spares);
+      newSpares[0] = ArrayType.BYTES_PER_ELEMENT;
+      this.spares = newSpares;
+    }
+    this.spares[2] = this.binding.capacity;
+    for (const field of this.fields) field.type.define(this.binding, field);
+  }
+
+  private growSpares(): void {
+    const ArrayType = this.ArrayType;
+    const maxSpares = this.spares ? Math.min(this.maxEntities, (this.spares.length - 4) * 2) : 8;
+    const sparesBuffer = new SharedArrayBuffer((4 + maxSpares) * ArrayType.BYTES_PER_ELEMENT);
+    const newSpares = new ArrayType(sparesBuffer);
+    if (this.spares) {
+      newSpares.set(this.spares);
+    } else {
+      newSpares[0] = ArrayType.BYTES_PER_ELEMENT;
+      newSpares[2] = this.binding.capacity;
+    }
+    this.spares = newSpares;
+  }
+
+  private get ArrayType() {
+    const capacity = this.binding.capacity;
+    return capacity <= (1 << 7) - 1 ? Int8Array :
+      capacity <= (1 << 15) - 1 ? Int16Array : Int32Array;
   }
 }
 
@@ -93,29 +185,6 @@ function gatherFields(type: ComponentType<any>): Field<any>[] {
   return fields;
 }
 
-const createStorageMethods = {
-  sparse<C>(binding: Binding<C>): StorageMethods<C> {
-    return {
-      bind: (id: EntityId, writable: boolean) => {
-        binding.entityId = id;
-        binding.index = id;
-        return writable ? binding.writableInstance : binding.readonlyInstance;
-      },
-      delete: (id: EntityId) => {
-        /* do nothing! */
-      }
-    };
-  },
-
-  packed<C>(binding: Binding<C>): StorageMethods<C> {
-    throw new Error('Not implemented');
-  },
-
-  compact<C>(binding: Binding<C>): StorageMethods<C> {
-    throw new Error('Not implemented');
-  }
-};
-
 
 export function assimilateComponentType<C>(
   typeId: number, type: ComponentType<C>, dispatcher: Dispatcher
@@ -127,6 +196,10 @@ export function assimilateComponentType<C>(
       throw new Error(
         `Component type ${type.name} cannot combine options.capacity with options.storage 'sparse'`
       );
+    }
+    if (capacity <= 0) {
+      throw new Error(
+        `Component type ${type.name} capacity option must be great than zero: got ${capacity}`);
     }
     if (capacity > dispatcher.maxEntities) {
       throw new Error(
@@ -141,8 +214,30 @@ export function assimilateComponentType<C>(
   type.__flagOffset = typeId >> 5;
   type.__flagMask = 1 << (typeId & 31);
   const binding = new Binding<C>(type, dispatcher, capacity);
-  ({bind: type.__bind, delete: type.__delete} = createStorageMethods[storage](binding));
   type.__fields = gatherFields(type);
   for (const field of type.__fields!) field.type.define(binding, field);
+
+  let storageManager: Storage;
+  switch (storage) {
+    case 'sparse':
+      storageManager = new SparseStorage();
+      STATS: dispatcher.stats.for(type).capacity = capacity;  // fixed
+      break;
+    case 'packed':
+      storageManager = new PackedStorage(dispatcher.maxEntities, binding, type.__fields);
+      break;
+    case 'compact':
+      throw new Error('Not yet implemented');
+    default:
+      CHECK: throw new Error(`Invalid storage type "${storage}`);
+  }
+  type.__bind = (id: EntityId, writable: boolean): C => {
+    binding.entityId = id;
+    binding.index = storageManager.acquireIndex(id);
+    return writable ? binding.writableInstance : binding.readonlyInstance;
+  };
+  type.__delete = (id: EntityId): void => {
+    storageManager.releaseIndex(id);
+  };
 }
 

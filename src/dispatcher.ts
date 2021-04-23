@@ -3,6 +3,7 @@ import {Entity, MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './entity';
 import {Log, LogPointer} from './datastructures';
 import {System, SystemBox, SystemType} from './system';
 import {Registry} from './registry';
+import {Stats} from './stats';
 
 
 const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
@@ -20,76 +21,6 @@ export interface WorldOptions {
   maxWritesPerFrame?: number;
   defaultComponentStorage?: ComponentStorage;
 }
-
-
-export class Stats {
-  frames = 0;
-
-  _numEntities = 0;
-  maxEntities = 0;
-
-  get numEntities(): number {
-    return this._numEntities;
-  }
-
-  set numEntities(value: number) {
-    this._numEntities = value;
-    if (value > this.maxEntities) this.maxEntities = value;
-  }
-
-  _maxLimboEntities = 0;
-
-  get maxLimboEntities(): number {
-    return this._maxLimboEntities;
-  }
-
-  set maxLimboEntities(value: number) {
-    if (value > this._maxLimboEntities) this._maxLimboEntities = value;
-  }
-
-  _numRefs = 0;
-  maxRefs = 0;
-
-  get numRefs(): number {
-    return this._numRefs;
-  }
-
-  set numRefs(value: number) {
-    this._numRefs = value;
-    if (value > this.maxRefs) this.maxRefs = value;
-  }
-
-  _maxShapeChangesPerFrame = 0;
-
-  get maxShapeChangesPerFrame(): number {
-    return this._maxShapeChangesPerFrame;
-  }
-
-  set maxShapeChangesPerFrame(value: number) {
-    if (value > this._maxShapeChangesPerFrame) this._maxShapeChangesPerFrame = value;
-  }
-
-  _maxWritesPerFrame = 0;
-
-  get maxWritesPerFrame(): number {
-    return this._maxWritesPerFrame;
-  }
-
-  set maxWritesPerFrame(value: number) {
-    if (value > this._maxWritesPerFrame) this._maxWritesPerFrame = value;
-  }
-
-  toString(): string {
-    /* eslint-disable max-len */
-    return `World stats:
-  frames: ${this.frames}
-  entities: ${this.numEntities} of ${this.maxEntities} max (${this.maxLimboEntities} limbo max)
-  refs: ${this.numRefs} of ${this.maxRefs} max
-  logs: ${this.maxShapeChangesPerFrame} shape changes/frame max, ${this.maxWritesPerFrame} writes/frame max`;
-    /* eslint-enable max-len */
-  }
-}
-
 
 class CallbackSystem extends System {
   __callback: (system: System) => void;

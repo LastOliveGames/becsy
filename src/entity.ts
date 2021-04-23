@@ -34,6 +34,7 @@ export class Entity {
       }
     }
     this.__registry.setFlag(this.__id, type);
+    STATS: this.__registry.dispatcher.stats.for(type).numEntities += 1;
     initComponent(type, this.__id, values);
     return this;
   }
@@ -103,8 +104,10 @@ export class Entity {
 
   private __remove(type: ComponentType<any>): void {
     this.__deindexOutboundRefs(type);
+    // TODO: queue deletion, skip if not needed by storage strategy
     type.__delete!(this.__id);
     this.__registry.clearFlag(this.__id, type);
+    STATS: this.__registry.dispatcher.stats.for(type).numEntities -= 1;
   }
 
   private __deindexOutboundRefs(type: ComponentType<any>): void {

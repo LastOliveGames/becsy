@@ -15,6 +15,8 @@ From bitecs we take:
 - [ ] Node and browser compatibility with no dependencies
 
 Then we add:
+- [ ] selectable component storage strategies, to adjust the performance/memory trade-off
+- [ ] weak references to native JS objects, for better integration with other frameworks
 - [ ] entity references that can be traversed in either direction
 - [ ] declarative system ordering based on data dependencies
 - [ ] built-in support for representing state machines (per [Sander Mertens](https://ajmmertens.medium.com/why-storing-state-machines-in-ecs-is-a-bad-idea-742de7a18e59))
