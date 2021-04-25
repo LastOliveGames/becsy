@@ -225,9 +225,6 @@ export function assimilateComponentType<C>(
         binding.index = id;
         return writable ? binding.writableInstance : binding.readonlyInstance;
       };
-      type.__delete = (id: EntityId): void => {
-        // nothing to do
-      };
       break;
     case 'packed':
     case 'compact': {

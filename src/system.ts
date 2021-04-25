@@ -42,7 +42,6 @@ export class SystemBox {
   writeQueries: QueryBox[] = [];
   hasWriteQueries: boolean;
   private processedEntities: Bitset;
-  removedEntities: Bitset;
   private shapeLogPointer: LogPointer;
   private writeLogPointer: LogPointer | undefined;
 
@@ -53,7 +52,6 @@ export class SystemBox {
     this.shapeLogPointer = dispatcher.shapeLog.createPointer();
     this.writeLogPointer = dispatcher.writeLog?.createPointer();
     this.processedEntities = new Bitset(dispatcher.maxEntities);
-    this.removedEntities = new Bitset(dispatcher.maxEntities);
     for (const builder of system.__queryBuilders!) builder.__build(this);
     system.__queryBuilders = null;
     this.hasWriteQueries = !!this.writeQueries.length;

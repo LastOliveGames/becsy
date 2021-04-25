@@ -16,6 +16,7 @@ export interface WorldOptions {
   defs: DefsArray;
   maxEntities?: number;
   maxLimboEntities?: number;
+  maxLimboComponents?: number;
   maxRefs?: number;
   maxShapeChangesPerFrame?: number;
   maxWritesPerFrame?: number;
@@ -50,6 +51,7 @@ export class Dispatcher {
     defs,
     maxEntities = 10000,
     maxLimboEntities = Math.ceil(maxEntities / 5),
+    maxLimboComponents = Math.ceil(maxEntities / 5),
     maxRefs = maxEntities,
     maxShapeChangesPerFrame = maxEntities * 2,
     maxWritesPerFrame = maxEntities * 4,
@@ -67,8 +69,8 @@ export class Dispatcher {
     this.defaultComponentStorage = defaultComponentStorage;
     this.shapeLog = new Log(maxShapeChangesPerFrame, 'maxShapeChangesPerFrame');
     this.shapeLogFramePointer = this.shapeLog.createPointer();
-    this.registry =
-      new Registry(maxEntities, maxLimboEntities, componentTypes.flat(Infinity), this);
+    this.registry = new Registry(
+      maxEntities, maxLimboEntities, maxLimboComponents, componentTypes.flat(Infinity), this);
     this.systems = this.normalizeAndInitSystems(systemTypes);
     if (this.systems.some(system => system.hasWriteQueries)) {
       this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame');

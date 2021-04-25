@@ -100,7 +100,6 @@ export class QueryBox {
       this.results.addedChangedOrRemoved?.add(id);
     } else if (!newMatch && oldMatch) {
       this.currentEntities?.unset(id);
-      this.system.removedEntities.set(id);
       this.results.all?.remove(id);
       this.results.removed?.add(id);
       this.results.changedOrRemoved?.add(id);

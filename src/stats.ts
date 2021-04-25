@@ -26,6 +26,7 @@ export class Stats {
   _numEntities = 0;
   maxEntities = 0;
   _maxLimboEntities = 0;
+  _maxLimboComponents = 0;
   _numRefs = 0;
   maxRefs = 0;
   _maxShapeChangesPerFrame = 0;
@@ -47,6 +48,14 @@ export class Stats {
 
   set maxLimboEntities(value: number) {
     if (value > this._maxLimboEntities) this._maxLimboEntities = value;
+  }
+
+  get maxLimboComponents(): number {
+    return this._maxLimboComponents;
+  }
+
+  set maxLimboComponents(value: number) {
+    if (value > this._maxLimboComponents) this._maxLimboComponents = value;
   }
 
   get numRefs(): number {

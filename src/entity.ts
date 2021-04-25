@@ -104,8 +104,7 @@ export class Entity {
 
   private __remove(type: ComponentType<any>): void {
     this.__deindexOutboundRefs(type);
-    // TODO: queue deletion, skip if not needed by storage strategy
-    type.__delete!(this.__id);
+    if (type.__delete) this.__registry.queueRemoval(this.__id, type);
     this.__registry.clearFlag(this.__id, type);
     STATS: this.__registry.dispatcher.stats.for(type).numEntities -= 1;
   }
