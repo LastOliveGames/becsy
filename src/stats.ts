@@ -15,7 +15,9 @@ class ComponentStats {
   }
 
   toString(): string {
-    return `${this.numEntities} of ${this.maxEntities} max`;
+    /* eslint-disable max-len */
+    return `${this.numEntities.toLocaleString()} of ${this.maxEntities.toLocaleString()} peak (capacity ${this.capacity.toLocaleString()})`;
+    /* eslint-enable max-len */
   }
 }
 
@@ -79,10 +81,10 @@ export class Stats {
   toString(): string {
     /* eslint-disable max-len */
     return `World stats:
-  frames: ${this.frames}
-  entities: ${this.numEntities} of ${this.maxEntities} max (${this.maxLimboEntities} limbo max)
-  refs: ${this.numRefs} of ${this.maxRefs} max
-  logs: ${this.maxShapeChangesPerFrame} shape changes/frame max, ${this.maxWritesPerFrame} writes/frame max`;
+  frames: ${this.frames.toLocaleString()}
+  entities: ${this.numEntities.toLocaleString()} of ${this.maxEntities.toLocaleString()} max (${this.maxLimboEntities.toLocaleString()} limbo max)
+  refs: ${this.numRefs.toLocaleString()} of ${this.maxRefs.toLocaleString()} max
+  logs: ${this.maxShapeChangesPerFrame.toLocaleString()} shape changes/frame max, ${this.maxWritesPerFrame.toLocaleString()} writes/frame max`;
     /* eslint-enable max-len */
   }
 }
