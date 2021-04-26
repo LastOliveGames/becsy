@@ -5,7 +5,9 @@ import {writeFileSync, readFileSync, existsSync} from 'fs';
 import chalk from 'chalk';
 
 const BENCHMARKS = [
-  'ecs-benchmark'
+  'ecs-benchmark',
+  'ecs-packed',
+  'ecs-packed-elastic',
 ];
 
 type Results = {
@@ -45,8 +47,8 @@ for (const filename of BENCHMARKS) {
     results[key] = {devOps, devRel, perfOps, perfRel};
     if (devError) errors.push(devError);
     if (perfError) errors.push(perfError);
-    const lastDevRel = lastResults?.[key].devRel;
-    const lastPerfRel = lastResults?.[key].perfRel;
+    const lastDevRel = lastResults?.[key]?.devRel;
+    const lastPerfRel = lastResults?.[key]?.perfRel;
     const devDiff = lastDevRel ? (devRel - lastDevRel) / lastDevRel : 0;
     const perfDiff = lastPerfRel ? (perfRel - lastPerfRel) / lastPerfRel : 0;
     console.log(
@@ -59,9 +61,9 @@ for (const filename of BENCHMARKS) {
     );
     index += 1;
   }
+  console.log();
 }
 
-console.log();
 if (errors.length) {
   console.log('Errors:');
   for (const error of errors) console.log(error);

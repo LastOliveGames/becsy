@@ -25,6 +25,7 @@ export interface Field<JSType> {
   default: JSType;
   buffer?: SharedArrayBuffer;
   localBuffer?: any[];
+  updateBuffer?(): void;
 }
 
 export interface ComponentType<C> {
@@ -78,7 +79,7 @@ class PackedStorage implements Storage {
 
   constructor(
     private readonly maxEntities: number, private readonly binding: Binding<any>,
-    private readonly fields: Field<any>[]
+    private readonly fields: Field<any>[], private readonly elastic: boolean
   ) {
     this.growSpares();
     this.growCapacity();
@@ -91,6 +92,11 @@ class PackedStorage implements Storage {
         index = this.spares[--this.spares[3] + 4];
       } else {
         if (this.spares[1] === this.spares[2]) {
+          CHECK: if (!this.elastic) {
+            throw new Error(
+              `Storage exhausted for component ${this.binding.type.name}; ` +
+              `raise its capacity above ${this.binding.capacity}`);
+          }
           this.binding.capacity = Math.min(this.maxEntities, this.binding.capacity * 2);
           this.growCapacity();
         }
@@ -128,7 +134,7 @@ class PackedStorage implements Storage {
       this.spares = newSpares;
     }
     this.spares[2] = this.binding.capacity;
-    for (const field of this.fields) field.type.define(this.binding, field);
+    if (this.elastic) for (const field of this.fields) field.updateBuffer!();
   }
 
   private growSpares(): void {
@@ -191,30 +197,34 @@ export function assimilateComponentType<C>(
   typeId: number, type: ComponentType<C>, dispatcher: Dispatcher
 ): void {
   const storage = type.options?.storage ?? dispatcher.defaultComponentStorage;
-  const capacity = type.options?.capacity ?? (storage === 'sparse' ? dispatcher.maxEntities : 8);
+  const capacity = storage === 'sparse' ?
+    dispatcher.maxEntities : Math.min(dispatcher.maxEntities, type.options?.capacity ?? 0);
   CHECK: {
-    if (storage === 'sparse' && type.options?.capacity) {
-      throw new Error(
-        `Component type ${type.name} cannot combine options.capacity with options.storage 'sparse'`
-      );
-    }
-    if (capacity <= 0) {
-      throw new Error(
-        `Component type ${type.name} capacity option must be great than zero: got ${capacity}`);
-    }
-    if (capacity > dispatcher.maxEntities) {
-      throw new Error(
-        `Component type ${type.name} has options.capacity higher than world maxEntities; ` +
-        `reduce ${type.options!.capacity} to or below ${dispatcher.maxEntities}`);
+    if (typeof type.options?.capacity !== 'undefined') {
+      if (storage === 'sparse') {
+        throw new Error(
+          `Component type ${type.name} cannot combine custom capacity with sparse storage`
+        );
+      }
+      if (type.options.capacity <= 0) {
+        throw new Error(
+          `Component type ${type.name} capacity option must be great than zero: got ${capacity}`);
+      }
     }
     if ((typeof process === 'undefined' || process.env.NODE_ENV !== 'test') && type.__bind) {
       throw new Error(`Component type ${type.name} is already in use in another world`);
     }
   }
   type.id = typeId;
-  const binding = new Binding<C>(type, gatherFields(type), dispatcher, capacity);
+  const binding = new Binding<C>(type, gatherFields(type), dispatcher, capacity || 8);
   type.__binding = binding;
-  for (const field of binding.fields) field.type.define(binding, field);
+  for (const field of binding.fields) {
+    if (capacity) {
+      field.type.defineFixed(binding, field);
+    } else {
+      field.type.defineElastic(binding, field);
+    }
+  }
 
   switch (storage) {
     case 'sparse':
@@ -226,11 +236,9 @@ export function assimilateComponentType<C>(
         return writable ? binding.writableInstance : binding.readonlyInstance;
       };
       break;
-    case 'packed':
-    case 'compact': {
-      const storageManager = storage === 'packed' ?
-        new PackedStorage(dispatcher.maxEntities, binding, binding.fields) : null;
-      if (!storageManager) throw new Error('Not yet implemented');
+    case 'packed': {
+      const storageManager =
+        new PackedStorage(dispatcher.maxEntities, binding, binding.fields, !capacity);
       type.__bind = (id: EntityId, writable: boolean): C => {
         binding.entityId = id;
         binding.index = storageManager.acquireIndex(id);
@@ -241,6 +249,8 @@ export function assimilateComponentType<C>(
       };
       break;
     }
+    case 'compact':
+      throw new Error('Not yet implemented');
     default:
       CHECK: throw new Error(`Invalid storage type "${storage}`);
   }
