@@ -42,6 +42,7 @@ export interface ComponentType<C> {
 
   __binding?: Binding<C>;
   __bind?(id: EntityId, writable: boolean): C;
+  __create?(id: EntityId): C;
   __delete?(id: EntityId): void;
 }
 
@@ -73,7 +74,7 @@ interface Storage {
 
 
 class PackedStorage implements Storage {
-  private index: Int8Array | Int16Array | Int32Array;
+  index: Int8Array | Int16Array | Int32Array;
   // layout: bytesPerElement, nextIndex, capacity, numSpares, ...spareIndices
   private spares: Int8Array | Int16Array | Int32Array;
 
@@ -169,7 +170,7 @@ export function initComponent(type: ComponentType<any>, id: EntityId, values: an
       }
     }
   }
-  const component = type.__bind!(id, true);
+  const component = type.__create!(id);
   for (const field of type.__binding!.fields) {
     (component as any)[field.name] = values?.[field.name] ?? field.default;
   }
@@ -235,22 +236,38 @@ export function assimilateComponentType<C>(
         binding.index = id;
         return writable ? binding.writableInstance : binding.readonlyInstance;
       };
+      type.__create = (id: EntityId): C => {
+        binding.entityId = id;
+        binding.index = id;
+        return binding.writableInstance;
+      };
       break;
+
     case 'packed': {
       const storageManager =
         new PackedStorage(dispatcher.maxEntities, binding, binding.fields, !capacity);
       type.__bind = (id: EntityId, writable: boolean): C => {
         binding.entityId = id;
-        binding.index = storageManager.acquireIndex(id);
+        binding.index = storageManager.index[id];
+        DEBUG: if (binding.index === -1) {
+          throw new Error(`Attempt to bind unacquired entity ${id} to ${type.name}`);
+        }
         return writable ? binding.writableInstance : binding.readonlyInstance;
+      };
+      type.__create = (id: EntityId): C => {
+        binding.entityId = id;
+        binding.index = storageManager.acquireIndex(id);
+        return binding.writableInstance;
       };
       type.__delete = (id: EntityId): void => {
         storageManager.releaseIndex(id);
       };
       break;
     }
+
     case 'compact':
       throw new Error('Not yet implemented');
+
     default:
       CHECK: throw new Error(`Invalid storage type "${storage}`);
   }
