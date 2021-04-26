@@ -7,7 +7,7 @@ From ECSY we take:
 - [x] multiple queries per system
 - [x] reactive queries (rather than event callbacks)
 - [x] explicit mutation tracking
-- [ ] references to native JS objects in components
+- [x] references to native JS objects in components
 
 From bitecs we take:
 - [x] extensive use of `ArrayBuffer` for performance
@@ -15,8 +15,8 @@ From bitecs we take:
 - [ ] Node and browser compatibility with no dependencies
 
 Then we add:
-- [ ] selectable component storage strategies, to adjust the performance/memory trade-off
-- [ ] weak references to native JS objects, for better integration with other frameworks
+- [x] selectable component storage strategies, to adjust the performance/memory trade-off
+- [x] weak references to native JS objects, for better integration with other frameworks
 - [ ] entity references that can be traversed in either direction
 - [ ] declarative system ordering based on data dependencies
 - [ ] built-in support for representing state machines (per [Sander Mertens](https://ajmmertens.medium.com/why-storing-state-machines-in-ecs-is-a-bad-idea-742de7a18e59))
