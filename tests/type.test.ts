@@ -1,5 +1,9 @@
 import {prop, component, Type, World, Entity} from '../src';
 
+class Stuff {
+  value: number;
+}
+
 @component class Big {
   @prop(Type.boolean) boolean: boolean;
   @prop(Type.uint8) uint8: number;
@@ -13,6 +17,8 @@ import {prop, component, Type, World, Entity} from '../src';
   @prop(Type.staticString(['foo', 'bar', 'baz'])) staticString: string;
   @prop(Type.dynamicString(14)) dynamicString: string;
   @prop(Type.ref) ref: Entity | null;
+  @prop(Type.object) object: Stuff;
+  @prop(Type.weakObject) weakObject: Stuff;
 }
 
 function testReadWrite(field: string, values: any[]): void {
@@ -85,4 +91,31 @@ describe('getting and setting fields of various types', () => {
     });
   });
 
+  test('object', () => {
+    const stuff = new Stuff();
+    testReadWrite('object', [undefined, null, stuff]);
+  });
+
+  test('weakObject', () => {
+    const stuff = new Stuff();
+    testReadWrite('weakObject', [undefined, null, stuff]);
+  });
+
+  // Can't figure out how to force garbage collection to test this, even after following
+  // https://stackoverflow.com/questions/65175380.
+  test.skip('weakObject garbage collection', () => {
+    const a: any[] = [new Stuff()];
+    const world = new World({defs: [Big]});
+    let entity: Entity;  // this will get released, but nothing will overwrite it
+    world.build(system => {
+      entity = system.createEntity(Big);
+      entity.write(Big).weakObject = a[0];
+      expect(entity.read(Big).weakObject).toBe(a[0]);
+    });
+    delete a[0];
+    eval('%CollectGarbage(true)');  // eslint-disable-line no-eval
+    expect(entity!.read(Big).weakObject).toBe(undefined);
+  });
+
 });
+

@@ -29,6 +29,8 @@ export abstract class Type<JSType> {
   static staticString: (choices: string[]) => Type<string>;
   static dynamicString: (maxUtf8Length: number) => Type<string>;
   static ref: Type<Entity | null>;
+  static object: Type<any>;
+  static weakObject: Type<any>;
 }
 
 class BooleanType extends Type<boolean> {
@@ -171,7 +173,8 @@ class NumberType extends Type<number> {
         throwNotWritable(binding);
       }
     });
-  }}
+  }
+}
 
 class StaticStringType extends Type<string> {
   private choicesIndex = new Map<string, number>();
@@ -265,7 +268,8 @@ class StaticStringType extends Type<string> {
         throwNotWritable(binding);
       }
     });
-  }}
+  }
+}
 
 class DynamicStringType extends Type<string> {
   private readonly maxUtf8Length: number;
@@ -454,7 +458,128 @@ class RefType extends Type<Entity | null> {
         throwNotWritable(binding);
       }
     });
-  }}
+  }
+}
+
+class ObjectType extends Type<any> {
+  constructor() {super(undefined);}
+
+  defineElastic<C>(binding: Binding<C>, field: Field<any>): void {
+    const data: any[] = [];
+    field.localBuffer = data;
+    field.updateBuffer = () => {/* no-op */};
+
+    Object.defineProperty(binding.writableInstance, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C): any {
+        return data[binding.index];
+      },
+      set(this: C, value: any): void {
+        data[binding.index] = value;
+      }
+    });
+
+    Object.defineProperty(binding.readonlyInstance, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C): any {
+        return data[binding.index];
+      },
+      set(this: C, value: any): void {
+        throwNotWritable(binding);
+      }
+    });
+  }
+
+  defineFixed<C>(binding: Binding<C>, field: Field<boolean>): void {
+    const data: any[] = new Array(binding.capacity);
+    field.localBuffer = data;
+    field.updateBuffer = () => {/* no-op */};
+
+    Object.defineProperty(binding.writableInstance, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C): any {
+        return data[binding.index];
+      },
+      set(this: C, value: any): void {
+        data[binding.index] = value;
+      }
+    });
+
+    Object.defineProperty(binding.readonlyInstance, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C): any {
+        return data[binding.index];
+      },
+      set(this: C, value: any): void {
+        throwNotWritable(binding);
+      }
+    });
+  }
+}
+
+class WeakObjectType extends Type<any> {
+  constructor() {super(undefined);}
+
+  defineElastic<C>(binding: Binding<C>, field: Field<any>): void {
+    const data: WeakRef<any>[] = [];
+    field.localBuffer = data;
+    field.updateBuffer = () => {/* no-op */};
+
+    Object.defineProperty(binding.writableInstance, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C): any {
+        const value = data[binding.index];
+        if (value === null || value === undefined) return value;
+        return value.deref();
+      },
+      set(this: C, value: any): void {
+        data[binding.index] = (value === null || value === undefined) ? value : new WeakRef(value);
+      }
+    });
+
+    Object.defineProperty(binding.readonlyInstance, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C): any {
+        const value = data[binding.index];
+        if (value === null || value === undefined) return value;
+        return value.deref();
+      },
+      set(this: C, value: any): void {
+        throwNotWritable(binding);
+      }
+    });
+  }
+
+  defineFixed<C>(binding: Binding<C>, field: Field<boolean>): void {
+    const data: WeakRef<any>[] = new Array(binding.capacity);
+    field.localBuffer = data;
+    field.updateBuffer = () => {/* no-op */};
+
+    Object.defineProperty(binding.writableInstance, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C): any {
+        const value = data[binding.index];
+        if (value === null || value === undefined) return value;
+        return value.deref();
+      },
+      set(this: C, value: any): void {
+        data[binding.index] = (value === null || value === undefined) ? value : new WeakRef(value);
+      }
+    });
+
+    Object.defineProperty(binding.readonlyInstance, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C): any {
+        const value = data[binding.index];
+        if (value === null || value === undefined) return value;
+        return value.deref();
+      },
+      set(this: C, value: any): void {
+        throwNotWritable(binding);
+      }
+    });
+  }
+}
 
 Type.boolean = new BooleanType();
 Type.uint8 = new NumberType(Uint8Array);
@@ -468,3 +593,5 @@ Type.float64 = new NumberType(Float64Array);
 Type.staticString = (choices: string[]) => new StaticStringType(choices);
 Type.dynamicString = (maxUtf8Length: number) => new DynamicStringType(maxUtf8Length);
 Type.ref = new RefType();
+Type.object = new ObjectType();
+Type.weakObject = new WeakObjectType();
