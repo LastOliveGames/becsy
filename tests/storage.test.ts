@@ -1,6 +1,6 @@
 import {prop, component, Type, World, Entity} from '../src';
 
-@component({storage: 'packed', capacity: 2})
+@component({storage: 'packed', initialCapacity: 2})
 class A {
   @prop(Type.int32) declare value: number;
 }

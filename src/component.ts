@@ -17,6 +17,7 @@ export type ComponentStorage = 'sparse' | 'packed' | 'compact';
 export interface ComponentOptions {
   storage?: ComponentStorage;
   capacity?: number;
+  initialCapacity?: number;
 }
 
 export interface Field<JSType> {
@@ -200,6 +201,7 @@ export function assimilateComponentType<C>(
   const storage = type.options?.storage ?? dispatcher.defaultComponentStorage;
   const capacity = storage === 'sparse' ?
     dispatcher.maxEntities : Math.min(dispatcher.maxEntities, type.options?.capacity ?? 0);
+  const initialCapacity = type.options?.initialCapacity ?? 8;
   CHECK: {
     if (typeof type.options?.capacity !== 'undefined') {
       if (storage === 'sparse') {
@@ -211,13 +213,17 @@ export function assimilateComponentType<C>(
         throw new Error(
           `Component type ${type.name} capacity option must be great than zero: got ${capacity}`);
       }
+      if (typeof type.options.initialCapacity !== 'undefined') {
+        throw new Error(
+          `Component type ${type.name} cannot have both capacity and initialCapacity options`);
+      }
     }
     if ((typeof process === 'undefined' || process.env.NODE_ENV !== 'test') && type.__bind) {
       throw new Error(`Component type ${type.name} is already in use in another world`);
     }
   }
   type.id = typeId;
-  const binding = new Binding<C>(type, gatherFields(type), dispatcher, capacity || 8);
+  const binding = new Binding<C>(type, gatherFields(type), dispatcher, capacity || initialCapacity);
   type.__binding = binding;
   for (const field of binding.fields) {
     if (capacity) {
