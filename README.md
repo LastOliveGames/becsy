@@ -15,6 +15,7 @@ From bitecs we take:
 - [ ] Node and browser compatibility with no dependencies
 
 Then we add:
+- [x] native TypeScript implementation, for a type-friendly design and the best typings
 - [x] selectable component storage strategies, to adjust the performance/memory trade-off
 - [x] weak references to native JS objects, for better integration with other frameworks
 - [ ] entity references that can be traversed in either direction
