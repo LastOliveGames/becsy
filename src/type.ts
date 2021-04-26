@@ -1,5 +1,5 @@
-import type {Binding, Field} from './component';
-import type {Entity} from './entity';
+import type {Binding, ComponentType, Field} from './component';
+import type {Entity, EntityId} from './entity';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -517,13 +517,20 @@ class ObjectType extends Type<any> {
   }
 }
 
+type FinalizerHeldValue = {
+  type: ComponentType<any>, field: Field<any>, weakRef: WeakRef<any>, id: EntityId, index: number
+};
+
 class WeakObjectType extends Type<any> {
+  private finalizers: FinalizationRegistry | undefined;
+
   constructor() {super(undefined);}
 
   defineElastic<C>(binding: Binding<C>, field: Field<any>): void {
     const data: WeakRef<any>[] = [];
     field.localBuffer = data;
     field.updateBuffer = () => {/* no-op */};
+    const finalizers = this.initFinalizers(binding);
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
@@ -533,7 +540,15 @@ class WeakObjectType extends Type<any> {
         return value.deref();
       },
       set(this: C, value: any): void {
-        data[binding.index] = (value === null || value === undefined) ? value : new WeakRef(value);
+        if (value !== null && value !== undefined) {
+          const weakRef = new WeakRef(value);
+          finalizers?.register(
+            value,
+            {type: binding.type, field, weakRef, id: binding.entityId, index: binding.index}
+          );
+          value = weakRef;
+        }
+        data[binding.index] = value;
       }
     });
 
@@ -554,6 +569,7 @@ class WeakObjectType extends Type<any> {
     const data: WeakRef<any>[] = new Array(binding.capacity);
     field.localBuffer = data;
     field.updateBuffer = () => {/* no-op */};
+    const finalizers = this.initFinalizers(binding);
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
@@ -563,7 +579,15 @@ class WeakObjectType extends Type<any> {
         return value.deref();
       },
       set(this: C, value: any): void {
-        data[binding.index] = (value === null || value === undefined) ? value : new WeakRef(value);
+        if (value !== null && value !== undefined) {
+          const weakRef = new WeakRef(value);
+          finalizers?.register(
+            value,
+            {type: binding.type, field, weakRef, id: binding.entityId, index: binding.index}
+          );
+          value = weakRef;
+        }
+        data[binding.index] = value;
       }
     });
 
@@ -578,6 +602,21 @@ class WeakObjectType extends Type<any> {
         throwNotWritable(binding);
       }
     });
+  }
+
+  private initFinalizers(binding: Binding<any>) {
+    if (!binding.trackedWrites) return;
+    if (this.finalizers) return this.finalizers;
+    const dispatcher = binding.dispatcher;
+    if (!dispatcher.writeLog || typeof FinalizationRegistry === 'undefined') return;
+    this.finalizers = new FinalizationRegistry(
+      ({type, field, weakRef, id, index}: FinalizerHeldValue) => {
+        if (field.localBuffer?.[index] === weakRef) {
+          dispatcher.registry.trackWrite(id, type);
+        }
+      }
+    );
+    return this.finalizers;
   }
 }
 
