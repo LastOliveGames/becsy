@@ -1,9 +1,11 @@
 import type {ComponentStorage, ComponentType} from './component';
-import {Entity, MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './entity';
+import type {Entity} from './entity';
+import {MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './consts';
 import {Log, LogPointer} from './datastructures';
 import {System, SystemBox, SystemType} from './system';
 import {Registry} from './registry';
 import {Stats} from './stats';
+import {RefIndexer} from './refindexer';
 
 
 const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
@@ -17,7 +19,7 @@ export interface WorldOptions {
   maxEntities?: number;
   maxLimboEntities?: number;
   maxLimboComponents?: number;
-  maxRefs?: number;
+  maxRefChangesPerFrame?: number;
   maxShapeChangesPerFrame?: number;
   maxWritesPerFrame?: number;
   defaultComponentStorage?: ComponentStorage;
@@ -44,6 +46,7 @@ export class Dispatcher {
   private readonly shapeLogFramePointer: LogPointer;
   private readonly writeLogFramePointer: LogPointer | undefined;
   readonly stats;
+  readonly indexer: RefIndexer;
   private readonly userCallbackSystem;
   private readonly callbackSystem;
 
@@ -52,9 +55,9 @@ export class Dispatcher {
     maxEntities = 10000,
     maxLimboEntities = Math.ceil(maxEntities / 5),
     maxLimboComponents = Math.ceil(maxEntities / 5),
-    maxRefs = maxEntities,
     maxShapeChangesPerFrame = maxEntities * 2,
     maxWritesPerFrame = maxEntities * 4,
+    maxRefChangesPerFrame = maxEntities,
     defaultComponentStorage = 'sparse'
   }: WorldOptions) {
     if (maxEntities > MAX_NUM_ENTITIES) {
@@ -71,6 +74,8 @@ export class Dispatcher {
     this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.registry = new Registry(
       maxEntities, maxLimboEntities, maxLimboComponents, componentTypes.flat(Infinity), this);
+    this.indexer = new RefIndexer(this, maxRefChangesPerFrame);
+    this.registry.initializeComponentTypes();
     this.systems = this.normalizeAndInitSystems(systemTypes);
     if (this.systems.some(system => system.hasWriteQueries)) {
       this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame');
@@ -152,6 +157,7 @@ export class Dispatcher {
 
   private flush(): void {
     this.registry.flush();
+    this.indexer.flush();  // may update writeLog
     this.shapeLog.commit();
     this.writeLog?.commit();
   }

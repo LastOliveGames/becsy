@@ -29,6 +29,7 @@ export abstract class Type<JSType> {
   static staticString: (choices: string[]) => Type<string>;
   static dynamicString: (maxUtf8Length: number) => Type<string>;
   static ref: Type<Entity | null>;
+  static backrefs: (type: ComponentType<any>, fieldName: string) => Type<Entity[]>;
   static object: Type<any>;
   static weakObject: Type<any>;
 }
@@ -380,6 +381,8 @@ class RefType extends Type<Entity | null> {
   defineElastic<C>(binding: Binding<C>, field: Field<Entity | null>): void {
     let buffer: SharedArrayBuffer;
     let data: Int32Array;
+    const indexer = binding.dispatcher.indexer;
+    indexer.registerSelector();
 
     field.updateBuffer = () => {
       const size = binding.capacity * Int32Array.BYTES_PER_ELEMENT;
@@ -387,6 +390,7 @@ class RefType extends Type<Entity | null> {
       if (!capacityChanged && field.buffer === buffer) return;
       buffer = capacityChanged ? new SharedArrayBuffer(size) : field.buffer!;
       data = new Int32Array(buffer);
+      data.fill(-1);
       if (capacityChanged && field.buffer) data.set(new Int32Array(field.buffer));
       field.buffer = buffer;
     };
@@ -403,10 +407,8 @@ class RefType extends Type<Entity | null> {
         const oldId = data[binding.index];
         const newId = value?.__id ?? -1;
         if (oldId === newId) return;
-        // TODO: deindex/reindex ref
-        // if (oldId !== 0) indexer.remove(oldId, binding.entityId);
         data[binding.index] = newId;
-        // if (newId !== 0) indexer.insert(newId, binding.entityId);
+        indexer.trackRefChange(binding.entityId, binding.type, field.seq, undefined, oldId, newId);
       }
     });
 
@@ -427,7 +429,10 @@ class RefType extends Type<Entity | null> {
     const size = binding.capacity * Int32Array.BYTES_PER_ELEMENT;
     const buffer = new SharedArrayBuffer(size);
     const data = new Int32Array(buffer);
+    data.fill(-1);
     field.buffer = buffer;
+    const indexer = binding.dispatcher.indexer;
+    indexer.registerSelector();
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
@@ -440,10 +445,8 @@ class RefType extends Type<Entity | null> {
         const oldId = data[binding.index];
         const newId = value?.__id ?? -1;
         if (oldId === newId) return;
-        // TODO: deindex/reindex ref
-        // if (oldId !== 0) indexer.remove(oldId, binding.entityId);
         data[binding.index] = newId;
-        // if (newId !== 0) indexer.insert(newId, binding.entityId);
+        indexer.trackRefChange(binding.entityId, binding.type, field.seq, undefined, oldId, newId);
       }
     });
 
@@ -458,6 +461,60 @@ class RefType extends Type<Entity | null> {
         throwNotWritable(binding);
       }
     });
+  }
+}
+
+const EMPTY_ARRAY: Entity[] = [];
+
+class BackrefsType extends Type<Entity[]> {
+  constructor(private readonly type?: ComponentType<any>, private readonly fieldName?: string) {
+    super(EMPTY_ARRAY);
+  }
+
+  defineElastic<C>(binding: Binding<C>, field: Field<Entity[]>): void {
+    CHECK: if (this.fieldName && !this.type) {
+      throw new Error(
+        `Backrefs selector has field but no component in ${binding.type.name}.${field.name}`);
+    }
+    const refField = this.fieldName ?
+      this.type!.__binding!.fields.find(aField => aField.name === this.fieldName) : undefined;
+    CHECK: if (this.fieldName && !refField) {
+      throw new Error(
+        `Backrefs field ${binding.type.name}.${field.name} refers to ` +
+        `an unknown field ${this.type!.name}.${this.fieldName}`);
+    }
+    const registry = binding.dispatcher.registry;
+    if (this.type) {
+      registry.extendMaskAndSetFlag(this.type.__binding!.backrefsWriteMask, binding.type);
+    } else {
+      for (const type of registry.types) {
+        if (type.__binding!.refFields.length) {
+          registry.extendMaskAndSetFlag(type.__binding!.backrefsWriteMask, binding.type);
+        }
+      }
+    }
+    const indexer = binding.dispatcher.indexer;
+    indexer.registerSelector();  // make sure global selector always registered first
+    const selectorId = indexer.registerSelector(binding.type, this.type, refField?.seq);
+
+    const propertyDefinition = {
+      enumerable: true, configurable: true,
+      get(this: C): Entity[] {
+        return indexer.getBackrefs(binding.entityId, selectorId);
+      },
+      set(this: C, value: Entity[]): void {
+        CHECK: if (value !== EMPTY_ARRAY) {
+          throw new Error('Backrefs properties are computed automatically, you cannot set them');
+        }
+      }
+    };
+
+    Object.defineProperty(binding.writableInstance, field.name, propertyDefinition);
+    Object.defineProperty(binding.readonlyInstance, field.name, propertyDefinition);
+  }
+
+  defineFixed(binding: Binding<any>, field: Field<any>): void {
+    this.defineElastic(binding, field);
   }
 }
 
@@ -632,5 +689,6 @@ Type.float64 = new NumberType(Float64Array);
 Type.staticString = (choices: string[]) => new StaticStringType(choices);
 Type.dynamicString = (maxUtf8Length: number) => new DynamicStringType(maxUtf8Length);
 Type.ref = new RefType();
+Type.backrefs = (type: ComponentType<any>, fieldName: string) => new BackrefsType(type, fieldName);
 Type.object = new ObjectType();
 Type.weakObject = new WeakObjectType();

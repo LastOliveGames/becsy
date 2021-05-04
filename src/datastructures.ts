@@ -65,7 +65,8 @@ export class Log {
   private readonly corral: Uint32Array;
 
   constructor(
-    private readonly maxEntries: number, private readonly configParamName: string
+    private readonly maxEntries: number, private readonly configParamName: string,
+    private readonly localProcessingAllowed = false
   ) {
     const buffer =
       new SharedArrayBuffer((maxEntries + LOG_HEADER_LENGTH) * Uint32Array.BYTES_PER_ELEMENT);
@@ -83,10 +84,17 @@ export class Log {
     this.corral[0] += 1;
   }
 
-  commit(): void {
+  commit(pointer?: LogPointer): boolean {
+    DEBUG: if (!pointer && this.localProcessingAllowed) {
+      throw new Error('Cannot use blind commit when log local processing is allowed');
+    }
     const corralLength = this.corral[0];
-    if (!corralLength) return;
+    if (!corralLength) return true;
     let index = this.data[0];
+    if (pointer && !(
+      pointer.generation === this.data[1] && pointer.index === index &&
+      pointer.corralGeneration === this.corral[1] && pointer.corralIndex === this.corral[0]
+    )) return false;
     const firstSegmentLength = Math.min(corralLength, this.maxEntries - index);
     this.data.set(
       this.corral.subarray(CORRAL_HEADER_LENGTH, firstSegmentLength + CORRAL_HEADER_LENGTH),
@@ -105,6 +113,11 @@ export class Log {
     this.data[0] = index;
     this.corral[0] = 0;
     this.corral[1] += 1;
+    if (pointer) {
+      pointer.index = index;
+      pointer.generation = this.data[1];
+    }
+    return true;
   }
 
   createPointer(pointer?: LogPointer): LogPointer {
@@ -132,14 +145,17 @@ export class Log {
 
   processSince(
     startPointer: LogPointer, endPointer?: LogPointer
-  ): [Uint32Array, number, number] | [] {
+  ): [Uint32Array, number, number, boolean] | [] {
+    // TODO: fix bug where client will reprocess corralled data after committing
     CHECK: this.checkPointers(startPointer, endPointer);
-    let result: [Uint32Array, number, number] | [] = EMPTY_TUPLE;
+    let result: [Uint32Array, number, number, boolean] | [] = EMPTY_TUPLE;
     const endIndex = endPointer?.index ?? this.data[0];
     const endGeneration = endPointer?.generation ?? this.data[1];
     if (startPointer.generation === endGeneration) {
       if (startPointer.index < endIndex) {
-        result = [this.data, startPointer.index + LOG_HEADER_LENGTH, endIndex + LOG_HEADER_LENGTH];
+        result = [
+          this.data, startPointer.index + LOG_HEADER_LENGTH, endIndex + LOG_HEADER_LENGTH, false
+        ];
         startPointer.index = endIndex;
       } else {
         const corralLength = this.corral[0];
@@ -149,18 +165,25 @@ export class Log {
         if (corralHasNewEntries) {
           result = [
             this.corral, startPointer.corralIndex + CORRAL_HEADER_LENGTH,
-            corralLength + CORRAL_HEADER_LENGTH
+            corralLength + CORRAL_HEADER_LENGTH, true
           ];
           startPointer.corralIndex = corralLength;
           startPointer.corralGeneration = corralGeneration;
         }
       }
     } else {
-      result = [this.data, startPointer.index + LOG_HEADER_LENGTH, this.data.length];
+      result = [this.data, startPointer.index + LOG_HEADER_LENGTH, this.data.length, false];
       startPointer.index = 0;
       startPointer.generation = endGeneration;
     }
     return result;
+  }
+
+  processAndCommitSince(startPointer: LogPointer): [Uint32Array, number, number, boolean] | [] {
+    const result = this.processSince(startPointer);
+    if (result[0]) return result;
+    if (this.commit(startPointer)) return EMPTY_TUPLE;
+    return this.processSince(startPointer);
   }
 
   countSince(startPointer: LogPointer, endPointer?: LogPointer): number {

@@ -1,5 +1,5 @@
 import {
-  component, ComponentType, componentTypes, Entity, prop, Query, System, SystemType, Type, World,
+  component, ComponentType, componentTypes, prop, Query, System, SystemType, Type, World,
 } from '../src';
 
 
@@ -8,7 +8,6 @@ import {
 }
 
 @component class B {
-  @prop(Type.ref) declare a: Entity;
   @prop(Type.uint8) declare value: number;
 }
 
@@ -94,26 +93,6 @@ class CreateAForEachC extends System {
   }
 }
 
-class DoubleARefsFromB extends System {
-  entities = this.query(q => q.all.with(B).and.using(A).write);
-  execute() {
-    for (const entity of this.entities.all) {
-      const ref = entity.read(B).a;
-      if (ref) ref.write(A).value *= 2;
-    }
-  }
-}
-
-// class IncrementBReferringToA extends System {
-//   entities = this.query(q => q.with(A).join('bs', j => j.with(B).write.ref('a')));
-//   execute() {
-//     for (const entity of this.entities.all) {
-//       for (const referrer of entity.joined.bs) {
-//         referrer.write(B).value += 1;
-//       }
-//     }
-//   }
-// }
 
 let total: {[key: string]: number} = {a: 0, b: 0, c: 0};
 
@@ -241,32 +220,6 @@ describe('creating and deleting entities', () => {
     world.execute();
     world.execute();
   });
-});
 
-describe('references', () => {
-
-  test('follow refs', () => {
-    const world = createWorld(DoubleARefsFromB);
-    world.build(sys => {
-      sys.createEntity(A, {value: 5});
-      const a = sys.createEntity(A, {value: 1});
-      sys.createEntity(B, {a});
-      sys.createEntity(B);
-    });
-    world.execute();
-    expect(total.a).toBe(7);
-  });
-
-  // test.skip('join refs', () => {
-  //   const world = createWorld(IncrementBReferringToA);
-  //   world.build(sys => {
-  //     sys.createEntity(A, {value: 5});
-  //     const a = sys.createEntity(A, {value: 1});
-  //     sys.createEntity(B, {a});
-  //     sys.createEntity(B);
-  //   });
-  //   world.execute();
-  //   expect(total.b).toBe(1);
-  // });
 });
 

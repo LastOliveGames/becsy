@@ -1,5 +1,6 @@
 import {Type} from './type';
-import type {EntityId} from './entity';
+import type {Entity, EntityId} from './entity';
+import {MAX_NUM_FIELDS} from './consts';
 import type {Dispatcher} from './dispatcher';
 
 
@@ -24,6 +25,7 @@ export interface Field<JSType> {
   name: string;
   type: Type<JSType>;
   default: JSType;
+  seq: number;
   buffer?: SharedArrayBuffer;
   localBuffer?: any[];
   updateBuffer?(): void;
@@ -52,18 +54,22 @@ export class Binding<C> {
   readonly writableInstance: C;
   readonly flagOffset: number;
   readonly flagMask: number;
-  trackedWrites: boolean;
+  readonly refFields: Field<Entity | null>[];
+  trackedWrites = false;
+  internallyIndexed = false;
+  readonly backrefsWriteMask: number[] = [];
   entityId = 0;
   index = 0;
 
   constructor(
     readonly type: ComponentType<C>, readonly fields: Field<any>[], readonly dispatcher: Dispatcher,
-    public capacity: number
+    public capacity: number, readonly storage: ComponentStorage, readonly elastic: boolean
   ) {
     this.readonlyInstance = new type();  // eslint-disable-line new-cap
     this.writableInstance = new type();  // eslint-disable-line new-cap
     this.flagOffset = type.id! >> 5;
     this.flagMask = 1 << (type.id! & 31);
+    this.refFields = fields.filter(field => field.type === Type.ref);
   }
 }
 
@@ -81,7 +87,7 @@ class PackedStorage implements Storage {
 
   constructor(
     private readonly maxEntities: number, private readonly binding: Binding<any>,
-    private readonly fields: Field<any>[], private readonly elastic: boolean
+    private readonly fields: Field<any>[]
   ) {
     this.growSpares();
     this.growCapacity();
@@ -94,7 +100,7 @@ class PackedStorage implements Storage {
         index = this.spares[--this.spares[3] + 4];
       } else {
         if (this.spares[1] === this.spares[2]) {
-          CHECK: if (!this.elastic) {
+          CHECK: if (!this.binding.elastic) {
             throw new Error(
               `Storage exhausted for component ${this.binding.type.name}; ` +
               `raise its capacity above ${this.binding.capacity}`);
@@ -136,7 +142,7 @@ class PackedStorage implements Storage {
       this.spares = newSpares;
     }
     this.spares[2] = this.binding.capacity;
-    if (this.elastic) for (const field of this.fields) field.updateBuffer!();
+    if (this.binding.elastic) for (const field of this.fields) field.updateBuffer!();
   }
 
   private growSpares(): void {
@@ -181,15 +187,19 @@ export function initComponent(type: ComponentType<any>, id: EntityId, values: an
 function gatherFields(type: ComponentType<any>): Field<any>[] {
   const schema = type.schema;
   const fields: Field<any>[] = [];
+  let seq = 0;
   for (const name in schema) {
     const entry = schema[name];
-    let field;
+    let field: Field<any>;
     if (entry instanceof Type) {
-      field = {name, default: entry.defaultValue, type: entry};
+      field = {name, default: entry.defaultValue, type: entry, seq: seq++};
     } else {
-      field = Object.assign({name, default: entry.type.defaultValue}, entry);
+      field = Object.assign({name, default: entry.type.defaultValue, seq: seq++}, entry);
     }
     fields.push(field);
+  }
+  CHECK: if (seq > MAX_NUM_FIELDS) {
+    throw new Error(`Component ${type.name} declares too many fields`);
   }
   return fields;
 }
@@ -223,20 +233,25 @@ export function assimilateComponentType<C>(
     }
   }
   type.id = typeId;
-  const binding = new Binding<C>(type, gatherFields(type), dispatcher, capacity || initialCapacity);
+  const binding = new Binding<C>(
+    type, gatherFields(type), dispatcher, capacity || initialCapacity, storage, !capacity);
   type.__binding = binding;
+}
+
+export function defineAndAllocateComponentType<C>(type: ComponentType<C>): void {
+  const binding = type.__binding!;
   for (const field of binding.fields) {
-    if (capacity) {
-      field.type.defineFixed(binding, field);
-    } else {
+    if (binding.elastic) {
       field.type.defineElastic(binding, field);
+    } else {
+      field.type.defineFixed(binding, field);
     }
   }
 
-  switch (storage) {
+  switch (binding.storage) {
     case 'sparse':
       // Inline the trivial storage manager for performance.
-      STATS: dispatcher.stats.for(type).capacity = capacity;  // fixed
+      STATS: binding.dispatcher.stats.for(type).capacity = binding.capacity;  // fixed
       type.__bind = (id: EntityId, writable: boolean): C => {
         binding.entityId = id;
         binding.index = id;
@@ -251,7 +266,7 @@ export function assimilateComponentType<C>(
 
     case 'packed': {
       const storageManager =
-        new PackedStorage(dispatcher.maxEntities, binding, binding.fields, !capacity);
+        new PackedStorage(binding.dispatcher.maxEntities, binding, binding.fields);
       type.__bind = (id: EntityId, writable: boolean): C => {
         binding.entityId = id;
         binding.index = storageManager.index[id];
@@ -275,7 +290,7 @@ export function assimilateComponentType<C>(
       throw new Error('Not yet implemented');
 
     default:
-      CHECK: throw new Error(`Invalid storage type "${storage}`);
+      CHECK: throw new Error(`Invalid storage type "${binding.storage}`);
   }
 }
 

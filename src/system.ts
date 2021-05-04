@@ -1,7 +1,8 @@
 import type {ComponentType} from './component';
 import {Bitset, LogPointer} from './datastructures';
 import type {Dispatcher} from './dispatcher';
-import {Entity, ENTITY_ID_BITS, ENTITY_ID_MASK, ReadWriteMasks} from './entity';
+import type {Entity, ReadWriteMasks} from './entity';
+import {ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import {Query, QueryBox, QueryBuilder} from './query';
 
 

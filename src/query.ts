@@ -217,7 +217,15 @@ export class QueryBuilder {
   }
 
   get write(): this {
-    this.set(this.__system.rwMasks.write);
+    const writeMask = this.__system.rwMasks.write;
+    this.set(writeMask);
+    for (const type of this.__lastTypes) {
+      const extraMask = type.__binding!.backrefsWriteMask;
+      for (let i = 0; i < extraMask.length; i++) {
+        if (writeMask[i] === undefined) writeMask[i] = 0;
+        writeMask[i] |= extraMask[i];
+      }
+    }
     return this;
   }
 
@@ -238,49 +246,6 @@ export class QueryBuilder {
     for (const type of types) this.__system.dispatcher.registry.extendMaskAndSetFlag(mask, type);
   }
 }
-
-
-// export class TopQueryBuilder extends QueryBuilder {
-//   private joinBuilders: {[name: string]: JoinQueryBuilder} = {};
-
-//   constructor(callback: (q: TopQueryBuilder) => void, query: TopQuery, system: System) {
-//     super(callback as any, query, system);
-//   }
-
-//   __build(): void {
-//     super.__build();
-//     try {
-//       for (const name in this.joinBuilders) this.joinBuilders[name].__build();
-//     } catch (e) {
-//       e.message = `Failed to build query in system ${this.__system.name}: ${e.message}`;
-//       throw e;
-//     }
-//   }
-
-//   join(name: string, joinCallback: (q: JoinQueryBuilder) => void): this {
-//     // eslint-disable-next-line @typescript-eslint/no-use-before-define
-//     const joinQuery = new JoinQuery(this.__system);
-//     (this.__query as TopQuery).__joins[name] = joinQuery;
-//     this.joinBuilders[name] =
-//       // eslint-disable-next-line @typescript-eslint/no-use-before-define
-//       new JoinQueryBuilder(joinCallback, joinQuery, this.__system);
-//     return this;
-//   }
-// }
-
-
-// class JoinQueryBuilder extends QueryBuilder {
-//   constructor(callback: (q: JoinQueryBuilder) => void, query: JoinQuery, system: System) {
-//     super(callback as any, query, system);
-//   }
-
-//   ref(prop?: string): this {
-//     this.set('__refMask', undefined, 'ref');
-//     (this.__query as JoinQuery).__refProp = prop;
-//     return this;
-//   }
-
-// }
 
 
 export class Query {

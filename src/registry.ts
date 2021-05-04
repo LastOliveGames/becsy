@@ -1,7 +1,8 @@
-import {ComponentType, assimilateComponentType} from './component';
+import {ComponentType, assimilateComponentType, defineAndAllocateComponentType} from './component';
 import {Log, LogPointer, Uint32Pool, UnsharedPool} from './datastructures';
 import type {Dispatcher} from './dispatcher';
-import {Entity, EntityId, ENTITY_ID_BITS, ENTITY_ID_MASK} from './entity';
+import {Entity, EntityId} from './entity';
+import {ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {SystemBox} from './system';
 
 
@@ -69,8 +70,6 @@ export class Registry {
     maxEntities: number, maxLimboEntities: number, maxLimboComponents: number,
     readonly types: ComponentType<any>[], readonly dispatcher: Dispatcher
   ) {
-    let componentId = 0;
-    for (const type of types) assimilateComponentType(componentId++, type, this.dispatcher);
     this.stride = Math.ceil(types.length / 32);
     const size = maxEntities * this.stride * 4;
     this.shapes = new Uint32Array(new SharedArrayBuffer(size));
@@ -84,6 +83,13 @@ export class Registry {
     this.removalLog = new Log(maxLimboComponents, 'maxLimboComponents');
     this.prevRemovalPointer = this.removalLog.createPointer();
     this.oldRemovalPointer = this.removalLog.createPointer();
+  }
+
+  initializeComponentTypes(): void {
+    let componentId = 0;
+    // Two-phase init, so components can have dependencies on each other's fields.
+    for (const type of this.types) assimilateComponentType(componentId++, type, this.dispatcher);
+    for (const type of this.types) defineAndAllocateComponentType(type);
   }
 
   createEntity(initialComponents: (ComponentType<any> | any)[]): Entity {

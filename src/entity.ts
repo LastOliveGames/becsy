@@ -1,28 +1,17 @@
 import {ComponentType, initComponent} from './component';
 import type {Registry} from './registry';
-import {Type} from './type';
 
 
 export type EntityId = number;
-export type ReadWriteMasks = {read: number[] | undefined, write: number[] | undefined};
-
-export const ENTITY_ID_BITS = 22;
-export const MAX_NUM_ENTITIES = 2 ** ENTITY_ID_BITS - 1;  // ID 0 is reserved
-export const ENTITY_ID_MASK = MAX_NUM_ENTITIES;  // happy coincidence!
-export const MAX_NUM_COMPONENTS = 2 ** (32 - ENTITY_ID_BITS);
-
-const EMPTY_JOIN = Object.freeze({});
-
+export type ReadWriteMasks = {read: number[], write: number[]};
 
 export class Entity {
   __id: EntityId;
-  joined: {[name: string]: Iterable<Entity>};
 
   constructor(private readonly __registry: Registry) {}
 
   __reset(id: EntityId): void {
     this.__id = id;
-    this.joined = EMPTY_JOIN;
   }
 
   add(type: ComponentType<any>, values?: any): this {
@@ -93,6 +82,7 @@ export class Entity {
   }
 
   delete(): void {
+    // TODO: add option of wiping inbound refs immediately or put on queue
     for (const type of this.__registry.types) {
       if (!this.__registry.hasFlag(this.__id, type)) continue;
       CHECK: this.__checkMask(type, true);
@@ -110,11 +100,10 @@ export class Entity {
   }
 
   private __deindexOutboundRefs(type: ComponentType<any>): void {
-    const fields = type.__binding!.fields;
-    if (fields.some(field => field.type === Type.ref)) {
+    if (type.__binding!.refFields.length) {
       const component = this.write(type);
-      for (const field of fields) {
-        if (field.type === Type.ref) (component as any)[field.name] = null;
+      for (const field of type.__binding!.refFields) {
+        (component as any)[field.name] = null;
       }
     }
   }
