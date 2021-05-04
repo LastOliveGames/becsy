@@ -21,7 +21,7 @@
   "main": "index.umd.js",
   "module": "index.js",
   "engines": {
-    "node": "^14.10.0"
+    "node": ">=12"
   },
   "repository": "git@github.com:lastolivegames/becsy.git",
   "author": "Piotr Kaminski <piotr@lastolive.games>",
