@@ -82,24 +82,23 @@ export class Entity {
   }
 
   delete(): void {
-    // TODO: add option of wiping inbound refs immediately or put on queue
     for (const type of this.__registry.types) {
       if (!this.__registry.hasFlag(this.__id, type)) continue;
       CHECK: this.__checkMask(type, true);
       this.__remove(type);
     }
     this.__registry.queueDeletion(this.__id);
-    this.__wipeInboundRefs();
+    this.__clearInboundRefs();
   }
 
   private __remove(type: ComponentType<any>): void {
-    this.__deindexOutboundRefs(type);
+    this.__clearOutboundRefs(type);
     if (type.__delete) this.__registry.queueRemoval(this.__id, type);
     this.__registry.clearFlag(this.__id, type);
     STATS: this.__registry.dispatcher.stats.for(type).numEntities -= 1;
   }
 
-  private __deindexOutboundRefs(type: ComponentType<any>): void {
+  private __clearOutboundRefs(type: ComponentType<any>): void {
     if (type.__binding!.refFields.length) {
       const component = this.write(type);
       for (const field of type.__binding!.refFields) {
@@ -108,7 +107,7 @@ export class Entity {
     }
   }
 
-  private __wipeInboundRefs(): void {
+  private __clearInboundRefs(): void {
     // TODO: implement
   }
 

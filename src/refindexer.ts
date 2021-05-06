@@ -9,9 +9,8 @@ import type {Dispatcher} from './dispatcher';
 import type {Registry} from './registry';
 
 
-const EMPTY_ARRAY: Entity[] = [];
-
 interface Selector {
+  id: number;
   targetTypes: ComponentType<any>[];
   sourceType?: ComponentType<any>;
   matchType: boolean;
@@ -176,12 +175,13 @@ export class RefIndexer {
       ) : -1;
     let selectorId = this.selectorIdsBySourceKey.get(selectorSourceKey);
     if (selectorId === undefined) {
-      this.selectors.push({
-        targetTypes: targetType ? [targetType] : [], sourceType,
+      const selector = {
+        id: this.selectors.length, targetTypes: targetType ? [targetType] : [], sourceType,
         matchType: !!sourceType, matchSeq: typeof sourceFieldSeq !== 'undefined',
         sourceTypeId: sourceType?.id, sourceSeq: sourceFieldSeq
-      });
-      selectorId = this.selectors.length - 1;
+      };
+      this.selectors.push(selector);
+      selectorId = selector.id;
       this.selectorIdsBySourceKey.set(selectorSourceKey, selectorId);
       CHECK: if (selectorId > MAX_NUM_COMPONENTS) {
         throw new Error(`Too many distinct backrefs selectors`);
@@ -193,8 +193,7 @@ export class RefIndexer {
   }
 
   getBackrefs(entityId: EntityId, selectorId = 0): Entity[] {
-    const tracker = this.trackers.get(entityId | (selectorId << ENTITY_ID_BITS));
-    return tracker?.entities ?? EMPTY_ARRAY;
+    return this.getTracker(this.selectors[selectorId], entityId).entities;
   }
 
   trackRefChange(
@@ -227,6 +226,17 @@ export class RefIndexer {
     if (internallyIndexed) this.refLog!.push(sourceInternalIndex!);
   }
 
+  private getTracker(selector: Selector, targetId: EntityId): Tracker {
+    const trackerKey = targetId | (selector.id << ENTITY_ID_BITS);
+    let tracker = this.trackers.get(trackerKey);
+    if (!tracker) {
+      tracker = new Tracker(targetId, selector, this.dispatcher);
+      this.trackers.set(trackerKey, tracker);
+    }
+    return tracker;
+  }
+
+  // TODO: track stats for the refLog
   flush(): void {
     if (!this.refLog) return;
     while (true) {
@@ -247,12 +257,7 @@ export class RefIndexer {
           const selector = this.selectors[j];
           if ((!selector.matchType || selector.sourceTypeId === sourceTypeId) &&
               (!selector.matchSeq || selector.sourceSeq === sourceSeq)) {
-            const trackerKey = targetId | (j << ENTITY_ID_BITS);
-            let tracker = this.trackers.get(trackerKey);
-            if (!tracker) {
-              tracker = new Tracker(targetId, selector, this.dispatcher);
-              this.trackers.set(trackerKey, tracker);
-            }
+            const tracker = this.getTracker(selector, targetId);
             if (referenced) {
               tracker.trackReference(sourceId, sourceTypeId, sourceSeq, internalIndex, local!);
             } else {

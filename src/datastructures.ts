@@ -146,7 +146,6 @@ export class Log {
   processSince(
     startPointer: LogPointer, endPointer?: LogPointer
   ): [Uint32Array, number, number, boolean] | [] {
-    // TODO: fix bug where client will reprocess corralled data after committing
     CHECK: this.checkPointers(startPointer, endPointer);
     let result: [Uint32Array, number, number, boolean] | [] = EMPTY_TUPLE;
     const endIndex = endPointer?.index ?? this.data[0];

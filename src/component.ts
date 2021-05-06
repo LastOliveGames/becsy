@@ -57,7 +57,6 @@ export class Binding<C> {
   readonly refFields: Field<Entity | null>[];
   trackedWrites = false;
   internallyIndexed = false;
-  readonly backrefsWriteMask: number[] = [];
   entityId = 0;
   index = 0;
 

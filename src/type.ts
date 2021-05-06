@@ -390,8 +390,13 @@ class RefType extends Type<Entity | null> {
       if (!capacityChanged && field.buffer === buffer) return;
       buffer = capacityChanged ? new SharedArrayBuffer(size) : field.buffer!;
       data = new Int32Array(buffer);
-      data.fill(-1);
-      if (capacityChanged && field.buffer) data.set(new Int32Array(field.buffer));
+      if (capacityChanged && field.buffer) {
+        const oldData = new Int32Array(field.buffer);
+        data.set(oldData);
+        data.fill(-1, oldData.length);
+      } else {
+        data.fill(-1);
+      }
       field.buffer = buffer;
     };
     field.updateBuffer();
@@ -471,26 +476,31 @@ class BackrefsType extends Type<Entity[]> {
     super(EMPTY_ARRAY);
   }
 
+  // TODO: build benchmarks for backrefs and see if storing pointers to the trackers' entities
+  // arrays for direct access performs significantly better than looking them up in the indexer's
+  // Map each time.
   defineElastic<C>(binding: Binding<C>, field: Field<Entity[]>): void {
-    CHECK: if (this.fieldName && !this.type) {
-      throw new Error(
-        `Backrefs selector has field but no component in ${binding.type.name}.${field.name}`);
-    }
     const refField = this.fieldName ?
-      this.type!.__binding!.fields.find(aField => aField.name === this.fieldName) : undefined;
-    CHECK: if (this.fieldName && !refField) {
-      throw new Error(
-        `Backrefs field ${binding.type.name}.${field.name} refers to ` +
-        `an unknown field ${this.type!.name}.${this.fieldName}`);
-    }
-    const registry = binding.dispatcher.registry;
-    if (this.type) {
-      registry.extendMaskAndSetFlag(this.type.__binding!.backrefsWriteMask, binding.type);
-    } else {
-      for (const type of registry.types) {
-        if (type.__binding!.refFields.length) {
-          registry.extendMaskAndSetFlag(type.__binding!.backrefsWriteMask, binding.type);
-        }
+      this.type?.__binding!.fields.find(aField => aField.name === this.fieldName) : undefined;
+    CHECK: {
+      if (this.fieldName && !refField) {
+        throw new Error(
+          `Backrefs field ${binding.type.name}.${field.name} refers to ` +
+          `an unknown field ${this.type!.name}.${this.fieldName}`);
+      }
+      if (refField && refField.type !== Type.ref) {
+        throw new Error(
+          `Backrefs field ${binding.type.name}.${field.name} refers to ` +
+          `a field ${this.type!.name}.${this.fieldName} that is not a ref`);
+      }
+      if (this.fieldName && !this.type) {
+        throw new Error(
+          `Backrefs selector has field but no component in ${binding.type.name}.${field.name}`);
+      }
+      if (this.type && !this.fieldName && !this.type.__binding!.refFields.length) {
+        throw new Error(
+          `Backrefs field ${binding.type.name}.${field.name} refers to ` +
+          `component ${this.type!.name} that has no ref fields`);
       }
     }
     const indexer = binding.dispatcher.indexer;

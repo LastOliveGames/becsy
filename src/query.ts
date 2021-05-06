@@ -217,15 +217,7 @@ export class QueryBuilder {
   }
 
   get write(): this {
-    const writeMask = this.__system.rwMasks.write;
-    this.set(writeMask);
-    for (const type of this.__lastTypes) {
-      const extraMask = type.__binding!.backrefsWriteMask;
-      for (let i = 0; i < extraMask.length; i++) {
-        if (writeMask[i] === undefined) writeMask[i] = 0;
-        writeMask[i] |= extraMask[i];
-      }
-    }
+    this.set(this.__system.rwMasks.write);
     return this;
   }
 
