@@ -12,6 +12,7 @@ export interface SystemType {
 
 
 export abstract class System {
+  static __system = true;
   __queryBuilders: QueryBuilder[] | null = [];
   __dispatcher: Dispatcher;
   time: number;

@@ -15,6 +15,8 @@ import {
   @prop(Type.uint8) declare value: number;
 }
 
+@component class D {}
+
 
 class IncrementA extends System {
   entities = this.query(q => q.all.with(A).write);
@@ -42,6 +44,15 @@ class IncrementAC extends System {
 
 class IncrementANotC extends System {
   entities = this.query(q => q.all.with(A).write.but.without(C));
+  execute() {
+    for (const entity of this.entities.all) {
+      entity.write(A).value += 1;
+    }
+  }
+}
+
+class IncrementAWithD extends System {
+  entities = this.query(q => q.all.with(A).write.with(D));
   execute() {
     for (const entity of this.entities.all) {
       entity.write(A).value += 1;
@@ -151,6 +162,16 @@ describe('basic queries, all iteration, reads and writes', () => {
     world.execute();
     expect(total.a).toBe(1);
     expect(total.c).toBe(1);
+  });
+
+  test('iterate type intersection with tag type', () => {
+    const world = createWorld(IncrementAWithD);
+    world.createEntity(A);
+    world.createEntity(A);
+    world.createEntity(A, D);
+    world.createEntity(D);
+    world.execute();
+    expect(total.a).toBe(1);
   });
 
   test('iterate type exclusion', () => {

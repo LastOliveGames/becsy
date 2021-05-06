@@ -107,7 +107,7 @@ export class Dispatcher {
     let lastDefWasSystem = false;
     for (const def of defs.flat(Infinity)) {
       if (typeof def === 'function') {
-        lastDefWasSystem = !def.schema;
+        lastDefWasSystem = def.__system;
         (lastDefWasSystem ? systemTypes : componentTypes).push(def);
       } else {
         CHECK: if (!lastDefWasSystem) throw new Error('Unexpected value in world defs: ' + def);

@@ -186,19 +186,21 @@ export function initComponent(type: ComponentType<any>, id: EntityId, values: an
 function gatherFields(type: ComponentType<any>): Field<any>[] {
   const schema = type.schema;
   const fields: Field<any>[] = [];
-  let seq = 0;
-  for (const name in schema) {
-    const entry = schema[name];
-    let field: Field<any>;
-    if (entry instanceof Type) {
-      field = {name, default: entry.defaultValue, type: entry, seq: seq++};
-    } else {
-      field = Object.assign({name, default: entry.type.defaultValue, seq: seq++}, entry);
+  if (schema) {
+    let seq = 0;
+    for (const name in schema) {
+      const entry = schema[name];
+      let field: Field<any>;
+      if (entry instanceof Type) {
+        field = {name, default: entry.defaultValue, type: entry, seq: seq++};
+      } else {
+        field = Object.assign({name, default: entry.type.defaultValue, seq: seq++}, entry);
+      }
+      fields.push(field);
     }
-    fields.push(field);
-  }
-  CHECK: if (seq > MAX_NUM_FIELDS) {
-    throw new Error(`Component ${type.name} declares too many fields`);
+    CHECK: if (seq > MAX_NUM_FIELDS) {
+      throw new Error(`Component ${type.name} declares too many fields`);
+    }
   }
   return fields;
 }
