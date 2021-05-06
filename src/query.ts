@@ -4,7 +4,7 @@ import type {Entity, EntityId} from './entity';
 import type {SystemBox} from './system';
 import {ArrayEntityList, EntityList, PackedArrayEntityList} from './entitylists';
 
-type MaskKind = '__withMask' | '__withoutMask' | '__trackMask' | '__refMask';
+type MaskKind = 'withMask' | 'withoutMask' | 'trackMask';
 
 const enum QueryFlavor {
   all = 1, added = 2, removed = 4, changed = 8, addedOrChanged = 16, changedOrRemoved = 32,
@@ -26,10 +26,9 @@ const changedFlavorsMask =
 export class QueryBox {
   results: Partial<Record<QueryFlavorName, EntityList>> & {all?: PackedArrayEntityList} = {};
   flavors = 0;
-  __withMask: number[] | undefined;
-  __withoutMask: number[] | undefined;
-  __trackMask: number[] | undefined;
-  __refMask: number[] | undefined;  // should be in JoinQuery, but type system...
+  withMask: number[] | undefined;
+  withoutMask: number[] | undefined;
+  trackMask: number[] | undefined;
   private hasTransientResults: boolean;
   hasChangedResults: boolean;
   private currentEntities: Bitset | undefined;
@@ -44,7 +43,7 @@ export class QueryBox {
     const dispatcher = this.system.dispatcher;
     this.hasTransientResults = Boolean(this.flavors & transientFlavorsMask);
     this.hasChangedResults = Boolean(this.flavors & changedFlavorsMask);
-    CHECK: if (this.hasChangedResults && !this.__trackMask) {
+    CHECK: if (this.hasChangedResults && !this.trackMask) {
       throw new Error(`Query for changed entities must track at least one component`);
     }
     if (this.flavors & QueryFlavor.all) {
@@ -91,7 +90,7 @@ export class QueryBox {
   handleShapeUpdate(id: EntityId): void {
     const registry = this.system.dispatcher.registry;
     const oldMatch = this.results.all?.has(id) ?? this.currentEntities!.get(id);
-    const newMatch = registry.matchShape(id, this.__withMask, this.__withoutMask);
+    const newMatch = registry.matchShape(id, this.withMask, this.withoutMask);
     if (newMatch && !oldMatch) {
       this.currentEntities?.set(id);
       this.results.all?.add(id);
@@ -109,7 +108,7 @@ export class QueryBox {
 
   handleWrite(entityId: EntityId, componentFlagOffset: number, componentFlagMask: number): void {
     if (!this.changedEntities!.get(entityId) &&
-      (this.__trackMask![componentFlagOffset] ?? 0) & componentFlagMask) {
+      (this.trackMask![componentFlagOffset] ?? 0) & componentFlagMask) {
       this.changedEntities!.set(entityId);
       this.results.changed?.add(entityId);
       this.results.addedOrChanged?.add(entityId);
@@ -191,13 +190,13 @@ export class QueryBuilder {
 
   with(...types: ComponentType<any>[]): this {
     this.set(this.__system.rwMasks.read, types);
-    this.set('__withMask');
+    this.set('withMask');
     return this;
   }
 
   without(...types: ComponentType<any>[]): this {
     this.set(this.__system.rwMasks.read, types);
-    this.set('__withoutMask', types);
+    this.set('withoutMask', types);
     return this;
   }
 
@@ -207,7 +206,7 @@ export class QueryBuilder {
   }
 
   get track(): this {
-    this.set('__trackMask');
+    this.set('trackMask');
     for (const type of this.__lastTypes) type.__binding!.trackedWrites = true;
     return this;
   }
