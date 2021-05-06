@@ -14,7 +14,7 @@ export interface SystemType {
 export abstract class System {
   static __system = true;
   __queryBuilders: QueryBuilder[] | null = [];
-  __dispatcher: Dispatcher;
+  __box: SystemBox;
   time: number;
   delta: number;
 
@@ -32,7 +32,11 @@ export abstract class System {
   }
 
   createEntity(...initialComponents: (ComponentType<any> | any)[]): Entity {
-    return this.__dispatcher.createEntity(initialComponents);
+    return this.__box.dispatcher.createEntity(initialComponents);
+  }
+
+  accessRecentlyRemovedData(toggle: boolean): void {
+    this.__box.includeRecentlyRemoved = toggle;
   }
 
   abstract execute(): void;
@@ -43,6 +47,7 @@ export class SystemBox {
   shapeQueries: QueryBox[] = [];
   writeQueries: QueryBox[] = [];
   hasWriteQueries: boolean;
+  includeRecentlyRemoved = false;
   private processedEntities: Bitset;
   private shapeLogPointer: LogPointer;
   private writeLogPointer: LogPointer | undefined;
@@ -50,7 +55,7 @@ export class SystemBox {
   get name(): string {return this.system.name;}
 
   constructor(private readonly system: System, readonly dispatcher: Dispatcher) {
-    system.__dispatcher = dispatcher;
+    system.__box = this;
     this.shapeLogPointer = dispatcher.shapeLog.createPointer();
     this.writeLogPointer = dispatcher.writeLog?.createPointer();
     this.processedEntities = new Bitset(dispatcher.maxEntities);

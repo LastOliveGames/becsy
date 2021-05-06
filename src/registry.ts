@@ -181,15 +181,16 @@ export class Registry {
     return ((mask?.[type.__binding!.flagOffset] ?? 0) & type.__binding!.flagMask) !== 0;
   }
 
-  hasFlag(id: EntityId, type: ComponentType<any>, allowRemoved = false): boolean {
+  hasShape(id: EntityId, type: ComponentType<any>): boolean {
     const shapeIndex = id * this.stride + type.__binding!.flagOffset;
     const mask = type.__binding!.flagMask;
     if ((this.shapes[shapeIndex] & mask) !== 0) return true;
-    if (allowRemoved && (this.staleShapes[shapeIndex] & mask) !== 0) return true;
+    if (this.executingSystem?.includeRecentlyRemoved &&
+        (this.staleShapes[shapeIndex] & mask) !== 0) return true;
     return false;
   }
 
-  setFlag(id: EntityId, type: ComponentType<any>): void {
+  setShape(id: EntityId, type: ComponentType<any>): void {
     const shapeIndex = id * this.stride + type.__binding!.flagOffset;
     const mask = type.__binding!.flagMask;
     this.shapes[shapeIndex] |= mask;
@@ -197,7 +198,7 @@ export class Registry {
     this.dispatcher.shapeLog.push(id);
   }
 
-  clearFlag(id: EntityId, type: ComponentType<any>): void {
+  clearShape(id: EntityId, type: ComponentType<any>): void {
     this.shapes[id * this.stride + type.__binding!.flagOffset] &= ~type.__binding!.flagMask;
     this.dispatcher.shapeLog.push(id);
   }

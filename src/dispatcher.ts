@@ -83,6 +83,8 @@ export class Dispatcher {
     }
     this.userCallbackSystem = new CallbackSystem();
     this.callbackSystem = new SystemBox(this.userCallbackSystem, this);
+    this.callbackSystem.rwMasks.read = undefined;
+    this.callbackSystem.rwMasks.write = undefined;
   }
 
   private normalizeAndInitSystems(systemTypes: (SystemType | any)[]): SystemBox[] {
@@ -139,11 +141,12 @@ export class Dispatcher {
     DEBUG: if (this.executing) {
       throw new Error('Ad hoc function execution not allowed while world is executing');
     }
-    // Don't set registry.executingSystem to avoid rwMask checks.
     this.executing = true;
+    this.registry.executingSystem = this.callbackSystem;
     this.userCallbackSystem.__callback = fn;
     this.callbackSystem.execute(0, 0);
     this.flush();
+    this.registry.executingSystem = undefined;
     this.registry.processEndOfFrame();
     this.executing = false;
     STATS: this.gatherFrameStats();

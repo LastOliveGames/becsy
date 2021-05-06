@@ -79,8 +79,10 @@ describe('using packed component storage', () => {
       const entity1 = system.createEntity(A, {value: 1});
       entity1.remove(A);
       system.createEntity(A, {value: 2});
-      expect(entity1.has(A, true)).toBe(true);
-      expect(entity1.readRecentlyRemoved(A).value).toBe(1);
+      expect(entity1.has(A)).toBe(false);
+      system.accessRecentlyRemovedData(true);
+      expect(entity1.has(A)).toBe(true);
+      expect(entity1.read(A).value).toBe(1);
     });
   });
 
