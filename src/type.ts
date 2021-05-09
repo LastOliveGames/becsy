@@ -1,4 +1,5 @@
 import type {Binding, ComponentType, Field} from './component';
+import {ENTITY_ID_MASK} from './consts';
 import type {Entity, EntityId} from './entity';
 
 const encoder = new TextEncoder();
@@ -373,6 +374,8 @@ class DynamicStringType extends Type<string> {
   }
 }
 
+const STALE_REF_BIT = 2 ** 31;
+
 class RefType extends Type<Entity | null> {
   constructor() {
     super(null);
@@ -382,6 +385,8 @@ class RefType extends Type<Entity | null> {
     let buffer: SharedArrayBuffer;
     let data: Int32Array;
     const indexer = binding.dispatcher.indexer;
+    const registry = binding.dispatcher.registry;
+    const pool = registry.pool;
     indexer.registerSelector();
 
     field.updateBuffer = () => {
@@ -401,19 +406,34 @@ class RefType extends Type<Entity | null> {
     };
     field.updateBuffer();
 
+    field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
+      DEBUG: if (internalIndex) throw new Error('Ref fields have no internal index');
+      DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0) {
+        throw new Error('Ref already marked stale');
+      }
+      const id = data[binding.index] & ENTITY_ID_MASK;
+      if (targetId !== undefined && id !== targetId) return;
+      if (!final) data[binding.index] |= STALE_REF_BIT;
+      else if (targetId) data[binding.index] = -1;
+      indexer.trackRefChange(
+        binding.entityId, binding.type, field.seq, undefined, id, -1, final);
+    };
+
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | null {
         const id = data[binding.index];
-        if (id === -1) return null;
-        return binding.dispatcher.registry.pool.borrowTemporarily(id);
+        if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return null;
+        return pool.borrowTemporarily(id & ENTITY_ID_MASK);
       },
       set(this: C, value: Entity | null): void {
+        // TODO: disallow setting ref to deleted entity
         const oldId = data[binding.index];
         const newId = value?.__id ?? -1;
         if (oldId === newId) return;
         data[binding.index] = newId;
-        indexer.trackRefChange(binding.entityId, binding.type, field.seq, undefined, oldId, newId);
+        indexer.trackRefChange(
+          binding.entityId, binding.type, field.seq, undefined, oldId, newId, true);
       }
     });
 
@@ -421,8 +441,8 @@ class RefType extends Type<Entity | null> {
       enumerable: true, configurable: true,
       get(this: C): Entity | null {
         const id = data[binding.index];
-        if (id === -1) return null;
-        return binding.dispatcher.registry.pool.borrowTemporarily(id);
+        if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return null;
+        return pool.borrowTemporarily(id & ENTITY_ID_MASK);
       },
       set(this: C, value: Entity | null): void {
         throwNotWritable(binding);
@@ -437,21 +457,38 @@ class RefType extends Type<Entity | null> {
     data.fill(-1);
     field.buffer = buffer;
     const indexer = binding.dispatcher.indexer;
+    const registry = binding.dispatcher.registry;
+    const pool = registry.pool;
     indexer.registerSelector();
+
+    field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
+      DEBUG: if (internalIndex) throw new Error('Ref fields have no internal index');
+      DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0) {
+        throw new Error('Ref already marked stale');
+      }
+      const id = data[binding.index] & ENTITY_ID_MASK;
+      if (targetId !== undefined && id !== targetId) return;
+      if (!final) data[binding.index] |= STALE_REF_BIT;
+      else if (targetId) data[binding.index] = -1;
+      indexer.trackRefChange(
+        binding.entityId, binding.type, field.seq, undefined, id, -1, final);
+    };
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | null {
         const id = data[binding.index];
         if (id === -1) return null;
-        return binding.dispatcher.registry.pool.borrowTemporarily(id);
+        return pool.borrowTemporarily(id);
       },
       set(this: C, value: Entity | null): void {
+        // TODO: disallow setting ref to deleted entity
         const oldId = data[binding.index];
         const newId = value?.__id ?? -1;
         if (oldId === newId) return;
         data[binding.index] = newId;
-        indexer.trackRefChange(binding.entityId, binding.type, field.seq, undefined, oldId, newId);
+        indexer.trackRefChange(
+          binding.entityId, binding.type, field.seq, undefined, oldId, newId, true);
       }
     });
 
@@ -460,7 +497,7 @@ class RefType extends Type<Entity | null> {
       get(this: C): Entity | null {
         const id = data[binding.index];
         if (id === -1) return null;
-        return binding.dispatcher.registry.pool.borrowTemporarily(id);
+        return pool.borrowTemporarily(id);
       },
       set(this: C, value: Entity | null): void {
         throwNotWritable(binding);
@@ -472,7 +509,10 @@ class RefType extends Type<Entity | null> {
 const EMPTY_ARRAY: Entity[] = [];
 
 class BackrefsType extends Type<Entity[]> {
-  constructor(private readonly type?: ComponentType<any>, private readonly fieldName?: string) {
+  constructor(
+    private readonly type?: ComponentType<any>, private readonly fieldName?: string,
+    private readonly trackDeletedBackrefs?: boolean
+  ) {
     super(EMPTY_ARRAY);
   }
 
@@ -503,13 +543,20 @@ class BackrefsType extends Type<Entity[]> {
           `component ${this.type!.name} that has no ref fields`);
       }
     }
+    const trackDeletedBackrefs = this.trackDeletedBackrefs;
     const indexer = binding.dispatcher.indexer;
     indexer.registerSelector();  // make sure global selector always registered first
-    const selectorId = indexer.registerSelector(binding.type, this.type, refField?.seq);
+    const selectorId =
+      indexer.registerSelector(binding.type, this.type, refField?.seq, this.trackDeletedBackrefs);
 
     const propertyDefinition = {
       enumerable: true, configurable: true,
       get(this: C): Entity[] {
+        CHECK: if (!trackDeletedBackrefs && binding.dispatcher.registry.includeRecentlyDeleted) {
+          throw new Error(
+            `Backrefs field ${binding.type.name}.${field.name} not configured to track recently ` +
+            `deleted refs`);
+        }
         return indexer.getBackrefs(binding.entityId, selectorId);
       },
       set(this: C, value: Entity[]): void {
@@ -699,6 +746,8 @@ Type.float64 = new NumberType(Float64Array);
 Type.staticString = (choices: string[]) => new StaticStringType(choices);
 Type.dynamicString = (maxUtf8Length: number) => new DynamicStringType(maxUtf8Length);
 Type.ref = new RefType();
-Type.backrefs = (type: ComponentType<any>, fieldName: string) => new BackrefsType(type, fieldName);
+Type.backrefs = (
+  type?: ComponentType<any>, fieldName?: string, trackDeletedBackrefs = false
+) => new BackrefsType(type, fieldName, trackDeletedBackrefs);
 Type.object = new ObjectType();
 Type.weakObject = new WeakObjectType();

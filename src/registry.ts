@@ -22,7 +22,7 @@ export class EntityPool {
     let entity = this.borrowed[id];
     if (!entity) {
       entity = this.borrowed[id] = this.spares.pop() ?? new Entity(this.registry);
-      entity.__reset(id);
+      entity.__id = id;
     }
     return entity;
   }
@@ -59,6 +59,7 @@ export class Registry {
   private readonly entityIdPool: Uint32Pool;
   readonly pool: EntityPool;
   executingSystem: SystemBox | undefined;
+  includeRecentlyDeleted = false;
   private readonly deletionLog: Log;
   private readonly prevDeletionPointer: LogPointer;
   private readonly oldDeletionPointer: LogPointer;
@@ -106,11 +107,8 @@ export class Registry {
     this.deletionLog.push(id);
   }
 
-  queueRemoval(id: EntityId, type: ComponentType<any>): void {
-    this.removalLog.push(id | (type.id! << ENTITY_ID_BITS));
-  }
-
   flush(): void {
+    this.includeRecentlyDeleted = false;
     this.pool.returnTemporaryBorrows();
     this.deletionLog.commit();
     this.removalLog.commit();
@@ -129,6 +127,9 @@ export class Registry {
       [log, startIndex, endIndex] =
         this.deletionLog.processSince(this.oldDeletionPointer, this.prevDeletionPointer);
       if (!log) break;
+      for (let i = startIndex!; i < endIndex!; i++) {
+        this.dispatcher.indexer.clearAllRefs(log[i], true);
+      }
       const segment = log.subarray(startIndex, endIndex);
       this.entityIdPool.refill(segment);
       numDeletedEntities += segment.length;
@@ -153,11 +154,12 @@ export class Registry {
         const entityId = entry & ENTITY_ID_MASK;
         const componentId = entry >>> ENTITY_ID_BITS;
         const type = this.types[componentId];
-        const shapeIndex = entityId * this.stride + type.__binding!.flagOffset;
-        const mask = type.__binding!.flagMask;
+        const shapeIndex = entityId * this.stride + type.__binding!.shapeOffset;
+        const mask = type.__binding!.shapeMask;
         if ((this.shapes[shapeIndex] & mask) === 0) {
           this.staleShapes[shapeIndex] &= ~mask;
-          type.__delete!(entityId);
+          this.clearRefs(entityId, type, true);
+          type.__free?.(entityId);
         }
       }
       numRemovedComponents += endIndex! - startIndex!;
@@ -168,43 +170,42 @@ export class Registry {
     this.removalLog.createPointer(this.prevRemovalPointer);
   }
 
-  extendMaskAndSetFlag(mask: number[], type: ComponentType<any>): void {
-    const flagOffset = type.__binding!.flagOffset!;
-    if (flagOffset >= mask.length) {
-      mask.length = flagOffset + 1;
-      mask.fill(0, mask.length, flagOffset);
-    }
-    mask[flagOffset] |= type.__binding!.flagMask!;
-  }
-
-  maskHasFlag(mask: number[] | undefined, type: ComponentType<any>): boolean {
-    return ((mask?.[type.__binding!.flagOffset] ?? 0) & type.__binding!.flagMask) !== 0;
-  }
-
-  hasShape(id: EntityId, type: ComponentType<any>): boolean {
-    const shapeIndex = id * this.stride + type.__binding!.flagOffset;
-    const mask = type.__binding!.flagMask;
+  hasShape(id: EntityId, type: ComponentType<any>, allowRecentlyDeleted: boolean): boolean {
+    const shapeIndex = id * this.stride + type.__binding!.shapeOffset;
+    const mask = type.__binding!.shapeMask;
     if ((this.shapes[shapeIndex] & mask) !== 0) return true;
-    if (this.executingSystem?.includeRecentlyRemoved &&
+    if (allowRecentlyDeleted && this.includeRecentlyDeleted &&
         (this.staleShapes[shapeIndex] & mask) !== 0) return true;
     return false;
   }
 
   setShape(id: EntityId, type: ComponentType<any>): void {
-    const shapeIndex = id * this.stride + type.__binding!.flagOffset;
-    const mask = type.__binding!.flagMask;
+    const shapeIndex = id * this.stride + type.__binding!.shapeOffset;
+    const mask = type.__binding!.shapeMask;
     this.shapes[shapeIndex] |= mask;
     this.staleShapes[shapeIndex] |= mask;
     this.dispatcher.shapeLog.push(id);
   }
 
   clearShape(id: EntityId, type: ComponentType<any>): void {
-    this.shapes[id * this.stride + type.__binding!.flagOffset] &= ~type.__binding!.flagMask;
+    const hasRefs = this.clearRefs(id, type, false);
+    if (type.__free || hasRefs) this.removalLog.push(id | (type.id! << ENTITY_ID_BITS));
+    this.shapes[id * this.stride + type.__binding!.shapeOffset] &= ~type.__binding!.shapeMask;
     this.dispatcher.shapeLog.push(id);
+    STATS: this.dispatcher.stats.for(type).numEntities -= 1;
   }
 
   trackWrite(id: EntityId, type: ComponentType<any>): void {
     this.dispatcher.writeLog!.push(id | (type.id! << ENTITY_ID_BITS));
+  }
+
+  private clearRefs(id: EntityId, type: ComponentType<any>, final: boolean): boolean {
+    const hasRefs = !!type.__binding!.refFields.length;
+    if (hasRefs) {
+      type.__bind!(id, true);
+      for (const field of type.__binding!.refFields) field.clearRef!(final);
+    }
+    return hasRefs;
   }
 
   matchShape(id: EntityId, positiveMask?: number[], negativeMask?: number[]): boolean {

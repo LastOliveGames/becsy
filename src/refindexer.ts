@@ -1,8 +1,9 @@
-import type {ComponentType} from './component';
+import {checkTypeDefined, ComponentType} from './component';
 import {Log, LogPointer} from './datastructures';
-import type {Entity, EntityId} from './entity';
+import {checkMask, Entity, EntityId} from './entity';
 import {
-  COMPONENT_ID_BITS, ENTITY_ID_BITS, ENTITY_ID_MASK, FIELD_SEQ_BITS, MAX_NUM_COMPONENTS,
+  COMPONENT_ID_BITS, COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK, FIELD_SEQ_BITS,
+  FIELD_SEQ_MASK, MAX_NUM_COMPONENTS,
   MAX_NUM_FIELDS
 } from './consts';
 import type {Dispatcher} from './dispatcher';
@@ -12,6 +13,7 @@ import type {Registry} from './registry';
 interface Selector {
   id: number;
   targetTypes: ComponentType<any>[];
+  trackStale: boolean;
   sourceType?: ComponentType<any>;
   matchType: boolean;
   matchSeq: boolean;
@@ -19,11 +21,18 @@ interface Selector {
   sourceSeq?: number;
 }
 
+const enum Action {
+  REFERENCE = 0, UNREFERENCE = 2 ** 30, RELEASE = 2 ** 31
+}
+
+const ACTION_MASK = Action.REFERENCE | Action.UNREFERENCE | Action.RELEASE;
+
 
 class Tracker {
-  readonly entities: Entity[] = [];
-  private readonly tags: (number | number[] | Set<number>)[] | undefined;
+  entities: Entity[] = [];
+  private tags: (number | number[] | Set<number>)[] | undefined;
   private entityIndex: number[] | undefined;
+  private clearing = false;
   private readonly registry: Registry;
 
   constructor(
@@ -39,19 +48,53 @@ class Tracker {
     this.registry = dispatcher.registry;
   }
 
+  clearAllRefs(final: boolean): void {
+    DEBUG: if (!this.tags) throw new Error('Unreferencing an untagged tracker');
+    this.clearing = true;
+    for (let i = 0; i < this.entities.length; i++) {
+      const entityId = this.entities[i].__id;
+      const set = this.tags[i];
+      if (typeof set === 'number') {
+        this.clearRef(entityId, set, final);
+      } else {
+        for (const tag of set) this.clearRef(entityId, tag, final);
+      }
+    }
+    this.entities = [];
+    this.tags = [];
+    this.entityIndex = undefined;
+    this.clearing = false;
+  }
+
+  private clearRef(sourceId: EntityId, tag: number, final: boolean): void {
+    const sourceTypeId = tag & COMPONENT_ID_MASK;
+    const sourceSeq = (tag >>> COMPONENT_ID_BITS) & FIELD_SEQ_MASK;
+    const internalIndex = tag >>> (COMPONENT_ID_BITS + FIELD_SEQ_BITS);
+    const sourceType = this.registry.types[sourceTypeId];
+    CHECK: checkMask(sourceType, this.registry.executingSystem, true);
+    sourceType.__bind!(sourceId, true);
+    sourceType.__binding!.fields[sourceSeq].clearRef!(final, this.targetEntityId, internalIndex);
+  }
+
   trackReference(
     entityId: EntityId, typeId: number, fieldSeq: number, internalIndex: number | undefined,
     trackChanges: boolean
   ): void {
+    DEBUG: if (this.clearing) {
+      throw new Error('Cannot track a new reference while clearing tracker');
+    }
+    CHECK: if (trackChanges) this.checkWriteMask();
     let index = this.getEntityIndex(entityId);
     if (index === undefined) index = this.addEntity(entityId, trackChanges);
     this.addTag(index, this.makeTag(typeId, fieldSeq, internalIndex));
   }
 
-  trackDereference(
+  trackUnreference(
     entityId: EntityId, typeId: number, fieldSeq: number, internalIndex: number | undefined,
     trackChanges: boolean
   ): void {
+    if (this.clearing) return;
+    CHECK: if (trackChanges) this.checkWriteMask();
     const index = this.getEntityIndex(entityId);
     DEBUG: if (index === undefined) throw new Error('Entity backref not tracked');
     const empty = this.removeTag(index, this.makeTag(typeId, fieldSeq, internalIndex));
@@ -119,7 +162,8 @@ class Tracker {
   }
 
   private addEntity(entityId: EntityId, trackChanges: boolean): number {
-    const index = this.entities.push(this.registry.pool.borrow(entityId));
+    const index = this.entities.length;
+    this.entities.push(this.registry.pool.borrow(entityId));
     if (this.entityIndex) {
       this.entityIndex[entityId] = index;
     } else if (index > 100) {
@@ -147,6 +191,13 @@ class Tracker {
       }
     }
   }
+
+  private checkWriteMask(): void {
+    const system = this.registry.executingSystem;
+    for (const targetType of this.selector.targetTypes) {
+      checkMask(targetType, system, true);
+    }
+  }
 }
 
 
@@ -156,15 +207,21 @@ export class RefIndexer {
   private readonly selectorIdsBySourceKey = new Map<number, number>();
   private readonly selectors: Selector[] = [];
   private readonly trackers = new Map<number, Tracker>();
+  private readonly registry: Registry;
 
   constructor(
     private readonly dispatcher: Dispatcher,
     private readonly maxRefChangesPerFrame: number
-  ) {}
+  ) {
+    this.registry = dispatcher.registry;
+  }
 
   registerSelector(
-    targetType?: ComponentType<any>, sourceType?: ComponentType<any>, sourceFieldSeq?: number
+    targetType?: ComponentType<any>, sourceType?: ComponentType<any>, sourceFieldSeq?: number,
+    trackStale = false
   ): number {
+    CHECK: if (targetType) checkTypeDefined(targetType);
+    CHECK: if (sourceType) checkTypeDefined(sourceType);
     if (!this.refLog) {
       this.refLog = new Log(this.maxRefChangesPerFrame, 'maxRefChangesPerFrame', true);
       this.refLogPointer = this.refLog.createPointer();
@@ -175,10 +232,12 @@ export class RefIndexer {
       ) : -1;
     let selectorId = this.selectorIdsBySourceKey.get(selectorSourceKey);
     if (selectorId === undefined) {
+      // Always track stale refs on the global selector.
+      if (!this.selectors.length) trackStale = true;
       const selector = {
         id: this.selectors.length, targetTypes: targetType ? [targetType] : [], sourceType,
         matchType: !!sourceType, matchSeq: typeof sourceFieldSeq !== 'undefined',
-        sourceTypeId: sourceType?.id, sourceSeq: sourceFieldSeq
+        sourceTypeId: sourceType?.id, sourceSeq: sourceFieldSeq, trackStale
       };
       this.selectors.push(selector);
       selectorId = selector.id;
@@ -186,34 +245,47 @@ export class RefIndexer {
       CHECK: if (selectorId > MAX_NUM_COMPONENTS) {
         throw new Error(`Too many distinct backrefs selectors`);
       }
-    } else if (targetType) {
-      this.selectors[selectorId].targetTypes.push(targetType);
+    } else {
+      const selector = this.selectors[selectorId];
+      selector.trackStale = selector.trackStale || trackStale;
+      if (targetType) selector.targetTypes.push(targetType);
     }
     return selectorId;
   }
 
   getBackrefs(entityId: EntityId, selectorId = 0): Entity[] {
-    return this.getTracker(this.selectors[selectorId], entityId).entities;
+    const selector = this.selectors[selectorId];
+    return this.getTracker(selector, entityId, this.registry.includeRecentlyDeleted).entities;
   }
 
   trackRefChange(
     sourceId: EntityId, sourceType: ComponentType<any>, sourceSeq: number,
-    sourceInternalIndex: number | undefined, oldTargetId: EntityId, newTargetId: EntityId
+    sourceInternalIndex: number | undefined, oldTargetId: EntityId, newTargetId: EntityId,
+    final: boolean
   ): void {
     DEBUG: if (!this.refLog) throw new Error(`Trying to trackRefChange without a refLog`);
     DEBUG: if (oldTargetId === newTargetId) throw new Error('No-op call to trackRefChange');
     if (oldTargetId !== -1) {
       this.pushRefLogEntry(
-        sourceId, sourceType, sourceSeq, sourceInternalIndex, oldTargetId, false);
+        sourceId, sourceType, sourceSeq, sourceInternalIndex, oldTargetId,
+        final ? Action.RELEASE : Action.UNREFERENCE
+      );
     }
     if (newTargetId !== -1) {
-      this.pushRefLogEntry(sourceId, sourceType, sourceSeq, sourceInternalIndex, newTargetId, true);
+      this.pushRefLogEntry(
+        sourceId, sourceType, sourceSeq, sourceInternalIndex, newTargetId, Action.REFERENCE
+      );
     }
+  }
+
+  clearAllRefs(targetId: EntityId, final: boolean): void {
+    if (!this.selectors.length) return;
+    this.getTracker(this.selectors[0], targetId, final, false)?.clearAllRefs(final);
   }
 
   private pushRefLogEntry(
     sourceId: EntityId, sourceType: ComponentType<any>, sourceSeq: number,
-    sourceInternalIndex: number | undefined, targetId: EntityId, referenced: boolean
+    sourceInternalIndex: number | undefined, targetId: EntityId, action: Action,
   ): void {
     const internallyIndexed = typeof sourceInternalIndex !== 'undefined';
     DEBUG: if (internallyIndexed !== sourceType.__binding!.internallyIndexed) {
@@ -221,19 +293,30 @@ export class RefIndexer {
     }
     this.refLog!.push(sourceId | (sourceType.id! << ENTITY_ID_BITS));
     this.refLog!.push(
-      targetId | (sourceSeq << ENTITY_ID_BITS) | (referenced ? 0 : 2 ** 31) |
-      (internallyIndexed ? 2 ** 30 : 0));
+      targetId | (sourceSeq << ENTITY_ID_BITS) | action | (internallyIndexed ? 2 ** 29 : 0));
     if (internallyIndexed) this.refLog!.push(sourceInternalIndex!);
+    this.processEntry(
+      sourceId, sourceType.id!, sourceSeq, sourceInternalIndex, targetId, action, true
+    );
   }
 
-  private getTracker(selector: Selector, targetId: EntityId): Tracker {
-    const trackerKey = targetId | (selector.id << ENTITY_ID_BITS);
-    let tracker = this.trackers.get(trackerKey);
-    if (!tracker) {
-      tracker = new Tracker(targetId, selector, this.dispatcher);
-      this.trackers.set(trackerKey, tracker);
+  private getTracker(
+    selector: Selector, targetId: EntityId, stale: boolean, createIfMissing = true
+  ): Tracker {
+    let tracker =
+      this.trackers.get(targetId | (selector.id << ENTITY_ID_BITS) | (stale ? 2 ** 31 : 0));
+    if (tracker) return tracker;
+    DEBUG: if (stale && !selector.trackStale) {
+      throw new Error('Selector not configured for stale tracking');
     }
-    return tracker;
+    let staleTracker: Tracker;
+    tracker = new Tracker(targetId, selector, this.dispatcher);
+    this.trackers.set(targetId | (selector.id << ENTITY_ID_BITS), tracker);
+    if (selector.trackStale) {
+      staleTracker = new Tracker(targetId, selector, this.dispatcher);
+      this.trackers.set(targetId | (selector.id << ENTITY_ID_BITS) | 2 ** 31, staleTracker);
+    }
+    return stale ? staleTracker! : tracker;
   }
 
   // TODO: track stats for the refLog
@@ -242,27 +325,46 @@ export class RefIndexer {
     while (true) {
       const [log, startIndex, endIndex, local] =
         this.refLog.processAndCommitSince(this.refLogPointer!);
-      if (!log) break;
+      if (!log || local) break;
       for (let i = startIndex!; i < endIndex!; i += 2) {
         const entryPart1 = log[i], entryPart2 = log[i + 1];
         const sourceId = entryPart1 & ENTITY_ID_MASK;
         const sourceTypeId = entryPart1 >>> ENTITY_ID_BITS;
         const targetId = entryPart2 & ENTITY_ID_MASK;
         const sourceSeq = (entryPart2 >>> ENTITY_ID_BITS) & (MAX_NUM_FIELDS - 1);
-        const referenced = (entryPart2 & 2 ** 31) === 0;
-        const internallyIndexed = (entryPart2 & 2 ** 30) !== 0;
+        const action: Action = (entryPart2 & ACTION_MASK) >>> 30;
+        const internallyIndexed = (entryPart2 & 2 ** 29) !== 0;
         const internalIndex = internallyIndexed ? log[i + 2] : undefined;
         if (internallyIndexed) i += 1;
-        for (let j = 0; j < this.selectors.length; j++) {
-          const selector = this.selectors[j];
-          if ((!selector.matchType || selector.sourceTypeId === sourceTypeId) &&
-              (!selector.matchSeq || selector.sourceSeq === sourceSeq)) {
-            const tracker = this.getTracker(selector, targetId);
-            if (referenced) {
-              tracker.trackReference(sourceId, sourceTypeId, sourceSeq, internalIndex, local!);
-            } else {
-              tracker.trackDereference(sourceId, sourceTypeId, sourceSeq, internalIndex, local!);
-            }
+        this.processEntry(
+          sourceId, sourceTypeId, sourceSeq, internalIndex, targetId, action, false
+        );
+      }
+    }
+  }
+
+  private processEntry(
+    sourceId: EntityId, sourceTypeId: number, sourceSeq: number,
+    sourceInternalIndex: number | undefined, targetId: EntityId, action: Action, local: boolean
+  ): void {
+    for (let j = 0; j < this.selectors.length; j++) {
+      const selector = this.selectors[j];
+      if ((!selector.matchType || selector.sourceTypeId === sourceTypeId) &&
+        (!selector.matchSeq || selector.sourceSeq === sourceSeq)) {
+        if (action === Action.REFERENCE || action === Action.UNREFERENCE) {
+          const tracker = this.getTracker(selector, targetId, false);
+          if (action === Action.REFERENCE) {
+            tracker.trackReference(sourceId, sourceTypeId, sourceSeq, sourceInternalIndex, local);
+          } else {
+            tracker.trackUnreference(sourceId, sourceTypeId, sourceSeq, sourceInternalIndex, local);
+          }
+        }
+        if (selector.trackStale && (action === Action.REFERENCE || action === Action.RELEASE)) {
+          const tracker = this.getTracker(selector, targetId, true);
+          if (action === Action.REFERENCE) {
+            tracker.trackReference(sourceId, sourceTypeId, sourceSeq, sourceInternalIndex, local);
+          } else {
+            tracker.trackUnreference(sourceId, sourceTypeId, sourceSeq, sourceInternalIndex, local);
           }
         }
       }

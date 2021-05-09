@@ -29,6 +29,7 @@ export interface Field<JSType> {
   buffer?: SharedArrayBuffer;
   localBuffer?: any[];
   updateBuffer?(): void;
+  clearRef?(final: boolean, targetId?: EntityId, internalIndex?: number): void;
 }
 
 export interface ComponentType<C> {
@@ -45,15 +46,15 @@ export interface ComponentType<C> {
 
   __binding?: Binding<C>;
   __bind?(id: EntityId, writable: boolean): C;
-  __create?(id: EntityId): C;
-  __delete?(id: EntityId): void;
+  __allocate?(id: EntityId): C;
+  __free?(id: EntityId): void;
 }
 
 export class Binding<C> {
   readonly readonlyInstance: C;
   readonly writableInstance: C;
-  readonly flagOffset: number;
-  readonly flagMask: number;
+  readonly shapeOffset: number;
+  readonly shapeMask: number;
   readonly refFields: Field<Entity | null>[];
   trackedWrites = false;
   internallyIndexed = false;
@@ -66,8 +67,8 @@ export class Binding<C> {
   ) {
     this.readonlyInstance = new type();  // eslint-disable-line new-cap
     this.writableInstance = new type();  // eslint-disable-line new-cap
-    this.flagOffset = type.id! >> 5;
-    this.flagMask = 1 << (type.id! & 31);
+    this.shapeOffset = type.id! >> 5;
+    this.shapeMask = 1 << (type.id! & 31);
     this.refFields = fields.filter(field => field.type === Type.ref);
   }
 }
@@ -76,6 +77,13 @@ export class Binding<C> {
 interface Storage {
   acquireIndex(id: EntityId): number;
   releaseIndex(id: EntityId): void;
+}
+
+
+export function checkTypeDefined(type: ComponentType<any>): void {
+  if (!type.__binding) {
+    throw new Error(`Component ${type.name} not defined; add to world defs`);
+  }
 }
 
 
@@ -168,6 +176,7 @@ class PackedStorage implements Storage {
 
 export function initComponent(type: ComponentType<any>, id: EntityId, values: any): void {
   CHECK: {
+    checkTypeDefined(type);
     if (values !== undefined) {
       for (const key in values) {
         if (!type.schema?.[key]) {
@@ -176,7 +185,7 @@ export function initComponent(type: ComponentType<any>, id: EntityId, values: an
       }
     }
   }
-  const component = type.__create!(id);
+  const component = type.__allocate!(id);
   for (const field of type.__binding!.fields) {
     (component as any)[field.name] = values?.[field.name] ?? field.default;
   }
@@ -258,7 +267,7 @@ export function defineAndAllocateComponentType<C>(type: ComponentType<C>): void 
         binding.index = id;
         return writable ? binding.writableInstance : binding.readonlyInstance;
       };
-      type.__create = (id: EntityId): C => {
+      type.__allocate = (id: EntityId): C => {
         binding.entityId = id;
         binding.index = id;
         return binding.writableInstance;
@@ -276,12 +285,12 @@ export function defineAndAllocateComponentType<C>(type: ComponentType<C>): void 
         }
         return writable ? binding.writableInstance : binding.readonlyInstance;
       };
-      type.__create = (id: EntityId): C => {
+      type.__allocate = (id: EntityId): C => {
         binding.entityId = id;
         binding.index = storageManager.acquireIndex(id);
         return binding.writableInstance;
       };
-      type.__delete = (id: EntityId): void => {
+      type.__free = (id: EntityId): void => {
         storageManager.releaseIndex(id);
       };
       break;

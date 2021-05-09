@@ -1,6 +1,6 @@
 import {Bitset} from './datastructures';
 import type {ComponentType} from './component';
-import type {Entity, EntityId} from './entity';
+import {Entity, EntityId, extendMaskAndSetFlag} from './entity';
 import type {SystemBox} from './system';
 import {ArrayEntityList, EntityList, PackedArrayEntityList} from './entitylists';
 
@@ -43,6 +43,9 @@ export class QueryBox {
     const dispatcher = this.system.dispatcher;
     this.hasTransientResults = Boolean(this.flavors & transientFlavorsMask);
     this.hasChangedResults = Boolean(this.flavors & changedFlavorsMask);
+    CHECK: if (this.flavors && !this.withMask) {
+      throw new Error(`Query for entities must have at least one with() clause`);
+    }
     CHECK: if (this.hasChangedResults && !this.trackMask) {
       throw new Error(`Query for changed entities must track at least one component`);
     }
@@ -234,7 +237,7 @@ export class QueryBuilder {
     } else if (onlyOne && mask.some(n => n !== 0)) {
       throw new Error(`Only one ${onlyOne} allowed`);
     }
-    for (const type of types) this.__system.dispatcher.registry.extendMaskAndSetFlag(mask, type);
+    for (const type of types) extendMaskAndSetFlag(mask, type);
   }
 }
 

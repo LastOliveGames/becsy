@@ -1,5 +1,6 @@
-import {ComponentType, initComponent} from './component';
+import {checkTypeDefined, ComponentType, initComponent} from './component';
 import type {Registry} from './registry';
+import type {SystemBox} from './system';
 
 
 export type EntityId = number;
@@ -10,15 +11,11 @@ export class Entity {
 
   constructor(private readonly __registry: Registry) {}
 
-  __reset(id: EntityId): void {
-    this.__id = id;
-  }
-
   add(type: ComponentType<any>, values?: any): this {
     // TODO: prevent add when entity has been deleted
     CHECK: {
       this.__checkMask(type, true);
-      if (this.__registry.hasShape(this.__id, type)) {
+      if (this.__registry.hasShape(this.__id, type, false)) {
         throw new Error(`Entity already has a ${type.name} component`);
       }
     }
@@ -44,11 +41,9 @@ export class Entity {
   }
 
   remove(type: ComponentType<any>): void {
-    CHECK: {
-      this.__checkMask(type, false);
-      this.__checkHas(type);
-    }
-    this.__remove(type);
+    CHECK: this.__checkHas(type, false);
+    CHECK: this.__checkMask(type, true);
+    this.__registry.clearShape(this.__id, type);
   }
 
   removeAll(...types: ComponentType<any>[]): void {
@@ -57,13 +52,13 @@ export class Entity {
 
   has(type: ComponentType<any>): boolean {
     CHECK: this.__checkMask(type, false);
-    return this.__registry.hasShape(this.__id, type);
+    return this.__registry.hasShape(this.__id, type, true);
   }
 
   read<C>(type: ComponentType<C>): Readonly<C> {
     CHECK: {
       this.__checkMask(type, false);
-      this.__checkHas(type);
+      this.__checkHas(type, true);
     }
     return type.__bind!(this.__id, false);
   }
@@ -71,7 +66,7 @@ export class Entity {
   write<C>(type: ComponentType<C>): C {
     CHECK: {
       this.__checkMask(type, true);
-      this.__checkHas(type);
+      this.__checkHas(type, true);
     }
     if (type.__binding!.trackedWrites) this.__registry.trackWrite(this.__id, type);
     return type.__bind!(this.__id, true);
@@ -79,48 +74,45 @@ export class Entity {
 
   delete(): void {
     for (const type of this.__registry.types) {
-      if (!this.__registry.hasShape(this.__id, type)) continue;
-      CHECK: this.__checkMask(type, true);
-      this.__remove(type);
-    }
-    this.__registry.queueDeletion(this.__id);
-    this.__clearInboundRefs();
-  }
-
-  private __remove(type: ComponentType<any>): void {
-    this.__clearOutboundRefs(type);
-    if (type.__delete) this.__registry.queueRemoval(this.__id, type);
-    this.__registry.clearShape(this.__id, type);
-    STATS: this.__registry.dispatcher.stats.for(type).numEntities -= 1;
-  }
-
-  private __clearOutboundRefs(type: ComponentType<any>): void {
-    if (type.__binding!.refFields.length) {
-      const component = this.write(type);
-      for (const field of type.__binding!.refFields) {
-        (component as any)[field.name] = null;
+      if (this.__registry.hasShape(this.__id, type, false)) {
+        CHECK: this.__checkMask(type, true);
+        this.__registry.clearShape(this.__id, type);
       }
     }
-  }
-
-  private __clearInboundRefs(): void {
-    // TODO: implement
+    this.__registry.queueDeletion(this.__id);
+    this.__registry.dispatcher.indexer.clearAllRefs(this.__id, false);
   }
 
   private __checkMask(type: ComponentType<any>, write: boolean): void {
-    const rwMasks = this.__registry.executingSystem?.rwMasks;
-    const mask = write ? rwMasks?.write : rwMasks?.read;
-    if (mask && !this.__registry.maskHasFlag(mask, type)) {
-      throw new Error(
-        `System didn't mark component ${type.name} as ${write ? 'writable' : 'readable'}`);
-    }
+    checkMask(type, this.__registry.executingSystem, write);
   }
 
-  private __checkHas(type: ComponentType<any>): void {
-    if (!this.__registry.hasShape(this.__id, type)) {
+  private __checkHas(type: ComponentType<any>, allowRecentlyDeleted: boolean): void {
+    if (!this.__registry.hasShape(this.__id, type, allowRecentlyDeleted)) {
       throw new Error(`Entity doesn't have a ${type.name} component`);
     }
   }
 }
 
 
+export function checkMask(
+  type: ComponentType<any>, system: SystemBox | undefined, write: boolean
+): void {
+  checkTypeDefined(type);
+  const mask = write ? system?.rwMasks.write : system?.rwMasks.read;
+  const ok = !mask || ((mask[type.__binding!.shapeOffset] ?? 0) & type.__binding!.shapeMask) !== 0;
+  if (!ok) {
+    throw new Error(
+      `System didn't mark component ${type.name} as ${write ? 'writable' : 'readable'}`);
+  }
+}
+
+export function extendMaskAndSetFlag(mask: number[], type: ComponentType<any>): void {
+  CHECK: checkTypeDefined(type);
+  const flagOffset = type.__binding!.shapeOffset!;
+  if (flagOffset >= mask.length) {
+    mask.length = flagOffset + 1;
+    mask.fill(0, mask.length, flagOffset);
+  }
+  mask[flagOffset] |= type.__binding!.shapeMask!;
+}

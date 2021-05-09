@@ -80,7 +80,7 @@ describe('using packed component storage', () => {
       entity1.remove(A);
       system.createEntity(A, {value: 2});
       expect(entity1.has(A)).toBe(false);
-      system.accessRecentlyRemovedData(true);
+      system.accessRecentlyDeletedData(true);
       expect(entity1.has(A)).toBe(true);
       expect(entity1.read(A).value).toBe(1);
     });
