@@ -29,10 +29,11 @@ export abstract class Type<JSType> {
   static float64: Type<number>;
   static staticString: (choices: string[]) => Type<string>;
   static dynamicString: (maxUtf8Length: number) => Type<string>;
-  static ref: Type<Entity | null>;
-  static backrefs: (type: ComponentType<any>, fieldName: string) => Type<Entity[]>;
   static object: Type<any>;
   static weakObject: Type<any>;
+  static ref: Type<Entity | undefined>;
+  static backrefs: (type?: ComponentType<any>, fieldName?: string, trackDeletedBackrefs?: boolean)
+    => Type<Entity[]>;
 }
 
 class BooleanType extends Type<boolean> {
@@ -376,12 +377,12 @@ class DynamicStringType extends Type<string> {
 
 const STALE_REF_BIT = 2 ** 31;
 
-class RefType extends Type<Entity | null> {
+class RefType extends Type<Entity | undefined> {
   constructor() {
-    super(null);
+    super(undefined);
   }
 
-  defineElastic<C>(binding: Binding<C>, field: Field<Entity | null>): void {
+  defineElastic<C>(binding: Binding<C>, field: Field<Entity | undefined>): void {
     let buffer: SharedArrayBuffer;
     let data: Int32Array;
     const indexer = binding.dispatcher.indexer;
@@ -408,25 +409,26 @@ class RefType extends Type<Entity | null> {
 
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
       DEBUG: if (internalIndex) throw new Error('Ref fields have no internal index');
-      DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0) {
-        throw new Error('Ref already marked stale');
+      DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
+        throw new Error('Wrong ref stale state');
       }
       const id = data[binding.index] & ENTITY_ID_MASK;
-      if (targetId !== undefined && id !== targetId) return;
+      const targetIdGiven = targetId !== undefined;
+      if (targetIdGiven && id !== targetId) return;
       if (!final) data[binding.index] |= STALE_REF_BIT;
-      else if (targetId) data[binding.index] = -1;
+      else if (targetIdGiven) data[binding.index] = -1;
       indexer.trackRefChange(
         binding.entityId, binding.type, field.seq, undefined, id, -1, final);
     };
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
-      get(this: C): Entity | null {
+      get(this: C): Entity | undefined {
         const id = data[binding.index];
-        if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return null;
+        if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
         return pool.borrowTemporarily(id & ENTITY_ID_MASK);
       },
-      set(this: C, value: Entity | null): void {
+      set(this: C, value: Entity | undefined | null): void {
         // TODO: disallow setting ref to deleted entity
         const oldId = data[binding.index];
         const newId = value?.__id ?? -1;
@@ -439,18 +441,18 @@ class RefType extends Type<Entity | null> {
 
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
-      get(this: C): Entity | null {
+      get(this: C): Entity | undefined {
         const id = data[binding.index];
-        if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return null;
+        if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
         return pool.borrowTemporarily(id & ENTITY_ID_MASK);
       },
-      set(this: C, value: Entity | null): void {
+      set(this: C, value: Entity | undefined | null): void {
         throwNotWritable(binding);
       }
     });
   }
 
-  defineFixed<C>(binding: Binding<C>, field: Field<Entity | null>): void {
+  defineFixed<C>(binding: Binding<C>, field: Field<Entity | undefined>): void {
     const size = binding.capacity * Int32Array.BYTES_PER_ELEMENT;
     const buffer = new SharedArrayBuffer(size);
     const data = new Int32Array(buffer);
@@ -463,25 +465,26 @@ class RefType extends Type<Entity | null> {
 
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
       DEBUG: if (internalIndex) throw new Error('Ref fields have no internal index');
-      DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0) {
-        throw new Error('Ref already marked stale');
+      DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
+        throw new Error('Wrong ref stale state');
       }
       const id = data[binding.index] & ENTITY_ID_MASK;
-      if (targetId !== undefined && id !== targetId) return;
+      const targetIdGiven = targetId !== undefined;
+      if (targetIdGiven && id !== targetId) return;
       if (!final) data[binding.index] |= STALE_REF_BIT;
-      else if (targetId) data[binding.index] = -1;
+      else if (targetIdGiven) data[binding.index] = -1;
       indexer.trackRefChange(
         binding.entityId, binding.type, field.seq, undefined, id, -1, final);
     };
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
-      get(this: C): Entity | null {
+      get(this: C): Entity | undefined {
         const id = data[binding.index];
-        if (id === -1) return null;
-        return pool.borrowTemporarily(id);
+        if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
+        return pool.borrowTemporarily(id & ENTITY_ID_MASK);
       },
-      set(this: C, value: Entity | null): void {
+      set(this: C, value: Entity | undefined | null): void {
         // TODO: disallow setting ref to deleted entity
         const oldId = data[binding.index];
         const newId = value?.__id ?? -1;
@@ -494,12 +497,12 @@ class RefType extends Type<Entity | null> {
 
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
-      get(this: C): Entity | null {
+      get(this: C): Entity | undefined {
         const id = data[binding.index];
-        if (id === -1) return null;
-        return pool.borrowTemporarily(id);
+        if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
+        return pool.borrowTemporarily(id & ENTITY_ID_MASK);
       },
-      set(this: C, value: Entity | null): void {
+      set(this: C, value: Entity | undefined | null): void {
         throwNotWritable(binding);
       }
     });

@@ -16,7 +16,7 @@ class Stuff {
   @prop(Type.float64) float64: number;
   @prop(Type.staticString(['foo', 'bar', 'baz'])) staticString: string;
   @prop(Type.dynamicString(14)) dynamicString: string;
-  @prop(Type.ref) ref: Entity | null;
+  @prop(Type.ref) ref?: Entity;
   @prop(Type.object) object: Stuff;
   @prop(Type.weakObject) weakObject: Stuff;
 }
@@ -86,8 +86,8 @@ describe('getting and setting fields of various types', () => {
       const b = system.createEntity(Big);
       a.write(Big).ref = b;
       expect(a.read(Big).ref).toBe(b);
-      a.write(Big).ref = null;
-      expect(a.read(Big).ref).toBe(null);
+      a.write(Big).ref = undefined;
+      expect(a.read(Big).ref).toBe(undefined);
     });
   });
 

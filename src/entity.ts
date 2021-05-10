@@ -6,12 +6,13 @@ import type {SystemBox} from './system';
 export type EntityId = number;
 export type ReadWriteMasks = {read?: number[], write?: number[]};
 
+
 export class Entity {
   __id: EntityId;
 
   constructor(private readonly __registry: Registry) {}
 
-  add(type: ComponentType<any>, values?: any): this {
+  add<C>(type: ComponentType<C>, values?: Partial<C>): this {
     // TODO: prevent add when entity has been deleted
     CHECK: {
       this.__checkMask(type, true);

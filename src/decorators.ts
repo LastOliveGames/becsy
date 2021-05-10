@@ -2,12 +2,14 @@ import type {ComponentOptions, ComponentType} from './component';
 import type {Type} from './type';
 
 interface PropOptions<JSType> {
-  type: Type<JSType>;
+  type: Type<JSType> | (() => Type<any>);
   default?: JSType;
 }
 
 
-export function prop<JSType>(practicalOptions: PropOptions<JSType> | Type<any>) {
+export function prop<JSType>(
+  practicalOptions: PropOptions<JSType> | Type<any> | (() => Type<any>)
+) {
   return function(target: any, name: string): void {
     if (!target.constructor.schema) target.constructor.schema = {};
     const options: PropOptions<JSType> =

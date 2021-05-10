@@ -1,9 +1,15 @@
-import type {ComponentType} from './component';
 import {Bitset, LogPointer} from './datastructures';
 import type {Dispatcher} from './dispatcher';
 import type {Entity, ReadWriteMasks} from './entity';
 import {ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import {Query, QueryBox, QueryBuilder} from './query';
+import type {ComponentType} from './component';
+
+
+// type ComponentTypesWithInitializers<C> =
+//   [] |
+//   [ComponentType<any>, ...ComponentTypesWithInitializers] |
+//   [ComponentType<C>, Partial<C>, ...ComponentTypesWithInitializers];
 
 
 export interface SystemType {

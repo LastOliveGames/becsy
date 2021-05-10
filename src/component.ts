@@ -5,12 +5,12 @@ import type {Dispatcher} from './dispatcher';
 
 
 interface SchemaDef<JSType> {
-  type: Type<JSType>;
-  default: JSType;
+  type: Type<JSType> | (() => Type<any>);
+  default?: JSType;
 }
 
 interface Schema {
-  [prop: string]: Type<any> | SchemaDef<any>;
+  [prop: string]: Type<any> | (() => Type<any>) | SchemaDef<any>;
 }
 
 export type ComponentStorage = 'sparse' | 'packed' | 'compact';
@@ -198,14 +198,11 @@ function gatherFields(type: ComponentType<any>): Field<any>[] {
   if (schema) {
     let seq = 0;
     for (const name in schema) {
-      const entry = schema[name];
-      let field: Field<any>;
-      if (entry instanceof Type) {
-        field = {name, default: entry.defaultValue, type: entry, seq: seq++};
-      } else {
-        field = Object.assign({name, default: entry.type.defaultValue, seq: seq++}, entry);
-      }
-      fields.push(field);
+      let entry = schema[name];
+      if (entry instanceof Type || typeof entry === 'function') entry = {type: entry};
+      if (typeof entry.type === 'function') entry.type = entry.type();
+      if (!('default' in entry)) entry.default = entry.type.defaultValue;
+      fields.push({name, seq: seq++, type: entry.type, default: entry.default});
     }
     CHECK: if (seq > MAX_NUM_FIELDS) {
       throw new Error(`Component ${type.name} declares too many fields`);
