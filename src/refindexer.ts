@@ -255,7 +255,8 @@ export class RefIndexer {
 
   getBackrefs(entityId: EntityId, selectorId = 0): Entity[] {
     const selector = this.selectors[selectorId];
-    return this.getTracker(selector, entityId, this.registry.includeRecentlyDeleted).entities;
+    return this.getOrCreateTracker(
+      selector, entityId, this.registry.includeRecentlyDeleted).entities;
   }
 
   trackRefChange(
@@ -280,7 +281,7 @@ export class RefIndexer {
 
   clearAllRefs(targetId: EntityId, final: boolean): void {
     if (!this.selectors.length) return;
-    this.getTracker(this.selectors[0], targetId, final, false)?.clearAllRefs(final);
+    this.getTracker(this.selectors[0], targetId, final)?.clearAllRefs(final);
   }
 
   private pushRefLogEntry(
@@ -300,11 +301,8 @@ export class RefIndexer {
     );
   }
 
-  private getTracker(
-    selector: Selector, targetId: EntityId, stale: boolean, createIfMissing = true
-  ): Tracker {
-    let tracker =
-      this.trackers.get(targetId | (selector.id << ENTITY_ID_BITS) | (stale ? 2 ** 31 : 0));
+  private getOrCreateTracker(selector: Selector, targetId: EntityId, stale: boolean): Tracker {
+    let tracker = this.getTracker(selector, targetId, stale);
     if (tracker) return tracker;
     DEBUG: if (stale && !selector.trackStale) {
       throw new Error('Selector not configured for stale tracking');
@@ -317,6 +315,10 @@ export class RefIndexer {
       this.trackers.set(targetId | (selector.id << ENTITY_ID_BITS) | 2 ** 31, staleTracker);
     }
     return stale ? staleTracker! : tracker;
+  }
+
+  private getTracker(selector: Selector, targetId: EntityId, stale: boolean): Tracker | undefined {
+    return this.trackers.get(targetId | (selector.id << ENTITY_ID_BITS) | (stale ? 2 ** 31 : 0));
   }
 
   // TODO: track stats for the refLog
@@ -352,7 +354,7 @@ export class RefIndexer {
       if ((!selector.matchType || selector.sourceTypeId === sourceTypeId) &&
         (!selector.matchSeq || selector.sourceSeq === sourceSeq)) {
         if (action === Action.REFERENCE || action === Action.UNREFERENCE) {
-          const tracker = this.getTracker(selector, targetId, false);
+          const tracker = this.getOrCreateTracker(selector, targetId, false);
           if (action === Action.REFERENCE) {
             tracker.trackReference(sourceId, sourceTypeId, sourceSeq, sourceInternalIndex, local);
           } else {
@@ -360,7 +362,7 @@ export class RefIndexer {
           }
         }
         if (selector.trackStale && (action === Action.REFERENCE || action === Action.RELEASE)) {
-          const tracker = this.getTracker(selector, targetId, true);
+          const tracker = this.getOrCreateTracker(selector, targetId, true);
           if (action === Action.REFERENCE) {
             tracker.trackReference(sourceId, sourceTypeId, sourceSeq, sourceInternalIndex, local);
           } else {
