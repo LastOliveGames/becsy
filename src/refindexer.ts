@@ -204,6 +204,7 @@ class Tracker {
 export class RefIndexer {
   private refLog?: Log;
   private refLogPointer?: LogPointer;
+  private refLogStatsPointer?: LogPointer;
   private readonly selectorIdsBySourceKey = new Map<number, number>();
   private readonly selectors: Selector[] = [];
   private readonly trackers = new Map<number, Tracker>();
@@ -216,6 +217,12 @@ export class RefIndexer {
     this.registry = dispatcher.registry;
   }
 
+  processEndOfFrame(): void {
+    this.flush();  // to handle ref changes coming from registry.processEndOfFrame()
+    STATS: this.dispatcher.stats.maxRefChangesPerFrame =
+      this.refLog?.countSince(this.refLogStatsPointer!) ?? 0;
+  }
+
   registerSelector(
     targetType?: ComponentType<any>, sourceType?: ComponentType<any>, sourceFieldSeq?: number,
     trackStale = false
@@ -225,6 +232,7 @@ export class RefIndexer {
     if (!this.refLog) {
       this.refLog = new Log(this.maxRefChangesPerFrame, 'maxRefChangesPerFrame', true);
       this.refLogPointer = this.refLog.createPointer();
+      this.refLogStatsPointer = this.refLog.createPointer();
     }
     const selectorSourceKey = sourceType ?
       (typeof sourceFieldSeq === 'undefined' ?
@@ -321,13 +329,13 @@ export class RefIndexer {
     return this.trackers.get(targetId | (selector.id << ENTITY_ID_BITS) | (stale ? 2 ** 31 : 0));
   }
 
-  // TODO: track stats for the refLog
   flush(): void {
     if (!this.refLog) return;
     while (true) {
       const [log, startIndex, endIndex, local] =
         this.refLog.processAndCommitSince(this.refLogPointer!);
-      if (!log || local) break;
+      if (!log) break;
+      if (local) continue;
       for (let i = startIndex!; i < endIndex!; i += 2) {
         const entryPart1 = log[i], entryPart2 = log[i + 1];
         const sourceId = entryPart1 & ENTITY_ID_MASK;

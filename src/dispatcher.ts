@@ -133,6 +133,7 @@ export class Dispatcher {
     }
     this.registry.executingSystem = undefined;
     this.registry.processEndOfFrame();
+    this.indexer.processEndOfFrame();
     this.executing = false;
     STATS: this.gatherFrameStats();
   }
@@ -148,6 +149,7 @@ export class Dispatcher {
     this.flush();
     this.registry.executingSystem = undefined;
     this.registry.processEndOfFrame();
+    this.indexer.processEndOfFrame();
     this.executing = false;
     STATS: this.gatherFrameStats();
   }

@@ -27,8 +27,7 @@ export class Stats {
   maxEntities = 0;
   _maxLimboEntities = 0;
   _maxLimboComponents = 0;
-  _numRefs = 0;
-  maxRefs = 0;
+  _maxRefChangesPerFrame = 0;
   _maxShapeChangesPerFrame = 0;
   _maxWritesPerFrame = 0;
   components: {[typeName: string]: ComponentStats} = Object.create(null);
@@ -58,13 +57,12 @@ export class Stats {
     if (value > this._maxLimboComponents) this._maxLimboComponents = value;
   }
 
-  get numRefs(): number {
-    return this._numRefs;
+  get maxRefChangesPerFrame(): number {
+    return this._maxRefChangesPerFrame;
   }
 
-  set numRefs(value: number) {
-    this._numRefs = value;
-    if (value > this.maxRefs) this.maxRefs = value;
+  set maxRefChangesPerFrame(value: number) {
+    if (value > this._maxRefChangesPerFrame) this._maxRefChangesPerFrame = value;
   }
 
   get maxShapeChangesPerFrame(): number {
@@ -92,7 +90,7 @@ export class Stats {
     return `World stats:
   frames: ${this.frames.toLocaleString()}
   entities: ${this.numEntities.toLocaleString()} of ${this.maxEntities.toLocaleString()} max (${this.maxLimboEntities.toLocaleString()} limbo max)
-  refs: ${this.numRefs.toLocaleString()} of ${this.maxRefs.toLocaleString()} max
+  refs: ${this.maxRefChangesPerFrame.toLocaleString()} ref changes/frame max
   logs: ${this.maxShapeChangesPerFrame.toLocaleString()} shape changes/frame max, ${this.maxWritesPerFrame.toLocaleString()} writes/frame max`;
     /* eslint-enable max-len */
   }
