@@ -12,6 +12,8 @@ const now = typeof window !== 'undefined' && typeof window.performance !== 'unde
   performance.now.bind(performance) : Date.now.bind(Date);
 
 
+// TODO: figure out a better type for interleaved arrays, here and elsewhere
+// https://stackoverflow.com/questions/67467302/type-for-an-interleaved-array-of-classes-and-values
 type DefsArray = (ComponentType<any> | SystemType | any | DefsArray)[];
 
 export interface WorldOptions {

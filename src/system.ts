@@ -6,12 +6,6 @@ import {Query, QueryBox, QueryBuilder} from './query';
 import type {ComponentType} from './component';
 
 
-// type ComponentTypesWithInitializers<C> =
-//   [] |
-//   [ComponentType<any>, ...ComponentTypesWithInitializers] |
-//   [ComponentType<C>, Partial<C>, ...ComponentTypesWithInitializers];
-
-
 export interface SystemType {
   new(): System;
 }
