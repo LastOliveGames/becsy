@@ -25,7 +25,7 @@ export class ArrayEntityList implements EntityList {
 
 
 export class PackedArrayEntityList implements EntityList {
-  readonly entities: Entity[] = [];
+  entities: Entity[] = [];
   private readonly lookupTable: Int32Array;
 
   constructor(private readonly pool: EntityPool, maxEntities: number) {
@@ -55,6 +55,8 @@ export class PackedArrayEntityList implements EntityList {
   }
 
   clear(): void {
-    throw new Error('Internal error, trying to clear persistent entity list');
+    for (const entity of this.entities) this.pool.return(entity.__id);
+    this.entities = [];
+    this.lookupTable.fill(-1);
   }
 }

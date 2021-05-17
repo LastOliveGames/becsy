@@ -215,7 +215,10 @@ function gatherFields(type: ComponentType<any>): Field<any>[] {
 export function assimilateComponentType<C>(
   typeId: number, type: ComponentType<C>, dispatcher: Dispatcher
 ): void {
-  const storage = type.options?.storage ?? dispatcher.defaultComponentStorage;
+  const fields = gatherFields(type);
+  // For tag components, force sparse storage since we don't actually need to allocate anything.
+  const storage =
+    fields.length ? (type.options?.storage ?? dispatcher.defaultComponentStorage) : 'sparse';
   const capacity = storage === 'sparse' ?
     dispatcher.maxEntities : Math.min(dispatcher.maxEntities, type.options?.capacity ?? 0);
   const initialCapacity = type.options?.initialCapacity ?? 8;
@@ -241,7 +244,7 @@ export function assimilateComponentType<C>(
   }
   type.id = typeId;
   const binding = new Binding<C>(
-    type, gatherFields(type), dispatcher, capacity || initialCapacity, storage, !capacity);
+    type, fields, dispatcher, capacity || initialCapacity, storage, !capacity);
   type.__binding = binding;
 }
 

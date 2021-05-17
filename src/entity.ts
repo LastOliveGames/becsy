@@ -13,9 +13,11 @@ export class Entity {
   constructor(private readonly __registry: Registry) {}
 
   add<C>(type: ComponentType<C>, values?: Partial<C>): this {
-    // TODO: prevent add when entity has been deleted
     CHECK: {
       this.__checkMask(type, true);
+      if (!this.__registry.hasShape(this.__id, this.__registry.Alive, false)) {
+        throw new Error('Entity has been deleted');
+      }
       if (this.__registry.hasShape(this.__id, type, false)) {
         throw new Error(`Entity already has a ${type.name} component`);
       }
@@ -74,9 +76,10 @@ export class Entity {
   }
 
   delete(): void {
+    const Alive = this.__registry.Alive;
     for (const type of this.__registry.types) {
       if (this.__registry.hasShape(this.__id, type, false)) {
-        CHECK: this.__checkMask(type, true);
+        CHECK: if (type !== Alive) this.__checkMask(type, true);
         this.__registry.clearShape(this.__id, type);
       }
     }

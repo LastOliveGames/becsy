@@ -1,5 +1,5 @@
 import type {ComponentType} from './component';
-import {Dispatcher, WorldOptions} from './dispatcher';
+import {ControlOptions, Dispatcher, WorldOptions} from './dispatcher';
 import type {Stats} from './stats';
 import type {System} from './system';
 
@@ -21,6 +21,10 @@ export class World {
 
   execute(time?: number, delta?: number): void {
     this.__dispatcher.execute(time, delta);
+  }
+
+  control(options: ControlOptions): void {
+    this.__dispatcher.control(options);
   }
 
   get stats(): Stats {

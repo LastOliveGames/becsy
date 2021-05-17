@@ -429,7 +429,9 @@ class RefType extends Type<Entity | undefined> {
         return pool.borrowTemporarily(id & ENTITY_ID_MASK);
       },
       set(this: C, value: Entity | undefined | null): void {
-        // TODO: disallow setting ref to deleted entity
+        CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
+          throw new Error('Referencing a deleted entity is not allowed');
+        }
         const oldId = data[binding.index];
         const newId = value?.__id ?? -1;
         if (oldId === newId) return;
@@ -485,7 +487,9 @@ class RefType extends Type<Entity | undefined> {
         return pool.borrowTemporarily(id & ENTITY_ID_MASK);
       },
       set(this: C, value: Entity | undefined | null): void {
-        // TODO: disallow setting ref to deleted entity
+        CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
+          throw new Error('Referencing a deleted entity is not allowed');
+        }
         const oldId = data[binding.index];
         const newId = value?.__id ?? -1;
         if (oldId === newId) return;

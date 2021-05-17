@@ -58,7 +58,7 @@ export class Registry {
   private readonly staleShapes: Uint32Array;
   private readonly entityIdPool: Uint32Pool;
   readonly pool: EntityPool;
-  executingSystem: SystemBox | undefined;
+  executingSystem?: SystemBox;
   includeRecentlyDeleted = false;
   private readonly deletionLog: Log;
   private readonly prevDeletionPointer: LogPointer;
@@ -66,6 +66,7 @@ export class Registry {
   private readonly removalLog: Log;
   private readonly prevRemovalPointer: LogPointer;
   private readonly oldRemovalPointer: LogPointer;
+  readonly Alive = class Alive {};
 
   constructor(
     maxEntities: number, maxLimboEntities: number, maxLimboComponents: number,
@@ -87,16 +88,24 @@ export class Registry {
   }
 
   initializeComponentTypes(): void {
+    this.types.unshift(this.Alive);
     let componentId = 0;
     // Two-phase init, so components can have dependencies on each other's fields.
     for (const type of this.types) assimilateComponentType(componentId++, type, this.dispatcher);
     for (const type of this.types) defineAndAllocateComponentType(type);
+    DEBUG: {
+      const aliveBinding = this.types[0].__binding!;
+      if (!(aliveBinding.shapeOffset === 0 && aliveBinding.shapeMask === 1)) {
+        throw new Error('Alive component was not assigned first available shape mask');
+      }
+    }
   }
 
   createEntity(initialComponents: (ComponentType<any> | any)[]): Entity {
     const id = this.entityIdPool.take();
-    this.shapes.fill(0, id * this.stride, (id + 1) * this.stride);
-    // for (let i = id * this.stride; i < (id + 1) * this.stride; i++) this.shapes[i] = 0;
+    const shapesIndex = id * this.stride;
+    this.shapes[shapesIndex] = 1;
+    if (this.stride > 1) this.shapes.fill(0, shapesIndex + 1, shapesIndex + this.stride);
     const entity = this.pool.borrowTemporarily(id);
     if (initialComponents) entity.addAll(...initialComponents);
     STATS: this.dispatcher.stats.numEntities += 1;
@@ -156,6 +165,8 @@ export class Registry {
         const type = this.types[componentId];
         const shapeIndex = entityId * this.stride + type.__binding!.shapeOffset;
         const mask = type.__binding!.shapeMask;
+        // TODO: somehow check that the component wasn't resurrected and then removed again in the
+        // next frame, or we'll finalize the removal too early!
         if ((this.shapes[shapeIndex] & mask) === 0) {
           this.staleShapes[shapeIndex] &= ~mask;
           this.clearRefs(entityId, type, true);

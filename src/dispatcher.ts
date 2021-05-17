@@ -2,7 +2,7 @@ import type {ComponentStorage, ComponentType} from './component';
 import type {Entity} from './entity';
 import {MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './consts';
 import {Log, LogPointer} from './datastructures';
-import {System, SystemBox, SystemType} from './system';
+import {RunState, System, SystemBox, SystemType} from './system';
 import {Registry} from './registry';
 import {Stats} from './stats';
 import {RefIndexer} from './refindexer';
@@ -27,6 +27,12 @@ export interface WorldOptions {
   defaultComponentStorage?: ComponentStorage;
 }
 
+export interface ControlOptions {
+  stop: DefsArray;
+  suspend: DefsArray;
+  restart: DefsArray;
+}
+
 class CallbackSystem extends System {
   __callback: (system: System) => void;
 
@@ -40,17 +46,19 @@ export class Dispatcher {
   readonly maxEntities;
   readonly defaultComponentStorage;
   readonly registry;
-  readonly systems: SystemBox[];
+  private readonly systems: SystemBox[];
+  private readonly systemsByClass = new Map<SystemType, SystemBox>();
   private lastTime = now() / 1000;
   executing: boolean;
   readonly shapeLog: Log;
-  readonly writeLog: Log | undefined;
+  readonly writeLog?: Log;
   private readonly shapeLogFramePointer: LogPointer;
-  private readonly writeLogFramePointer: LogPointer | undefined;
+  private readonly writeLogFramePointer?: LogPointer;
   readonly stats;
   readonly indexer: RefIndexer;
   private readonly userCallbackSystem;
   private readonly callbackSystem;
+  private readonly deferredControls = new Map<SystemBox, RunState>();
 
   constructor({
     defs,
@@ -93,13 +101,16 @@ export class Dispatcher {
     const systems = [];
     const flatUserSystems = systemTypes.flat(Infinity);
     for (let i = 0; i < flatUserSystems.length; i++) {
-      const system = new flatUserSystems[i]() as System;
+      const SystemClass = flatUserSystems[i] as SystemType;
+      const system = new SystemClass();
       const props = flatUserSystems[i + 1];
       if (props && typeof props !== 'function') {
         Object.assign(system, props);
         i++;
       }
-      systems.push(new SystemBox(system, this));
+      const box = new SystemBox(system, this);
+      systems.push(box);
+      this.systemsByClass.set(SystemClass, box);
     }
     return systems;
   }
@@ -134,10 +145,8 @@ export class Dispatcher {
       this.flush();
     }
     this.registry.executingSystem = undefined;
-    this.registry.processEndOfFrame();
-    this.indexer.processEndOfFrame();
     this.executing = false;
-    STATS: this.gatherFrameStats();
+    this.processEndOfFrame();
   }
 
   executeFunction(fn: (system: System) => void): void {
@@ -150,10 +159,15 @@ export class Dispatcher {
     this.callbackSystem.execute(0, 0);
     this.flush();
     this.registry.executingSystem = undefined;
+    this.executing = false;
+    this.processEndOfFrame();
+  }
+
+  private processEndOfFrame(): void {
     this.registry.processEndOfFrame();
     this.indexer.processEndOfFrame();
-    this.executing = false;
     STATS: this.gatherFrameStats();
+    this.processDeferredControls();
   }
 
   private gatherFrameStats(): void {
@@ -173,5 +187,59 @@ export class Dispatcher {
     const entity = this.registry.createEntity(initialComponents);
     if (!this.executing) this.flush();
     return entity;
+  }
+
+  control(options: ControlOptions): void {
+    CHECK: this.checkControlOverlap(options);
+    this.deferRequestedRunState(options.stop, RunState.STOPPED);
+    this.deferRequestedRunState(options.suspend, RunState.SUSPENDED);
+    this.deferRequestedRunState(options.restart, RunState.RUNNING);
+    if (!this.executing) this.processDeferredControls();
+  }
+
+  private deferRequestedRunState(defs: DefsArray, state: RunState): void {
+    for (const def of defs) {
+      if (!def.__system) continue;
+      const system = this.systemsByClass.get(def);
+      CHECK: if (!system) throw new Error(`System ${def.name} not defined for this world`);
+      this.deferredControls!.set(system, state);
+    }
+  }
+
+  private checkControlOverlap(options: ControlOptions): void {
+    const stopSet = new Set<SystemType>();
+    const suspendSet = new Set<SystemType>();
+    for (const def of options.stop) {
+      if (!def.__system) continue;
+      stopSet.add(def);
+    }
+    for (const def of options.suspend) {
+      if (!def.__system) continue;
+      if (stopSet.has(def)) {
+        throw new Error(`Request to both stop and suspend system ${def.name}`);
+      }
+      suspendSet.add(def);
+    }
+    for (const def of options.restart) {
+      if (!def.__system) continue;
+      if (stopSet.has(def)) {
+        throw new Error(`Request to both stop and restart system ${def.name}`);
+      }
+      if (suspendSet.has(def)) {
+        throw new Error(`Request to both suspend and restart system ${def.name}`);
+      }
+    }
+  }
+
+  private processDeferredControls(): void {
+    if (!this.deferredControls.size) return;
+    for (const [system, state] of this.deferredControls.entries()) {
+      switch (state) {
+        case RunState.STOPPED: system.stop(); break;
+        case RunState.SUSPENDED: system.suspend(); break;
+        case RunState.RUNNING: system.restart(); break;
+      }
+    }
+    this.deferredControls.clear();
   }
 }

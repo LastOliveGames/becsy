@@ -43,9 +43,6 @@ export class QueryBox {
     const dispatcher = this.system.dispatcher;
     this.hasTransientResults = Boolean(this.flavors & transientFlavorsMask);
     this.hasChangedResults = Boolean(this.flavors & changedFlavorsMask);
-    CHECK: if (this.flavors && !this.withMask) {
-      throw new Error(`Query for entities must have at least one with() clause`);
-    }
     CHECK: if (this.hasChangedResults && !this.trackMask) {
       throw new Error(`Query for changed entities must track at least one component`);
     }
@@ -88,6 +85,11 @@ export class QueryBox {
     this.results.changedOrRemoved?.clear();
     this.results.addedChangedOrRemoved?.clear();
     this.changedEntities?.clear();
+  }
+
+  clearAllResults(): void {
+    this.clearTransientResults();
+    this.results.all?.clear();
   }
 
   handleShapeUpdate(id: EntityId): void {

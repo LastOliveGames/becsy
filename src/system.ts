@@ -10,6 +10,10 @@ export interface SystemType {
   new(): System;
 }
 
+export const enum RunState {
+  RUNNING, SUSPENDED, STOPPED
+}
+
 
 export abstract class System {
   static __system = true;
@@ -49,7 +53,8 @@ export class SystemBox {
   hasWriteQueries: boolean;
   private processedEntities: Bitset;
   private shapeLogPointer: LogPointer;
-  private writeLogPointer: LogPointer | undefined;
+  private writeLogPointer?: LogPointer;
+  private state: RunState = RunState.RUNNING;
 
   get name(): string {return this.system.name;}
 
@@ -64,6 +69,7 @@ export class SystemBox {
   }
 
   execute(time: number, delta: number): void {
+    if (this.state !== RunState.RUNNING) return;
     this.system.time = time;
     this.system.delta = delta;
     this.runQueries();
@@ -118,5 +124,34 @@ export class SystemBox {
         }
       }
     }
+  }
+
+  stop(): void {
+    if (this.state === RunState.STOPPED) return;
+    this.state = RunState.STOPPED;
+    for (const query of this.shapeQueries) query.clearAllResults();
+  }
+
+  restart(): void {
+    if (this.state === RunState.STOPPED) {
+      const registry = this.dispatcher.registry;
+      const Alive = registry.Alive;
+      for (let id = 0; id < this.dispatcher.maxEntities; id++) {
+        if (registry.hasShape(id, Alive, false)) {
+          for (const query of this.shapeQueries) query.handleShapeUpdate(id);
+        }
+      }
+      for (const query of this.shapeQueries) query.clearTransientResults();
+      this.dispatcher.shapeLog.createPointer(this.shapeLogPointer);
+      this.dispatcher.writeLog?.createPointer(this.writeLogPointer!);
+    }
+    this.state = RunState.RUNNING;
+  }
+
+  suspend(): void {
+    if (this.state === RunState.STOPPED) this.restart();
+    // TODO: find a more efficient way of caching results while suspended than leaving them in the
+    // original logs, but that doesn't lead to duplicates in the entity lists.
+    this.state = RunState.SUSPENDED;
   }
 }
