@@ -198,7 +198,7 @@ export class Dispatcher {
   }
 
   private deferRequestedRunState(defs: DefsArray, state: RunState): void {
-    for (const def of defs) {
+    for (const def of defs.flat(Infinity)) {
       if (!def.__system) continue;
       const system = this.systemsByClass.get(def);
       CHECK: if (!system) throw new Error(`System ${def.name} not defined for this world`);
@@ -209,18 +209,18 @@ export class Dispatcher {
   private checkControlOverlap(options: ControlOptions): void {
     const stopSet = new Set<SystemType>();
     const suspendSet = new Set<SystemType>();
-    for (const def of options.stop) {
+    for (const def of options.stop.flat(Infinity)) {
       if (!def.__system) continue;
       stopSet.add(def);
     }
-    for (const def of options.suspend) {
+    for (const def of options.suspend.flat(Infinity)) {
       if (!def.__system) continue;
       if (stopSet.has(def)) {
         throw new Error(`Request to both stop and suspend system ${def.name}`);
       }
       suspendSet.add(def);
     }
-    for (const def of options.restart) {
+    for (const def of options.restart.flat(Infinity)) {
       if (!def.__system) continue;
       if (stopSet.has(def)) {
         throw new Error(`Request to both stop and restart system ${def.name}`);
