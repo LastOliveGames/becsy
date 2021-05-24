@@ -11,7 +11,7 @@ export interface SystemType {
 }
 
 export const enum RunState {
-  RUNNING, SUSPENDED, STOPPED
+  RUNNING, STOPPED
 }
 
 
@@ -146,12 +146,5 @@ export class SystemBox {
       this.dispatcher.writeLog?.createPointer(this.writeLogPointer!);
     }
     this.state = RunState.RUNNING;
-  }
-
-  suspend(): void {
-    if (this.state === RunState.STOPPED) this.restart();
-    // TODO: find a more efficient way of caching results while suspended than leaving them in the
-    // original logs, but that doesn't lead to duplicates in the entity lists.
-    this.state = RunState.SUSPENDED;
   }
 }

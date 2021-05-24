@@ -29,7 +29,6 @@ export interface WorldOptions {
 
 export interface ControlOptions {
   stop: DefsArray;
-  suspend: DefsArray;
   restart: DefsArray;
 }
 
@@ -192,7 +191,6 @@ export class Dispatcher {
   control(options: ControlOptions): void {
     CHECK: this.checkControlOverlap(options);
     this.deferRequestedRunState(options.stop, RunState.STOPPED);
-    this.deferRequestedRunState(options.suspend, RunState.SUSPENDED);
     this.deferRequestedRunState(options.restart, RunState.RUNNING);
     if (!this.executing) this.processDeferredControls();
   }
@@ -208,26 +206,13 @@ export class Dispatcher {
 
   private checkControlOverlap(options: ControlOptions): void {
     const stopSet = new Set<SystemType>();
-    const suspendSet = new Set<SystemType>();
     for (const def of options.stop.flat(Infinity)) {
       if (!def.__system) continue;
       stopSet.add(def);
     }
-    for (const def of options.suspend.flat(Infinity)) {
-      if (!def.__system) continue;
-      if (stopSet.has(def)) {
-        throw new Error(`Request to both stop and suspend system ${def.name}`);
-      }
-      suspendSet.add(def);
-    }
     for (const def of options.restart.flat(Infinity)) {
       if (!def.__system) continue;
-      if (stopSet.has(def)) {
-        throw new Error(`Request to both stop and restart system ${def.name}`);
-      }
-      if (suspendSet.has(def)) {
-        throw new Error(`Request to both suspend and restart system ${def.name}`);
-      }
+      if (stopSet.has(def)) throw new Error(`Request to both stop and restart system ${def.name}`);
     }
   }
 
@@ -236,7 +221,6 @@ export class Dispatcher {
     for (const [system, state] of this.deferredControls.entries()) {
       switch (state) {
         case RunState.STOPPED: system.stop(); break;
-        case RunState.SUSPENDED: system.suspend(); break;
         case RunState.RUNNING: system.restart(); break;
       }
     }
