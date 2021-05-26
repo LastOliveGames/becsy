@@ -1,116 +1,116 @@
 {
   "baseline": {
-    "devOps": 27543,
+    "devOps": 39698,
     "devRel": 1,
-    "perfOps": 27543,
+    "perfOps": 39698,
     "perfRel": 1
   },
   "ecs-benchmark/packed1": {
-    "devOps": 11727,
-    "devRel": 0.42577061322296045,
-    "perfOps": 72372,
-    "perfRel": 2.6276004792506265
+    "devOps": 19501,
+    "devRel": 0.49123381530555693,
+    "perfOps": 129335,
+    "perfRel": 3.2579726938384805
   },
   "ecs-benchmark/packed5": {
-    "devOps": 10467,
-    "devRel": 0.38002396253131465,
-    "perfOps": 54455,
-    "perfRel": 1.9770903677885487
+    "devOps": 17708,
+    "devRel": 0.4460678119804524,
+    "perfOps": 117411,
+    "perfRel": 2.9576049171242884
   },
   "ecs-benchmark/simpleIter": {
-    "devOps": 2160,
-    "devRel": 0.07842282975710707,
-    "perfOps": 27367,
-    "perfRel": 0.9936099916494209
+    "devOps": 4335,
+    "devRel": 0.10919945589198449,
+    "perfOps": 65715,
+    "perfRel": 1.6553730666532318
   },
   "ecs-benchmark/fragIter": {
-    "devOps": 21347,
-    "devRel": 0.7750426605671132,
-    "perfOps": 114950,
-    "perfRel": 4.173474203971971
+    "devOps": 37517,
+    "devRel": 0.9450602045443095,
+    "perfOps": 239241,
+    "perfRel": 6.026525265756462
   },
   "ecs-benchmark/entityCycle": {
-    "devOps": 715,
-    "devRel": 0.025959408924227573,
-    "perfOps": 1423,
-    "perfRel": 0.05166466978905711
+    "devOps": 436,
+    "devRel": 0.010982921053957378,
+    "perfOps": 2220,
+    "perfRel": 0.05592221270592977
   },
   "ecs-benchmark/addRemove": {
-    "devOps": 2150,
-    "devRel": 0.07805976110082416,
-    "perfOps": 8370,
-    "perfRel": 0.3038884653087899
+    "devOps": 1578,
+    "devRel": 0.039750113355836565,
+    "perfOps": 14770,
+    "perfRel": 0.372059045795758
   },
   "ecs-packed/packed1": {
-    "devOps": 10124,
-    "devRel": 0.3675707076208111,
-    "perfOps": 35532,
-    "perfRel": 1.2900555495044113
+    "devOps": 17774,
+    "devRel": 0.44773036425008816,
+    "perfOps": 79451,
+    "perfRel": 2.0013854602246965
   },
   "ecs-packed/packed5": {
-    "devOps": 7389,
-    "devRel": 0.2682714301274371,
-    "perfOps": 34128,
-    "perfRel": 1.2390807101622916
+    "devOps": 16605,
+    "devRel": 0.4182830369288125,
+    "perfOps": 75788,
+    "perfRel": 1.9091138092599123
   },
   "ecs-packed/simpleIter": {
-    "devOps": 1622,
-    "devRel": 0.058889736049086885,
-    "perfOps": 16508,
-    "perfRel": 0.5993537377918164
+    "devOps": 3053,
+    "devRel": 0.07690563756360522,
+    "perfOps": 46419,
+    "perfRel": 1.1693032394579073
   },
   "ecs-packed/fragIter": {
-    "devOps": 14693,
-    "devRel": 0.5334567766764695,
-    "perfOps": 60582,
-    "perfRel": 2.1995425334930836
+    "devOps": 33812,
+    "devRel": 0.8517305657715754,
+    "perfOps": 151660,
+    "perfRel": 3.820343594135725
   },
   "ecs-packed/entityCycle": {
-    "devOps": 418,
-    "devRel": 0.01517626983262535,
-    "perfOps": 952,
-    "perfRel": 0.03456413607813238
+    "devOps": 450,
+    "devRel": 0.011335583656607386,
+    "perfOps": 2092,
+    "perfRel": 0.05269786891027256
   },
   "ecs-packed/addRemove": {
-    "devOps": 1583,
-    "devRel": 0.05747376828958356,
-    "perfOps": 5404,
-    "perfRel": 0.19620230185528084
+    "devOps": 1595,
+    "devRel": 0.04017834651619729,
+    "perfOps": 11915,
+    "perfRel": 0.30014106504106003
   },
   "ecs-packed-elastic/packed1": {
-    "devOps": 7241,
-    "devRel": 0.2628980140144501,
-    "perfOps": 17150,
-    "perfRel": 0.6226627455251789
+    "devOps": 16377,
+    "devRel": 0.4125396745427981,
+    "perfOps": 48164,
+    "perfRel": 1.2132601138596404
   },
   "ecs-packed-elastic/packed5": {
-    "devOps": 6764,
-    "devRel": 0.24557963910975567,
-    "perfOps": 20199,
-    "perfRel": 0.733362378825836
+    "devOps": 15695,
+    "devRel": 0.39535996775656207,
+    "perfOps": 49263,
+    "perfRel": 1.2409441281676659
   },
   "ecs-packed-elastic/simpleIter": {
-    "devOps": 1542,
-    "devRel": 0.05598518679882366,
-    "perfOps": 9837,
-    "perfRel": 0.3571506371854918
+    "devOps": 2956,
+    "devRel": 0.07446218953095873,
+    "perfOps": 24986,
+    "perfRel": 0.6294019849866492
   },
   "ecs-packed-elastic/fragIter": {
-    "devOps": 14052,
-    "devRel": 0.5101840758087355,
-    "perfOps": 34024,
-    "perfRel": 1.2353047961369494
+    "devOps": 31914,
+    "devRel": 0.8039195929265958,
+    "perfOps": 98275,
+    "perfRel": 2.4755655196735353
   },
   "ecs-packed-elastic/entityCycle": {
-    "devOps": 451,
-    "devRel": 0.01637439639835893,
-    "perfOps": 499,
-    "perfRel": 0.018117125948516864
+    "devOps": 457,
+    "devRel": 0.01151191495793239,
+    "perfOps": 2023,
+    "perfRel": 0.05095974608292609
   },
   "ecs-packed-elastic/addRemove": {
-    "devOps": 574,
-    "devRel": 0.020840140870638638,
-    "perfOps": 3240,
-    "perfRel": 0.1176342446356606
+    "devOps": 1419,
+    "devRel": 0.035744873797168626,
+    "perfOps": 11312,
+    "perfRel": 0.2849513829412061
   }
 }
