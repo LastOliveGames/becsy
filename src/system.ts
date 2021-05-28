@@ -22,6 +22,9 @@ export abstract class System {
   time: number;
   delta: number;
 
+  // TODO: support schedule builder
+  // TODO: allow attaching another system
+
   get name(): string {return this.constructor.name;}
 
   query(buildCallback: (q: QueryBuilder) => void): Query {
@@ -42,6 +45,8 @@ export abstract class System {
   accessRecentlyDeletedData(toggle = true): void {
     this.__dispatcher.registry.includeRecentlyDeleted = toggle;
   }
+
+  // TODO: support an async initializer
 
   abstract execute(): void;
 }

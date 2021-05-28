@@ -31,9 +31,12 @@ export abstract class Type<JSType> {
   static dynamicString: (maxUtf8Length: number) => Type<string>;
   static object: Type<any>;
   static weakObject: Type<any>;
+  // TODO: add autoremove/autodelete when nulled out
   static ref: Type<Entity | undefined>;
   static backrefs: (type?: ComponentType<any>, fieldName?: string, trackDeletedBackrefs?: boolean)
     => Type<Entity[]>;
+  // TODO: add array type
+  // TODO: add struct type
 }
 
 class BooleanType extends Type<boolean> {

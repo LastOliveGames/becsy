@@ -7,6 +7,7 @@ import type {System} from './system';
 export class World {
   private readonly __dispatcher: Dispatcher;
 
+  // TODO: change API to an async world creator
   constructor(options: WorldOptions) {
     this.__dispatcher = new Dispatcher(options);
   }

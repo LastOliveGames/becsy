@@ -258,6 +258,7 @@ export function defineAndAllocateComponentType<C>(type: ComponentType<C>): void 
     }
   }
 
+  // TODO: in CHECK mode guard against reuse of bound components
   switch (binding.storage) {
     case 'sparse':
       // Inline the trivial storage manager for performance.

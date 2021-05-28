@@ -76,6 +76,7 @@ export class Dispatcher {
     if (componentTypes.length > MAX_NUM_COMPONENTS) {
       throw new Error(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
     }
+    // TODO: allocate all shared buffers through a central manager
     STATS: this.stats = new Stats();
     this.maxEntities = maxEntities;
     this.defaultComponentStorage = defaultComponentStorage;
