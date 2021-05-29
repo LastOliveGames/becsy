@@ -105,15 +105,15 @@ class Count extends System {
   }
 }
 
-function createWorld(...systems: SystemType[]): World {
-  return new World({maxEntities: 200, defs: [componentTypes, systems, Count]});
+async function createWorld(...systems: SystemType[]): Promise<World> {
+  return World.create({maxEntities: 200, defs: [componentTypes, systems, Count]});
 }
 
 
 describe('follow forward references', () => {
 
-  test('refs', () => {
-    const world = createWorld(IncrementTargetedDests);
+  test('refs', async() => {
+    const world = await createWorld(IncrementTargetedDests);
     world.build(sys => {
       sys.createEntity(PreciseDest);
       const d1 = sys.createEntity(PreciseDest);
@@ -122,12 +122,12 @@ describe('follow forward references', () => {
       sys.createEntity(Origin, MultiOrigin);
       sys.createEntity(Origin, {target: d1}, MultiOrigin, {target1: d2, target2: d3});
     });
-    world.execute();
+    await world.execute();
     expect(total.preciseDest).toBe(3);
   });
 
-  test('refs in recently removed component', () => {
-    const world = createWorld();
+  test('refs in recently removed component', async() => {
+    const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(PreciseDest);
       const o = sys.createEntity(Origin, {target: d1});
@@ -142,8 +142,8 @@ describe('follow forward references', () => {
 
 describe('follow backward references', () => {
 
-  test('precise backref', () => {
-    const world = createWorld(IncrementTargeters);
+  test('precise backref', async() => {
+    const world = await createWorld(IncrementTargeters);
     world.build(sys => {
       sys.createEntity(PreciseDest);
       const d1 = sys.createEntity(PreciseDest);
@@ -153,13 +153,13 @@ describe('follow backward references', () => {
       sys.createEntity(Origin, {target: d1});
       sys.createEntity(Origin, {target: d2});
     });
-    world.execute();
+    await world.execute();
     expect(total.multiOrigin).toBe(1);
     expect(total.origin).toBe(0);
   });
 
-  test('type backref', () => {
-    const world = createWorld(IncrementTargeters);
+  test('type backref', async() => {
+    const world = await createWorld(IncrementTargeters);
     world.build(sys => {
       sys.createEntity(TypeDest);
       const d1 = sys.createEntity(TypeDest);
@@ -169,13 +169,13 @@ describe('follow backward references', () => {
       sys.createEntity(Origin, {target: d1});
       sys.createEntity(Origin, {target: d2});
     });
-    world.execute();
+    await world.execute();
     expect(total.multiOrigin).toBe(2);
     expect(total.origin).toBe(0);
   });
 
-  test('global backref', () => {
-    const world = createWorld(IncrementTargeters);
+  test('global backref', async() => {
+    const world = await createWorld(IncrementTargeters);
     world.build(sys => {
       sys.createEntity(GlobalDest);
       const d1 = sys.createEntity(GlobalDest);
@@ -185,13 +185,13 @@ describe('follow backward references', () => {
       sys.createEntity(Origin, {target: d1});
       sys.createEntity(Origin, {target: d2});
     });
-    world.execute();
+    await world.execute();
     expect(total.multiOrigin).toBe(2);
     expect(total.origin).toBe(2);
   });
 
-  test('fail to access backrefs to recently removed component when not enabled', () => {
-    const world = createWorld();
+  test('fail to access backrefs to recently removed component when not enabled', async() => {
+    const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
       const o = sys.createEntity(Origin, {target: d1});
@@ -201,8 +201,8 @@ describe('follow backward references', () => {
     });
   });
 
-  test('backrefs to recently removed component', () => {
-    const world = createWorld();
+  test('backrefs to recently removed component', async() => {
+    const world = await createWorld();
     let d1: Entity;  // should stay bound long enough...
     world.build(sys => {
       d1 = sys.createEntity(GlobalDestWithStales);
@@ -213,8 +213,8 @@ describe('follow backward references', () => {
       sys.accessRecentlyDeletedData();
       expect(d1.read(GlobalDestWithStales).targeters.length).toBe(2);
     });
-    world.execute();
-    world.execute();
+    await world.execute();
+    await world.execute();
     world.build(sys => {
       expect(d1.read(GlobalDestWithStales).targeters.length).toBe(1);
       sys.accessRecentlyDeletedData();
@@ -225,8 +225,8 @@ describe('follow backward references', () => {
 
 describe('backrefs storage variants', () => {
 
-  test('small entities list', () => {
-    const world = createWorld();
+  test('small entities list', async() => {
+    const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
       for (let i = 0; i < 10; i++) sys.createEntity(Origin, {target: d1});
@@ -234,8 +234,8 @@ describe('backrefs storage variants', () => {
     });
   });
 
-  test('large entities list, with index', () => {
-    const world = createWorld();
+  test('large entities list, with index', async() => {
+    const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
       const origins = [];
@@ -246,8 +246,8 @@ describe('backrefs storage variants', () => {
     });
   });
 
-  test('single tag', () => {
-    const world = createWorld();
+  test('single tag', async() => {
+    const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
       sys.createEntity(MultiOrigin, {target1: d1});
@@ -255,8 +255,8 @@ describe('backrefs storage variants', () => {
     });
   });
 
-  test('tag array', () => {
-    const world = createWorld();
+  test('tag array', async() => {
+    const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
       const o = sys.createEntity(MultiOrigin, {target1: d1, target2: d1});
@@ -272,8 +272,8 @@ describe('backrefs storage variants', () => {
 
 describe('refs affected by entity deletion', () => {
 
-  test('clear refs to deleted entity', () => {
-    const world = createWorld();
+  test('clear refs to deleted entity', async() => {
+    const world = await createWorld();
     let o: Entity;
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
@@ -283,16 +283,16 @@ describe('refs affected by entity deletion', () => {
       sys.accessRecentlyDeletedData();
       expect(o.read(Origin).target).toBe(d1);
     });
-    world.execute();
-    world.execute();
+    await world.execute();
+    await world.execute();
     world.build(sys => {
       sys.accessRecentlyDeletedData();
       expect(o.read(Origin).target).toBe(undefined);
     });
   });
 
-  test('overwrite cleared refs before deletion finalized', () => {
-    const world = createWorld();
+  test('overwrite cleared refs before deletion finalized', async() => {
+    const world = await createWorld();
     let o: Entity;
     let d2: Entity;
     world.build(sys => {
@@ -307,8 +307,8 @@ describe('refs affected by entity deletion', () => {
       o.write(Origin).target = d2;
       expect(o.read(Origin).target).toBe(d2);
     });
-    world.execute();
-    world.execute();
+    await world.execute();
+    await world.execute();
     expect(o!.read(Origin).target).toBe(d2!);
   });
 });

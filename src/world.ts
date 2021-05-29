@@ -3,12 +3,22 @@ import {ControlOptions, Dispatcher, WorldOptions} from './dispatcher';
 import type {Stats} from './stats';
 import type {System} from './system';
 
+const MAGIC_COOKIE = {};
+
 
 export class World {
   private readonly __dispatcher: Dispatcher;
 
-  // TODO: change API to an async world creator
-  constructor(options: WorldOptions) {
+  static async create(options: WorldOptions): Promise<World> {
+    const world = new World(options, MAGIC_COOKIE);
+    await world.__dispatcher.initialize();
+    return world;
+  }
+
+  private constructor(options: WorldOptions, magicCookie: any) {
+    if (magicCookie !== MAGIC_COOKIE) {
+      throw new Error(`Don't call World constructor directly; use World.create instead`);
+    }
     this.__dispatcher = new Dispatcher(options);
   }
 
@@ -20,8 +30,8 @@ export class World {
     this.__dispatcher.createEntity(initialComponents);
   }
 
-  execute(time?: number, delta?: number): void {
-    this.__dispatcher.execute(time, delta);
+  execute(time?: number, delta?: number): Promise<void> {
+    return this.__dispatcher.execute(time, delta);
   }
 
   control(options: ControlOptions): void {
@@ -32,3 +42,4 @@ export class World {
     return this.__dispatcher.stats;
   }
 }
+

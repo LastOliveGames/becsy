@@ -21,8 +21,8 @@ class Stuff {
   @field(Type.weakObject) weakObject: Stuff;
 }
 
-function testReadWrite(prop: string, values: any[]): void {
-  const world = new World({defs: [Big]});
+async function testReadWrite(prop: string, values: any[]): Promise<void> {
+  const world = await World.create({defs: [Big]});
   world.build(system => {
     const entity = system.createEntity(Big);
     for (const value of values) {
@@ -35,52 +35,52 @@ function testReadWrite(prop: string, values: any[]): void {
 
 describe('getting and setting fields of various types', () => {
 
-  test('boolean', () => {
-    testReadWrite('boolean', [false, true]);
+  test('boolean', async() => {
+    await testReadWrite('boolean', [false, true]);
   });
 
-  test('uint8', () => {
-    testReadWrite('uint8', [0, 127, 255]);
+  test('uint8', async() => {
+    await testReadWrite('uint8', [0, 127, 255]);
   });
 
-  test('int8', () => {
-    testReadWrite('int8', [0, 127, -128]);
+  test('int8', async() => {
+    await testReadWrite('int8', [0, 127, -128]);
   });
 
-  test('uint16', () => {
-    testReadWrite('uint16', [0, 2 ** 15 - 1, 2 ** 16 - 1]);
+  test('uint16', async() => {
+    await testReadWrite('uint16', [0, 2 ** 15 - 1, 2 ** 16 - 1]);
   });
 
-  test('int16', () => {
-    testReadWrite('int16', [0, 2 ** 15 - 1, -(2 ** 15)]);
+  test('int16', async() => {
+    await testReadWrite('int16', [0, 2 ** 15 - 1, -(2 ** 15)]);
   });
 
-  test('uint32', () => {
-    testReadWrite('uint32', [0, 2 ** 31 - 1, 2 ** 32 - 1]);
+  test('uint32', async() => {
+    await testReadWrite('uint32', [0, 2 ** 31 - 1, 2 ** 32 - 1]);
   });
 
-  test('int32', () => {
-    testReadWrite('int32', [0, 2 ** 31 - 1, -(2 ** 31)]);
+  test('int32', async() => {
+    await testReadWrite('int32', [0, 2 ** 31 - 1, -(2 ** 31)]);
   });
 
-  test('float32', () => {
-    testReadWrite('float32', [0, 2 ** 24, -(2 ** 24), 0.5, -0.5]);
+  test('float32', async() => {
+    await testReadWrite('float32', [0, 2 ** 24, -(2 ** 24), 0.5, -0.5]);
   });
 
-  test('float64', () => {
-    testReadWrite('float64', [0, 2 ** 53, -(2 ** 53), 0.5, -0.5]);
+  test('float64', async() => {
+    await testReadWrite('float64', [0, 2 ** 53, -(2 ** 53), 0.5, -0.5]);
   });
 
-  test('staticString', () => {
-    testReadWrite('staticString', ['foo', 'bar', 'baz']);
+  test('staticString', async() => {
+    await testReadWrite('staticString', ['foo', 'bar', 'baz']);
   });
 
-  test('dynamicString', () => {
-    testReadWrite('dynamicString', ['', 'foo', 'foobarbazqux12', '🤷‍♂️']);
+  test('dynamicString', async() => {
+    await testReadWrite('dynamicString', ['', 'foo', 'foobarbazqux12', '🤷‍♂️']);
   });
 
-  test('ref', () => {
-    const world = new World({defs: [Big]});
+  test('ref', async() => {
+    const world = await World.create({defs: [Big]});
     world.build(system => {
       const a = system.createEntity(Big);
       const b = system.createEntity(Big);
@@ -91,21 +91,21 @@ describe('getting and setting fields of various types', () => {
     });
   });
 
-  test('object', () => {
+  test('object', async() => {
     const stuff = new Stuff();
-    testReadWrite('object', [undefined, null, stuff]);
+    await testReadWrite('object', [undefined, null, stuff]);
   });
 
-  test('weakObject', () => {
+  test('weakObject', async() => {
     const stuff = new Stuff();
-    testReadWrite('weakObject', [undefined, null, stuff]);
+    await testReadWrite('weakObject', [undefined, null, stuff]);
   });
 
   // Can't figure out how to force garbage collection to test this, even after following
   // https://stackoverflow.com/questions/65175380.
-  test.skip('weakObject garbage collection', () => {
+  test.skip('weakObject garbage collection', async() => {
     const a: any[] = [new Stuff()];
-    const world = new World({defs: [Big]});
+    const world = await World.create({defs: [Big]});
     let entity: Entity;  // this will get released, but nothing will overwrite it
     world.build(system => {
       entity = system.createEntity(Big);

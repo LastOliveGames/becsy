@@ -6,8 +6,8 @@ import {field, component, Type, World} from '../src';
 
 describe('exercising validity checks', () => {
 
-  test('reuse readable component', () => {
-    const world = new World({defs: [A]});
+  test('reuse readable component', async() => {
+    const world = await World.create({defs: [A]});
     world.build(system => {
       const entity1 = system.createEntity(A, {value: 1});
       const a1 = entity1.read(A);
@@ -16,8 +16,8 @@ describe('exercising validity checks', () => {
     });
   });
 
-  test('reuse writable component', () => {
-    const world = new World({defs: [A]});
+  test('reuse writable component', async() => {
+    const world = await World.create({defs: [A]});
     world.build(system => {
       const entity1 = system.createEntity(A, {value: 1});
       const a1 = entity1.write(A);

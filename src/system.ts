@@ -46,9 +46,8 @@ export abstract class System {
     this.__dispatcher.registry.includeRecentlyDeleted = toggle;
   }
 
-  // TODO: support an async initializer
-
-  abstract execute(): void;
+  initialize(): void | Promise<void> { } // eslint-disable-line @typescript-eslint/no-empty-function
+  execute(): void { } // eslint-disable-line @typescript-eslint/no-empty-function
 }
 
 export class SystemBox {
@@ -71,6 +70,10 @@ export class SystemBox {
     for (const builder of system.__queryBuilders!) builder.__build(this);
     system.__queryBuilders = null;
     this.hasWriteQueries = !!this.writeQueries.length;
+  }
+
+  async initialize(): Promise<void> {
+    await Promise.resolve(this.system.initialize());
   }
 
   execute(time: number, delta: number): void {

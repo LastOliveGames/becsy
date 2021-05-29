@@ -133,7 +133,11 @@ export class Dispatcher {
     return {componentTypes, systemTypes};
   }
 
-  execute(time?: number, delta?: number, systems?: SystemBox[]): void {
+  async initialize(): Promise<void> {
+    await Promise.all(this.systems.map(system => system.initialize()));
+  }
+
+  async execute(time?: number, delta?: number, systems?: SystemBox[]): Promise<void> {
     CHECK: if (this.executing) throw new Error('Recursive system execution not allowed');
     this.executing = true;
     if (time === undefined) time = now() / 1000;

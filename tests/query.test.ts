@@ -124,63 +124,63 @@ class Count extends System {
   }
 }
 
-function createWorld(...systems: SystemType[]): World {
-  return new World({maxEntities: 100, defs: [componentTypes, systems, Count]});
+async function createWorld(...systems: SystemType[]): Promise<World> {
+  return World.create({maxEntities: 100, defs: [componentTypes, systems, Count]});
 }
 
 
 describe('basic queries, all iteration, reads and writes', () => {
 
-  test('iterate one type', () => {
-    const world = createWorld(IncrementA);
+  test('iterate one type', async() => {
+    const world = await createWorld(IncrementA);
     world.createEntity(A);
     world.createEntity(A);
     world.createEntity(A, C);
     world.createEntity(C);
-    world.execute();
+    await world.execute();
     expect(total.a).toBe(3);
     expect(total.c).toBe(0);
   });
 
-  test('iterate overlapping types', () => {
-    const world = createWorld(IncrementA, IncrementC);
+  test('iterate overlapping types', async() => {
+    const world = await createWorld(IncrementA, IncrementC);
     world.createEntity(A);
     world.createEntity(A);
     world.createEntity(A, C);
     world.createEntity(C);
-    world.execute();
+    await world.execute();
     expect(total.a).toBe(3);
     expect(total.c).toBe(2);
   });
 
-  test('iterate type intersection', () => {
-    const world = createWorld(IncrementAC);
+  test('iterate type intersection', async() => {
+    const world = await createWorld(IncrementAC);
     world.createEntity(A);
     world.createEntity(A);
     world.createEntity(A, C);
     world.createEntity(C);
-    world.execute();
+    await world.execute();
     expect(total.a).toBe(1);
     expect(total.c).toBe(1);
   });
 
-  test('iterate type intersection with tag type', () => {
-    const world = createWorld(IncrementAWithD);
+  test('iterate type intersection with tag type', async() => {
+    const world = await createWorld(IncrementAWithD);
     world.createEntity(A);
     world.createEntity(A);
     world.createEntity(A, D);
     world.createEntity(D);
-    world.execute();
+    await world.execute();
     expect(total.a).toBe(1);
   });
 
-  test('iterate type exclusion', () => {
-    const world = createWorld(IncrementANotC);
+  test('iterate type exclusion', async() => {
+    const world = await createWorld(IncrementANotC);
     world.createEntity(A);
     world.createEntity(A);
     world.createEntity(A, C);
     world.createEntity(C);
-    world.execute();
+    await world.execute();
     expect(total.a).toBe(2);
     expect(total.c).toBe(0);
   });
@@ -188,21 +188,21 @@ describe('basic queries, all iteration, reads and writes', () => {
 
 describe('component shape changes', () => {
 
-  test('add a component for a subsequent system', () => {
-    const world = createWorld(AddCToA, IncrementC);
+  test('add a component for a subsequent system', async() => {
+    const world = await createWorld(AddCToA, IncrementC);
     world.createEntity(A);
     world.createEntity(A);
     world.createEntity(A, C);
-    world.execute();
+    await world.execute();
     expect(total.c).toBe(3);
   });
 
-  test('remove a component for a subsequent system', () => {
-    const world = createWorld(RemoveCFromAC, IncrementC);
+  test('remove a component for a subsequent system', async() => {
+    const world = await createWorld(RemoveCFromAC, IncrementC);
     world.createEntity(C);
     world.createEntity(C);
     world.createEntity(A, C);
-    world.execute();
+    await world.execute();
     expect(total.c).toBe(2);
   });
 
@@ -210,36 +210,36 @@ describe('component shape changes', () => {
 
 describe('creating and deleting entities', () => {
 
-  test('create entity for subsequent system', () => {
-    const world = createWorld(CreateA, IncrementA);
+  test('create entity for subsequent system', async() => {
+    const world = await createWorld(CreateA, IncrementA);
     world.createEntity(A, C);
-    world.execute();
+    await world.execute();
     expect(total.a).toBe(2);
     expect(total.c).toBe(0);
   });
 
-  test('delete entity for subsequent system', () => {
-    const world = createWorld(DeleteA, IncrementA, IncrementC);
+  test('delete entity for subsequent system', async() => {
+    const world = await createWorld(DeleteA, IncrementA, IncrementC);
     world.createEntity(A);
     world.createEntity(A);
     world.createEntity(A, C);
     world.createEntity(C);
-    world.execute();
+    await world.execute();
     expect(total.a).toBe(0);
     expect(total.c).toBe(1);
   });
 
-  test('recycle entity IDs', () => {
-    const world = new World({
+  test('recycle entity IDs', async() => {
+    const world = await World.create({
       maxEntities: 9, maxLimboEntities: 7, defs: [componentTypes, CreateAForEachC, DeleteA]
     });
     world.createEntity(C, {value: 1});
     world.createEntity(C, {value: 2});
     world.createEntity(C, {value: 3});
-    world.execute();
-    world.execute();
-    world.execute();
-    world.execute();
+    await world.execute();
+    await world.execute();
+    await world.execute();
+    await world.execute();
   });
 
 });

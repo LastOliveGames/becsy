@@ -4,7 +4,7 @@ import {parentPort, workerData} from 'worker_threads';
 const TARGET_RUNNING_TIME = 500;  // ms
 
 if (workerData.baseline) {
-  const ops = benchmark(runBaselineWorkload);
+  const ops = await benchmark(runBaselineWorkload);
   parentPort!.postMessage({name: 'baseline', ops});
 }
 
@@ -15,7 +15,7 @@ let index = 0;
 for (const name in tests) {
   if (index++ === workerData.index) {
     try {
-      const ops = runCase(tests[name]);
+      const ops = await runCase(tests[name]);
       parentPort!.postMessage({name, ops});
     } catch (e) {
       parentPort!.postMessage({name, ops: 0, error: e.toString()});
@@ -25,17 +25,17 @@ for (const name in tests) {
 }
 parentPort!.postMessage({ops: 0});
 
-function runCase(fn: () => any): number {
-  const world = fn();
-  return benchmark(() => {world.execute();});
+async function runCase(fn: () => Promise<any>): Promise<number> {
+  const world = await fn();
+  return benchmark(() => world.execute());
 }
 
-function benchmark(fn: () => void): number {
+async function benchmark(fn: () => Promise<void>): Promise<number> {
   let cycleTime = 0;
   let cycleTotalTime = 0;
   let cycleCount = 1;
   while (cycleTotalTime < TARGET_RUNNING_TIME) {
-    const elapsed = time(fn, cycleCount);
+    const elapsed = await time(fn, cycleCount);
     cycleTime = elapsed / cycleCount;
     cycleCount *= 2;
     cycleTotalTime += elapsed;
@@ -43,18 +43,18 @@ function benchmark(fn: () => void): number {
 
   global.gc();
   const targetCount = Math.ceil(TARGET_RUNNING_TIME / cycleTime);
-  const totalTime = time(fn, targetCount);
+  const totalTime = await time(fn, targetCount);
   return Math.floor(targetCount / totalTime * 1000);
 }
 
-function time(fn: () => void, count: number): number {
+async function time(fn: () => Promise<void>, count: number): Promise<number> {
   const start = performance.now();
-  for (let i = 0; i < count; i++) fn();
+  for (let i = 0; i < count; i++) await fn();
   const end = performance.now();
   return end - start;
 }
 
-function runBaselineWorkload(): void {
+async function runBaselineWorkload(): Promise<void> {
   let n = 1;
   for (let i = 0; i < 50000; i++) {
     n += 1;

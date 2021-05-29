@@ -9,7 +9,7 @@ type Becsy = {
 }
 
 
-export default (becsy: Becsy): {[key: string]: () => any} => {
+export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
   class A {
     @becsy.field(becsy.Type.int32) declare value: number;
   }
@@ -190,27 +190,27 @@ export default (becsy: Becsy): {[key: string]: () => any} => {
   }
 
   return {
-    packed1() {
+    async packed1() {
       const count = 5000;
-      const world = new becsy.World({
+      const world = await becsy.World.create({
         maxEntities: count, defs: [A, B, C, D, E, SystemA]
       });
       for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
       return world;
     },
 
-    packed5() {
+    async packed5() {
       const count = 1000;
-      const world = new becsy.World({
+      const world = await becsy.World.create({
         maxEntities: count, defs: [A, B, C, D, E, SystemA, SystemB, SystemC, SystemD, SystemE]
       });
       for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
       return world;
     },
 
-    simpleIter() {
+    async simpleIter() {
       const count = 1000;
-      const world = new becsy.World({
+      const world = await becsy.World.create({
         maxEntities: count * 4, defs: [A, B, C, D, E, SystemAB, SystemCD, SystemCE]
       });
       for (let i = 0; i < count; i++) {
@@ -222,9 +222,9 @@ export default (becsy: Becsy): {[key: string]: () => any} => {
       return world;
     },
 
-    fragIter() {
+    async fragIter() {
       const count = 100;
-      const world = new becsy.World({
+      const world = await becsy.World.create({
         maxEntities: count * COMPS.length, defs: [COMPS, Data, DataSystem]
       });
       for (let i = 0; i < count; i++) {
@@ -233,18 +233,18 @@ export default (becsy: Becsy): {[key: string]: () => any} => {
       return world;
     },
 
-    entityCycle() {
+    async entityCycle() {
       const count = 1000;
-      const world = new becsy.World({
+      const world = await becsy.World.create({
         maxEntities: count * 8, maxLimboEntities: 10000, defs: [A, B, SpawnB, KillB]
       });
       for (let i = 0; i < count; i++) world.createEntity(A, {value: i});
       return world;
     },
 
-    addRemove() {
+    async addRemove() {
       const count = 1000;
-      const world = new becsy.World({
+      const world = await becsy.World.create({
         maxEntities: count, maxShapeChangesPerFrame: count * 3, defs: [A, B, AddB, RemoveB]
       });
       for (let i = 0; i < count; i++) world.createEntity(A);
