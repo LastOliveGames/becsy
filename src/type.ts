@@ -1,4 +1,4 @@
-import type {Binding, ComponentType, Field} from './component';
+import type {Binding, Component, ComponentType, Field} from './component';
 import {ENTITY_ID_MASK} from './consts';
 import type {Entity, EntityId} from './entity';
 
@@ -10,6 +10,15 @@ function throwNotWritable(binding: Binding<any>) {
   throw new Error(
     `Component is not writable; ` +
     `use entity.write(${binding.type.name}) to acquire a writable version`);
+}
+
+function checkInvalid(component: Component, binding: Binding<any>) {
+  if (component.__invalid) {
+    throw new Error(
+      `Component instance for ${binding.type.name} is no longer valid, as you already bound it ` +
+      `to another entity`
+    );
+  }
 }
 
 export abstract class Type<JSType> {
@@ -59,9 +68,11 @@ class BooleanType extends Type<boolean> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): boolean {
+        CHECK: checkInvalid(this, binding);
         return Boolean(data[binding.index]);
       },
       set(this: C, value: boolean): void {
+        CHECK: checkInvalid(this, binding);
         data[binding.index] = value ? 1 : 0;
       }
     });
@@ -69,6 +80,7 @@ class BooleanType extends Type<boolean> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): boolean {
+        CHECK: checkInvalid(this, binding);
         return Boolean(data[binding.index]);
       },
       set(this: C, value: boolean): void {
@@ -85,9 +97,11 @@ class BooleanType extends Type<boolean> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): boolean {
+        CHECK: checkInvalid(this, binding);
         return Boolean(data[binding.index]);
       },
       set(this: C, value: boolean): void {
+        CHECK: checkInvalid(this, binding);
         data[binding.index] = value ? 1 : 0;
       }
     });
@@ -95,6 +109,7 @@ class BooleanType extends Type<boolean> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): boolean {
+        CHECK: checkInvalid(this, binding);
         return Boolean(data[binding.index]);
       },
       set(this: C, value: boolean): void {
@@ -136,9 +151,11 @@ class NumberType extends Type<number> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): number {
+        CHECK: checkInvalid(this, binding);
         return data[binding.index];
       },
       set(this: C, value: number): void {
+        CHECK: checkInvalid(this, binding);
         data[binding.index] = value;
       }
     });
@@ -146,6 +163,7 @@ class NumberType extends Type<number> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): number {
+        CHECK: checkInvalid(this, binding);
         return data[binding.index];
       },
       set(this: C, value: number): void {
@@ -163,9 +181,11 @@ class NumberType extends Type<number> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): number {
+        CHECK: checkInvalid(this, binding);
         return data[binding.index];
       },
       set(this: C, value: number): void {
+        CHECK: checkInvalid(this, binding);
         data[binding.index] = value;
       }
     });
@@ -173,6 +193,7 @@ class NumberType extends Type<number> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): number {
+        CHECK: checkInvalid(this, binding);
         return data[binding.index];
       },
       set(this: C, value: number): void {
@@ -214,12 +235,14 @@ class StaticStringType extends Type<string> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
+        CHECK: checkInvalid(this, binding);
         const index = data[binding.index];
         const result = choices[index];
         if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
         return result;
       },
       set(this: C, value: string): void {
+        CHECK: checkInvalid(this, binding);
         const index = choicesIndex.get(value);
         if (index === undefined) throw new Error(`Static string not in set: "${value}"`);
         data[binding.index] = index;
@@ -229,6 +252,7 @@ class StaticStringType extends Type<string> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
+        CHECK: checkInvalid(this, binding);
         const index = data[binding.index];
         const result = choices[index];
         if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
@@ -250,12 +274,14 @@ class StaticStringType extends Type<string> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
+        CHECK: checkInvalid(this, binding);
         const index = data[binding.index];
         const result = choices[index];
         if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
         return result;
       },
       set(this: C, value: string): void {
+        CHECK: checkInvalid(this, binding);
         const index = choicesIndex.get(value);
         if (index === undefined) throw new Error(`Static string not in set: "${value}"`);
         data[binding.index] = index;
@@ -265,6 +291,7 @@ class StaticStringType extends Type<string> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
+        CHECK: checkInvalid(this, binding);
         const index = data[binding.index];
         const result = choices[index];
         if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
@@ -311,11 +338,13 @@ class DynamicStringType extends Type<string> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
+        CHECK: checkInvalid(this, binding);
         const length = lengths[binding.index * lengthsStride];
         return decoder.decode(
           new Uint8Array(bytes.buffer, binding.index * bytesStride + 2, length));
       },
       set(this: C, value: string): void {
+        CHECK: checkInvalid(this, binding);
         const encodedString = encoder.encode(value);
         if (encodedString.byteLength > maxUtf8Length) {
           throw new Error(`Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
@@ -328,6 +357,7 @@ class DynamicStringType extends Type<string> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
+        CHECK: checkInvalid(this, binding);
         const length = lengths[binding.index * lengthsStride];
         return decoder.decode(
           new Uint8Array(bytes.buffer, binding.index * bytesStride + 2, length));
@@ -350,11 +380,13 @@ class DynamicStringType extends Type<string> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
+        CHECK: checkInvalid(this, binding);
         const length = lengths[binding.index * lengthsStride];
         return decoder.decode(
           new Uint8Array(bytes.buffer, binding.index * bytesStride + 2, length));
       },
       set(this: C, value: string): void {
+        CHECK: checkInvalid(this, binding);
         const encodedString = encoder.encode(value);
         if (encodedString.byteLength > maxUtf8Length) {
           throw new Error(`Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
@@ -367,6 +399,7 @@ class DynamicStringType extends Type<string> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
+        CHECK: checkInvalid(this, binding);
         const length = lengths[binding.index * lengthsStride];
         return decoder.decode(
           new Uint8Array(bytes.buffer, binding.index * bytesStride + 2, length));
@@ -427,11 +460,13 @@ class RefType extends Type<Entity | undefined> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | undefined {
+        CHECK: checkInvalid(this, binding);
         const id = data[binding.index];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
         return pool.borrowTemporarily(id & ENTITY_ID_MASK);
       },
       set(this: C, value: Entity | undefined | null): void {
+        CHECK: checkInvalid(this, binding);
         CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
           throw new Error('Referencing a deleted entity is not allowed');
         }
@@ -447,6 +482,7 @@ class RefType extends Type<Entity | undefined> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | undefined {
+        CHECK: checkInvalid(this, binding);
         const id = data[binding.index];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
         return pool.borrowTemporarily(id & ENTITY_ID_MASK);
@@ -485,11 +521,13 @@ class RefType extends Type<Entity | undefined> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | undefined {
+        CHECK: checkInvalid(this, binding);
         const id = data[binding.index];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
         return pool.borrowTemporarily(id & ENTITY_ID_MASK);
       },
       set(this: C, value: Entity | undefined | null): void {
+        CHECK: checkInvalid(this, binding);
         CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
           throw new Error('Referencing a deleted entity is not allowed');
         }
@@ -505,6 +543,7 @@ class RefType extends Type<Entity | undefined> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | undefined {
+        CHECK: checkInvalid(this, binding);
         const id = data[binding.index];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
         return pool.borrowTemporarily(id & ENTITY_ID_MASK);
@@ -562,6 +601,7 @@ class BackrefsType extends Type<Entity[]> {
     const propertyDefinition = {
       enumerable: true, configurable: true,
       get(this: C): Entity[] {
+        CHECK: checkInvalid(this, binding);
         CHECK: if (!trackDeletedBackrefs && binding.dispatcher.registry.includeRecentlyDeleted) {
           throw new Error(
             `Backrefs field ${binding.type.name}.${field.name} not configured to track recently ` +
@@ -570,6 +610,7 @@ class BackrefsType extends Type<Entity[]> {
         return indexer.getBackrefs(binding.entityId, selectorId);
       },
       set(this: C, value: Entity[]): void {
+        CHECK: checkInvalid(this, binding);
         CHECK: if (value !== EMPTY_ARRAY) {
           throw new Error('Backrefs properties are computed automatically, you cannot set them');
         }
@@ -596,9 +637,11 @@ class ObjectType extends Type<any> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
+        CHECK: checkInvalid(this, binding);
         return data[binding.index];
       },
       set(this: C, value: any): void {
+        CHECK: checkInvalid(this, binding);
         data[binding.index] = value;
       }
     });
@@ -606,6 +649,7 @@ class ObjectType extends Type<any> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
+        CHECK: checkInvalid(this, binding);
         return data[binding.index];
       },
       set(this: C, value: any): void {
@@ -622,9 +666,11 @@ class ObjectType extends Type<any> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
+        CHECK: checkInvalid(this, binding);
         return data[binding.index];
       },
       set(this: C, value: any): void {
+        CHECK: checkInvalid(this, binding);
         data[binding.index] = value;
       }
     });
@@ -632,6 +678,7 @@ class ObjectType extends Type<any> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
+        CHECK: checkInvalid(this, binding);
         return data[binding.index];
       },
       set(this: C, value: any): void {
@@ -659,11 +706,13 @@ class WeakObjectType extends Type<any> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
+        CHECK: checkInvalid(this, binding);
         const value = data[binding.index];
         if (value === null || value === undefined) return value;
         return value.deref();
       },
       set(this: C, value: any): void {
+        CHECK: checkInvalid(this, binding);
         if (value !== null && value !== undefined) {
           const weakRef = new WeakRef(value);
           finalizers?.register(
@@ -679,6 +728,7 @@ class WeakObjectType extends Type<any> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
+        CHECK: checkInvalid(this, binding);
         const value = data[binding.index];
         if (value === null || value === undefined) return value;
         return value.deref();
@@ -698,11 +748,13 @@ class WeakObjectType extends Type<any> {
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
+        CHECK: checkInvalid(this, binding);
         const value = data[binding.index];
         if (value === null || value === undefined) return value;
         return value.deref();
       },
       set(this: C, value: any): void {
+        CHECK: checkInvalid(this, binding);
         if (value !== null && value !== undefined) {
           const weakRef = new WeakRef(value);
           finalizers?.register(
@@ -718,6 +770,7 @@ class WeakObjectType extends Type<any> {
     Object.defineProperty(binding.readonlyInstance, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
+        CHECK: checkInvalid(this, binding);
         const value = data[binding.index];
         if (value === null || value === undefined) return value;
         return value.deref();

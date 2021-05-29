@@ -32,7 +32,11 @@ export interface Field<JSType> {
   clearRef?(final: boolean, targetId?: EntityId, internalIndex?: number): void;
 }
 
-export interface ComponentType<C> {
+export interface Component {
+  __invalid?: boolean;
+}
+
+export interface ComponentType<C extends Component> {
   new(): C;
   schema?: Schema;
   options?: ComponentOptions;
@@ -51,8 +55,8 @@ export interface ComponentType<C> {
 }
 
 export class Binding<C> {
-  readonly readonlyInstance: C;
-  readonly writableInstance: C;
+  readonlyInstance: C;
+  writableInstance: C;
   readonly shapeOffset: number;
   readonly shapeMask: number;
   readonly refFields: Field<Entity | null>[];
@@ -248,7 +252,7 @@ export function assimilateComponentType<C>(
   type.__binding = binding;
 }
 
-export function defineAndAllocateComponentType<C>(type: ComponentType<C>): void {
+export function defineAndAllocateComponentType<C extends Component>(type: ComponentType<C>): void {
   const binding = type.__binding!;
   for (const field of binding.fields) {
     if (binding.elastic) {
@@ -258,7 +262,26 @@ export function defineAndAllocateComponentType<C>(type: ComponentType<C>): void 
     }
   }
 
-  // TODO: in CHECK mode guard against reuse of bound components
+  let readonlyMaster: C, writableMaster: C;
+  CHECK: {
+    readonlyMaster = binding.readonlyInstance;
+    writableMaster = binding.writableInstance;
+    binding.readonlyInstance = Object.create(readonlyMaster);
+    binding.readonlyInstance.__invalid = true;
+    binding.writableInstance = Object.create(writableMaster);
+    binding.writableInstance.__invalid = true;
+  }
+
+  function resetComponent(writable: boolean): void {
+    if (writable) {
+      binding.writableInstance.__invalid = true;
+      binding.writableInstance = Object.create(writableMaster);
+    } else {
+      binding.readonlyInstance.__invalid = true;
+      binding.readonlyInstance = Object.create(readonlyMaster);
+    }
+  }
+
   switch (binding.storage) {
     case 'sparse':
       // Inline the trivial storage manager for performance.
@@ -266,11 +289,13 @@ export function defineAndAllocateComponentType<C>(type: ComponentType<C>): void 
       type.__bind = (id: EntityId, writable: boolean): C => {
         binding.entityId = id;
         binding.index = id;
+        CHECK: resetComponent(writable);
         return writable ? binding.writableInstance : binding.readonlyInstance;
       };
       type.__allocate = (id: EntityId): C => {
         binding.entityId = id;
         binding.index = id;
+        CHECK: resetComponent(true);
         return binding.writableInstance;
       };
       break;
@@ -284,11 +309,13 @@ export function defineAndAllocateComponentType<C>(type: ComponentType<C>): void 
         DEBUG: if (binding.index === -1) {
           throw new Error(`Attempt to bind unacquired entity ${id} to ${type.name}`);
         }
+        CHECK: resetComponent(writable);
         return writable ? binding.writableInstance : binding.readonlyInstance;
       };
       type.__allocate = (id: EntityId): C => {
         binding.entityId = id;
         binding.index = storageManager.acquireIndex(id);
+        CHECK: resetComponent(true);
         return binding.writableInstance;
       };
       type.__free = (id: EntityId): void => {
