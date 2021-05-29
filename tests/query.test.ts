@@ -1,18 +1,18 @@
 import {
-  component, ComponentType, componentTypes, prop, Query, System, SystemType, Type, World,
+  component, ComponentType, componentTypes, field, Query, System, SystemType, Type, World,
 } from '../src';
 
 
 @component class A {
-  @prop(Type.uint8) declare value: number;
+  @field(Type.uint8) declare value: number;
 }
 
 @component class B {
-  @prop(Type.uint8) declare value: number;
+  @field(Type.uint8) declare value: number;
 }
 
 @component class C {
-  @prop(Type.uint8) declare value: number;
+  @field(Type.uint8) declare value: number;
 }
 
 @component class D {}

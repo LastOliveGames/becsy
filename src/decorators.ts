@@ -7,7 +7,7 @@ interface PropOptions<JSType> {
 }
 
 
-export function prop<JSType>(
+export function field<JSType>(
   practicalOptions: PropOptions<JSType> | Type<any> | (() => Type<any>)
 ) {
   return function(target: any, name: string): void {

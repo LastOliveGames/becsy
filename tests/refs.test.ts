@@ -1,37 +1,37 @@
 import {
-  component, ComponentType, componentTypes, Entity, prop, Query, System, SystemType, Type, World,
+  component, ComponentType, componentTypes, Entity, field, Query, System, SystemType, Type, World,
 } from '../src';
 
 
 @component class Origin {
-  @prop(Type.uint8) declare value: number;
-  @prop(Type.ref) declare target?: Entity;
+  @field(Type.uint8) declare value: number;
+  @field(Type.ref) declare target?: Entity;
 }
 
 @component class MultiOrigin {
-  @prop(Type.uint8) declare value: number;
-  @prop(Type.ref) declare target1?: Entity;
-  @prop(Type.ref) declare target2?: Entity;
+  @field(Type.uint8) declare value: number;
+  @field(Type.ref) declare target1?: Entity;
+  @field(Type.ref) declare target2?: Entity;
 }
 
 @component class PreciseDest {
-  @prop(Type.uint8) declare value: number;
-  @prop(Type.backrefs(MultiOrigin, 'target1')) declare targeters: Entity[];
+  @field(Type.uint8) declare value: number;
+  @field(Type.backrefs(MultiOrigin, 'target1')) declare targeters: Entity[];
 }
 
 @component class TypeDest {
-  @prop(Type.uint8) declare value: number;
-  @prop(Type.backrefs(MultiOrigin)) declare targeters: Entity[];
+  @field(Type.uint8) declare value: number;
+  @field(Type.backrefs(MultiOrigin)) declare targeters: Entity[];
 }
 
 @component class GlobalDest {
-  @prop(Type.uint8) declare value: number;
-  @prop(Type.backrefs) declare targeters: Entity[];
+  @field(Type.uint8) declare value: number;
+  @field(Type.backrefs) declare targeters: Entity[];
 }
 
 @component class GlobalDestWithStales {
-  @prop(Type.uint8) declare value: number;
-  @prop(Type.backrefs(undefined, undefined, true)) declare targeters: Entity[];
+  @field(Type.uint8) declare value: number;
+  @field(Type.backrefs(undefined, undefined, true)) declare targeters: Entity[];
 }
 
 

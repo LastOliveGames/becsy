@@ -1,33 +1,33 @@
-import {prop, component, Type, World, Entity} from '../src';
+import {field, component, Type, World, Entity} from '../src';
 
 class Stuff {
   value: number;
 }
 
 @component class Big {
-  @prop(Type.boolean) boolean: boolean;
-  @prop(Type.uint8) uint8: number;
-  @prop(Type.int8) int8: number;
-  @prop(Type.uint16) uint16: number;
-  @prop(Type.int16) int16: number;
-  @prop(Type.uint32) uint32: number;
-  @prop(Type.int32) int32: number;
-  @prop(Type.float32) float32: number;
-  @prop(Type.float64) float64: number;
-  @prop(Type.staticString(['foo', 'bar', 'baz'])) staticString: string;
-  @prop(Type.dynamicString(14)) dynamicString: string;
-  @prop(Type.ref) ref?: Entity;
-  @prop(Type.object) object: Stuff;
-  @prop(Type.weakObject) weakObject: Stuff;
+  @field(Type.boolean) boolean: boolean;
+  @field(Type.uint8) uint8: number;
+  @field(Type.int8) int8: number;
+  @field(Type.uint16) uint16: number;
+  @field(Type.int16) int16: number;
+  @field(Type.uint32) uint32: number;
+  @field(Type.int32) int32: number;
+  @field(Type.float32) float32: number;
+  @field(Type.float64) float64: number;
+  @field(Type.staticString(['foo', 'bar', 'baz'])) staticString: string;
+  @field(Type.dynamicString(14)) dynamicString: string;
+  @field(Type.ref) ref?: Entity;
+  @field(Type.object) object: Stuff;
+  @field(Type.weakObject) weakObject: Stuff;
 }
 
-function testReadWrite(field: string, values: any[]): void {
+function testReadWrite(prop: string, values: any[]): void {
   const world = new World({defs: [Big]});
   world.build(system => {
     const entity = system.createEntity(Big);
     for (const value of values) {
-      (entity.write(Big) as any)[field] = value;
-      expect((entity.read(Big) as any)[field]).toBe(value);
+      (entity.write(Big) as any)[prop] = value;
+      expect((entity.read(Big) as any)[prop]).toBe(value);
     }
   });
 }

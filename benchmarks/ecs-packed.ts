@@ -2,7 +2,7 @@
 // they're exactly the same anyway.
 import type * as becsyDev from '../index';
 type Becsy = {
-  prop: typeof becsyDev.prop,
+  field: typeof becsyDev.field,
   Type: typeof becsyDev.Type,
   System: typeof becsyDev.System,
   World: typeof becsyDev.World
@@ -12,27 +12,27 @@ type Becsy = {
 export default (becsy: Becsy): {[key: string]: () => any} => {
   class A {
     static options = {capacity: 10000};
-    @becsy.prop(becsy.Type.int32) declare value: number;
+    @becsy.field(becsy.Type.int32) declare value: number;
   }
 
   class B {
     static options = {capacity: 10000};
-    @becsy.prop(becsy.Type.int32) declare value: number;
+    @becsy.field(becsy.Type.int32) declare value: number;
   }
 
   class C {
     static options = {capacity: 10000};
-    @becsy.prop(becsy.Type.int32) declare value: number;
+    @becsy.field(becsy.Type.int32) declare value: number;
   }
 
   class D {
     static options = {capacity: 10000};
-    @becsy.prop(becsy.Type.int32) declare value: number;
+    @becsy.field(becsy.Type.int32) declare value: number;
   }
 
   class E {
     static options = {capacity: 10000};
-    @becsy.prop(becsy.Type.int32) declare value: number;
+    @becsy.field(becsy.Type.int32) declare value: number;
   }
 
   const COMPS = Array.from(
@@ -48,7 +48,7 @@ export default (becsy: Becsy): {[key: string]: () => any} => {
 
   class Data {
     static options = {capacity: 10000};
-    @becsy.prop(becsy.Type.int32) declare value: number;
+    @becsy.field(becsy.Type.int32) declare value: number;
   }
 
 
