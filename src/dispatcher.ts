@@ -14,7 +14,7 @@ const now = typeof window !== 'undefined' && typeof window.performance !== 'unde
 
 // TODO: figure out a better type for interleaved arrays, here and elsewhere
 // https://stackoverflow.com/questions/67467302/type-for-an-interleaved-array-of-classes-and-values
-type DefsArray = (ComponentType<any> | SystemType | any | DefsArray)[];
+type DefsArray = (ComponentType<any> | SystemType<System> | any | DefsArray)[];
 
 export interface WorldOptions {
   defs: DefsArray;
@@ -46,7 +46,7 @@ export class Dispatcher {
   readonly defaultComponentStorage;
   readonly registry;
   private readonly systems: SystemBox[];
-  private readonly systemsByClass = new Map<SystemType, SystemBox>();
+  readonly systemsByClass = new Map<SystemType<System>, SystemBox>();
   private lastTime = now() / 1000;
   executing: boolean;
   readonly shapeLog: Log;
@@ -97,11 +97,11 @@ export class Dispatcher {
     this.callbackSystem.rwMasks.write = undefined;
   }
 
-  private normalizeAndInitSystems(systemTypes: (SystemType | any)[]): SystemBox[] {
+  private normalizeAndInitSystems(systemTypes: (SystemType<System> | any)[]): SystemBox[] {
     const systems = [];
     const flatUserSystems = systemTypes.flat(Infinity);
     for (let i = 0; i < flatUserSystems.length; i++) {
-      const SystemClass = flatUserSystems[i] as SystemType;
+      const SystemClass = flatUserSystems[i] as SystemType<System>;
       const system = new SystemClass();
       const props = flatUserSystems[i + 1];
       if (props && typeof props !== 'function') {
@@ -112,13 +112,14 @@ export class Dispatcher {
       systems.push(box);
       this.systemsByClass.set(SystemClass, box);
     }
+    for (const box of systems) box.replaceAttachmentPlaceholders();
     return systems;
   }
 
   private splitDefs(defs: DefsArray):
-      {componentTypes: ComponentType<any>[], systemTypes: (SystemType | any)[]} {
+      {componentTypes: ComponentType<any>[], systemTypes: (SystemType<System> | any)[]} {
     const componentTypes: ComponentType<any>[] = [];
-    const systemTypes: (SystemType | any)[] = [];
+    const systemTypes: (SystemType<System> | any)[] = [];
     let lastDefWasSystem = false;
     for (const def of defs.flat(Infinity)) {
       if (typeof def === 'function') {
@@ -210,7 +211,7 @@ export class Dispatcher {
   }
 
   private checkControlOverlap(options: ControlOptions): void {
-    const stopSet = new Set<SystemType>();
+    const stopSet = new Set<SystemType<System>>();
     for (const def of options.stop.flat(Infinity)) {
       if (!def.__system) continue;
       stopSet.add(def);

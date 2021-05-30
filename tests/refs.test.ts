@@ -105,7 +105,7 @@ class Count extends System {
   }
 }
 
-async function createWorld(...systems: SystemType[]): Promise<World> {
+async function createWorld(...systems: SystemType<System>[]): Promise<World> {
   return World.create({maxEntities: 200, defs: [componentTypes, systems, Count]});
 }
 

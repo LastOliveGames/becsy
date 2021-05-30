@@ -6,12 +6,16 @@ import {Query, QueryBox, QueryBuilder} from './query';
 import type {ComponentType} from './component';
 
 
-export interface SystemType {
-  new(): System;
+export interface SystemType<S extends System> {
+  new(): S;
 }
 
 export const enum RunState {
   RUNNING, STOPPED
+}
+
+class Placeholder {
+  constructor(readonly type: SystemType<System>) {}
 }
 
 
@@ -23,7 +27,6 @@ export abstract class System {
   delta: number;
 
   // TODO: support schedule builder
-  // TODO: allow attaching another system
 
   get name(): string {return this.constructor.name;}
 
@@ -36,6 +39,10 @@ export abstract class System {
     }
     this.__queryBuilders.push(builder);
     return query;
+  }
+
+  attach<S extends System>(systemType: SystemType<S>): S {
+    return new Placeholder(systemType) as unknown as S;
   }
 
   createEntity(...initialComponents: (ComponentType<any> | any)[]): Entity {
@@ -70,6 +77,19 @@ export class SystemBox {
     for (const builder of system.__queryBuilders!) builder.__build(this);
     system.__queryBuilders = null;
     this.hasWriteQueries = !!this.writeQueries.length;
+  }
+
+  replaceAttachmentPlaceholders(): void {
+    for (const prop in this.system) {
+      if ((this.system as any)[prop] instanceof Placeholder) {
+        const targetSystemType = (this.system as any)[prop].type;
+        const targetSystem = this.dispatcher.systemsByClass.get(targetSystemType);
+        CHECK: if (!targetSystem) {
+          throw new Error(`Attached system ${targetSystemType.name} not defined in this world`);
+        }
+        (this.system as any)[prop] = targetSystem;
+      }
+    }
   }
 
   async initialize(): Promise<void> {

@@ -1,10 +1,18 @@
-import {field, component, Type, World} from '../src';
+import {field, component, System, Type, World} from '../src';
 
 @component class A {
   @field(Type.int32) declare value: number;
 }
 
-describe('exercising validity checks', () => {
+class SystemA extends System {
+}
+
+class SystemB extends System {
+  systemA = this.attach(SystemA);
+}
+
+
+describe('exercising component validity checks', () => {
 
   test('reuse readable component', async() => {
     const world = await World.create({defs: [A]});
@@ -24,6 +32,15 @@ describe('exercising validity checks', () => {
       const unused = entity1.write(A);
       expect(() => {a1.value = 2;}).toThrow();
     });
+  });
+
+});
+
+
+describe('exercising system validity checks', () => {
+
+  test('attach undefined system', async() => {
+    await expect(World.create({defs: [SystemB]})).rejects.toThrow();
   });
 
 });
