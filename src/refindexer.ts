@@ -230,7 +230,8 @@ export class RefIndexer {
     CHECK: if (targetType) checkTypeDefined(targetType);
     CHECK: if (sourceType) checkTypeDefined(sourceType);
     if (!this.refLog) {
-      this.refLog = new Log(this.maxRefChangesPerFrame, 'maxRefChangesPerFrame', true);
+      this.refLog = new Log(
+        this.maxRefChangesPerFrame, 'maxRefChangesPerFrame', this.dispatcher.buffers, true);
       this.refLogPointer = this.refLog.createPointer();
       this.refLogStatsPointer = this.refLog.createPointer();
     }

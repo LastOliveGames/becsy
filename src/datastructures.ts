@@ -1,3 +1,5 @@
+import type {Buffers} from './buffers';
+
 /**
  * A fixed but arbitrary size bitset.
  */
@@ -60,20 +62,22 @@ const EMPTY_TUPLE: [] = [];
  */
 export class Log {
   /* layout: [index, generation, ...entries] */
-  private readonly data: Uint32Array;
+  private data: Uint32Array;
   /* layout: [length, generation, ...entries] */
-  private readonly corral: Uint32Array;
+  private corral: Uint32Array;
 
   constructor(
     private readonly maxEntries: number, private readonly configParamName: string,
-    private readonly localProcessingAllowed = false
+    buffers: Buffers, private readonly localProcessingAllowed = false
   ) {
-    const buffer =
-      new SharedArrayBuffer((maxEntries + LOG_HEADER_LENGTH) * Uint32Array.BYTES_PER_ELEMENT);
-    this.data = new Uint32Array(buffer);
-    const corralBuffer =
-      new SharedArrayBuffer((maxEntries + CORRAL_HEADER_LENGTH) * Uint32Array.BYTES_PER_ELEMENT);
-    this.corral = new Uint32Array(corralBuffer);
+    buffers.register(
+      `log.${configParamName}.buffer`, maxEntries + LOG_HEADER_LENGTH, Uint32Array,
+      (data: Uint32Array) => {this.data = data;}
+    );
+    buffers.register(
+      `log.${configParamName}.corral`, maxEntries + CORRAL_HEADER_LENGTH, Uint32Array,
+      (corral: Uint32Array) => {this.corral = corral;}
+    );
   }
 
   push(value: number): void {
@@ -249,7 +253,7 @@ export class UnsharedPool {
 
   constructor(private readonly maxItems: number, private readonly configParamName: string) {
     this.data =
-      new Uint32Array(new SharedArrayBuffer((maxItems + 1) * Uint32Array.BYTES_PER_ELEMENT));
+      new Uint32Array(new ArrayBuffer((maxItems + 1) * Uint32Array.BYTES_PER_ELEMENT));
   }
 
   get length(): number {
@@ -293,11 +297,15 @@ export class UnsharedPool {
  * The `refill` method is not threadsafe.
  */
 export class SharedAtomicPool {
-  private readonly data: Uint32Array;
+  private data: Uint32Array;
 
-  constructor(private readonly maxItems: number, private readonly configParamName: string) {
-    this.data =
-      new Uint32Array(new SharedArrayBuffer((maxItems + 1) * Uint32Array.BYTES_PER_ELEMENT));
+  constructor(
+    private readonly maxItems: number, private readonly configParamName: string, buffers: Buffers
+  ) {
+    buffers.register(
+      `pool.${configParamName}`, maxItems + 1, Uint32Array,
+      (data: Uint32Array) => {this.data = data;}
+    );
   }
 
   get length(): number {

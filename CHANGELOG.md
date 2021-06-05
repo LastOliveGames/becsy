@@ -1,3 +1,6 @@
+### Upcoming
+- Only use `SharedArrayBuffer`s when running in multithreaded mode for maximum compatibility with browsers in singlethreaded mode.
+
 ### 0.5.0
 - Renamed `@prop` to `@field`.
 - Removed `suspend` option from `world.control` options.  I don't think suspension can be implemented given becsy's design.

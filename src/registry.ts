@@ -1,5 +1,5 @@
 import {ComponentType, assimilateComponentType, defineAndAllocateComponentType} from './component';
-import {Log, LogPointer, Uint32Pool, UnsharedPool} from './datastructures';
+import {Log, LogPointer, SharedAtomicPool, Uint32Pool, UnsharedPool} from './datastructures';
 import type {Dispatcher} from './dispatcher';
 import {Entity, EntityId} from './entity';
 import {ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
@@ -54,8 +54,8 @@ export class EntityPool {
 
 export class Registry {
   private readonly stride: number;
-  private readonly shapes: Uint32Array;
-  private readonly staleShapes: Uint32Array;
+  private shapes: Uint32Array;
+  private staleShapes: Uint32Array;
   private readonly entityIdPool: Uint32Pool;
   readonly pool: EntityPool;
   executingSystem?: SystemBox;
@@ -73,16 +73,21 @@ export class Registry {
     readonly types: ComponentType<any>[], readonly dispatcher: Dispatcher
   ) {
     this.stride = Math.ceil(types.length / 32);
-    const size = maxEntities * this.stride * 4;
-    this.shapes = new Uint32Array(new SharedArrayBuffer(size));
-    this.staleShapes = new Uint32Array(new SharedArrayBuffer(size));
-    this.entityIdPool = new UnsharedPool(maxEntities, 'maxEntities');
+    const length = maxEntities * this.stride;
+    dispatcher.buffers.register(
+      'registry.shapes', length, Uint32Array, shapes => {this.shapes = shapes;});
+    dispatcher.buffers.register(
+      'registry.staleShapes', length, Uint32Array,
+      staleShapes => {this.staleShapes = staleShapes;});
+    this.entityIdPool = dispatcher.threaded ?
+      new SharedAtomicPool(maxEntities, 'maxEntities', dispatcher.buffers) :
+      new UnsharedPool(maxEntities, 'maxEntities');
     this.entityIdPool.fillWithDescendingIntegers(0);
     this.pool = new EntityPool(this, maxEntities);
-    this.deletionLog = new Log(maxLimboEntities, 'maxLimboEntities');
+    this.deletionLog = new Log(maxLimboEntities, 'maxLimboEntities', dispatcher.buffers);
     this.prevDeletionPointer = this.deletionLog.createPointer();
     this.oldDeletionPointer = this.deletionLog.createPointer();
-    this.removalLog = new Log(maxLimboComponents, 'maxLimboComponents');
+    this.removalLog = new Log(maxLimboComponents, 'maxLimboComponents', dispatcher.buffers);
     this.prevRemovalPointer = this.removalLog.createPointer();
     this.oldRemovalPointer = this.removalLog.createPointer();
   }

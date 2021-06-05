@@ -1,3 +1,4 @@
+import type {TypedArray, TypedArrayConstructor} from './buffers';
 import type {Binding, Component, ComponentType, Field} from './component';
 import {ENTITY_ID_MASK} from './consts';
 import type {Entity, EntityId} from './entity';
@@ -52,16 +53,13 @@ class BooleanType extends Type<boolean> {
   constructor() {super(false);}
 
   defineElastic<C>(binding: Binding<C>, field: Field<boolean>): void {
-    let buffer: SharedArrayBuffer;
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
     let data: Uint8Array;
 
     field.updateBuffer = () => {
-      const capacityChanged = field.buffer?.byteLength !== binding.capacity;
-      if (!capacityChanged && field.buffer === buffer) return;
-      buffer = capacityChanged ? new SharedArrayBuffer(binding.capacity) : field.buffer!;
-      data = new Uint8Array(buffer);
-      if (capacityChanged && field.buffer) data.set(new Uint8Array(field.buffer));
-      field.buffer = buffer;
+      binding.dispatcher.buffers.register(
+        bufferKey, binding.capacity, Uint8Array, (newData: Uint8Array) => {data = newData;}
+      );
     };
     field.updateBuffer();
 
@@ -90,9 +88,8 @@ class BooleanType extends Type<boolean> {
   }
 
   defineFixed<C>(binding: Binding<C>, field: Field<boolean>): void {
-    const buffer = new SharedArrayBuffer(binding.capacity);
-    const data = new Uint8Array(buffer);
-    field.buffer = buffer;
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
+    const data = binding.dispatcher.buffers.register(bufferKey, binding.capacity, Uint8Array);
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
@@ -119,32 +116,20 @@ class BooleanType extends Type<boolean> {
   }
 }
 
-type TypedNumberArray =
-  Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array |
-  Float32Array | Float64Array;
-
-interface TypeNumberArrayConstructor {
- new (buffer: SharedArrayBuffer): TypedNumberArray;
- BYTES_PER_ELEMENT: number;
-}
 
 class NumberType extends Type<number> {
-  constructor(private readonly NumberArray: TypeNumberArrayConstructor) {
+  constructor(private readonly NumberArray: TypedArrayConstructor) {
     super(0);
   }
 
   defineElastic<C>(binding: Binding<C>, field: Field<number>): void {
-    let buffer: SharedArrayBuffer;
-    let data: TypedNumberArray;
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
+    let data: TypedArray;
 
     field.updateBuffer = () => {
-      const size = binding.capacity * this.NumberArray.BYTES_PER_ELEMENT;
-      const capacityChanged = field.buffer?.byteLength !== size;
-      if (!capacityChanged && field.buffer === buffer) return;
-      buffer = capacityChanged ? new SharedArrayBuffer(size) : field.buffer!;
-      data = new this.NumberArray(buffer);
-      if (capacityChanged && field.buffer) data.set(new this.NumberArray(field.buffer));
-      field.buffer = buffer;
+      binding.dispatcher.buffers.register(
+        bufferKey, binding.capacity, this.NumberArray, (newData: TypedArray) => {data = newData;}
+      );
     };
     field.updateBuffer();
 
@@ -173,10 +158,8 @@ class NumberType extends Type<number> {
   }
 
   defineFixed<C>(binding: Binding<C>, field: Field<number>): void {
-    const size = binding.capacity * this.NumberArray.BYTES_PER_ELEMENT;
-    const buffer = new SharedArrayBuffer(size);
-    const data = new this.NumberArray(buffer);
-    field.buffer = buffer;
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
+    const data = binding.dispatcher.buffers.register(bufferKey, binding.capacity, this.NumberArray);
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
@@ -217,18 +200,15 @@ class StaticStringType extends Type<string> {
   }
 
   defineElastic<C>(binding: Binding<C>, field: Field<string>): void {
-    let buffer: SharedArrayBuffer;
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
     let data: Uint8Array | Uint16Array | Uint32Array;
     const choices = this.choices, choicesIndex = this.choicesIndex;
 
     field.updateBuffer = () => {
-      const size = binding.capacity * this.TypedArray.BYTES_PER_ELEMENT;
-      const capacityChanged = field.buffer?.byteLength !== size;
-      if (!capacityChanged && field.buffer === buffer) return;
-      buffer = capacityChanged ? new SharedArrayBuffer(size) : field.buffer!;
-      data = new this.TypedArray(buffer);
-      if (capacityChanged && field.buffer) data.set(new this.TypedArray(field.buffer));
-      field.buffer = buffer;
+      binding.dispatcher.buffers.register(
+        bufferKey, binding.capacity, this.TypedArray,
+        (newData: Uint8Array | Uint16Array | Uint32Array) => {data = newData;}
+      );
     };
     field.updateBuffer();
 
@@ -265,11 +245,9 @@ class StaticStringType extends Type<string> {
   }
 
   defineFixed<C>(binding: Binding<C>, field: Field<string>): void {
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
     const choices = this.choices, choicesIndex = this.choicesIndex;
-    const size = binding.capacity * this.TypedArray.BYTES_PER_ELEMENT;
-    const buffer = new SharedArrayBuffer(size);
-    const data = new this.TypedArray(buffer);
-    field.buffer = buffer;
+    const data = binding.dispatcher.buffers.register(bufferKey, binding.capacity, this.TypedArray);
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
@@ -317,7 +295,7 @@ class DynamicStringType extends Type<string> {
   }
 
   defineElastic<C>(binding: Binding<C>, field: Field<string>): void {
-    let buffer: SharedArrayBuffer;
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
     let lengths: Uint16Array;
     let bytes: Uint8Array;
     const maxUtf8Length = this.maxUtf8Length;
@@ -325,13 +303,12 @@ class DynamicStringType extends Type<string> {
 
     field.updateBuffer = () => {
       const size = binding.capacity * (this.maxUtf8Length + Uint16Array.BYTES_PER_ELEMENT);
-      const capacityChanged = field.buffer?.byteLength !== size;
-      if (!capacityChanged && field.buffer === buffer) return;
-      buffer = capacityChanged ? new SharedArrayBuffer(size) : field.buffer!;
-      lengths = new Uint16Array(buffer);
-      bytes = new Uint8Array(buffer);
-      if (capacityChanged && field.buffer) bytes.set(new Uint8Array(field.buffer));
-      field.buffer = buffer;
+      binding.dispatcher.buffers.register(
+        bufferKey, size, Uint8Array, (newData: Uint8Array) => {
+          bytes = newData;
+          lengths = new Uint16Array(bytes.buffer);
+        }
+      );
     };
     field.updateBuffer();
 
@@ -369,13 +346,12 @@ class DynamicStringType extends Type<string> {
   }
 
   defineFixed<C>(binding: Binding<C>, field: Field<string>): void {
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
     const maxUtf8Length = this.maxUtf8Length;
     const lengthsStride = this.lengthsStride, bytesStride = this.bytesStride;
     const size = binding.capacity * (this.maxUtf8Length + Uint16Array.BYTES_PER_ELEMENT);
-    const buffer = new SharedArrayBuffer(size);
-    const lengths = new Uint16Array(buffer);
-    const bytes = new Uint8Array(buffer);
-    field.buffer = buffer;
+    const bytes = binding.dispatcher.buffers.register(bufferKey, size, Uint8Array);
+    const lengths = new Uint16Array(bytes.buffer);
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
@@ -419,7 +395,7 @@ class RefType extends Type<Entity | undefined> {
   }
 
   defineElastic<C>(binding: Binding<C>, field: Field<Entity | undefined>): void {
-    let buffer: SharedArrayBuffer;
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
     let data: Int32Array;
     const indexer = binding.dispatcher.indexer;
     const registry = binding.dispatcher.registry;
@@ -427,19 +403,9 @@ class RefType extends Type<Entity | undefined> {
     indexer.registerSelector();
 
     field.updateBuffer = () => {
-      const size = binding.capacity * Int32Array.BYTES_PER_ELEMENT;
-      const capacityChanged = field.buffer?.byteLength !== size;
-      if (!capacityChanged && field.buffer === buffer) return;
-      buffer = capacityChanged ? new SharedArrayBuffer(size) : field.buffer!;
-      data = new Int32Array(buffer);
-      if (capacityChanged && field.buffer) {
-        const oldData = new Int32Array(field.buffer);
-        data.set(oldData);
-        data.fill(-1, oldData.length);
-      } else {
-        data.fill(-1);
-      }
-      field.buffer = buffer;
+      binding.dispatcher.buffers.register(
+        bufferKey, binding.capacity, Int32Array, (newData: Int32Array) => {data = newData;}, -1
+      );
     };
     field.updateBuffer();
 
@@ -494,11 +460,10 @@ class RefType extends Type<Entity | undefined> {
   }
 
   defineFixed<C>(binding: Binding<C>, field: Field<Entity | undefined>): void {
-    const size = binding.capacity * Int32Array.BYTES_PER_ELEMENT;
-    const buffer = new SharedArrayBuffer(size);
-    const data = new Int32Array(buffer);
-    data.fill(-1);
-    field.buffer = buffer;
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
+    const data = binding.dispatcher.buffers.register(
+      bufferKey, binding.capacity, Int32Array, undefined, -1
+    );
     const indexer = binding.dispatcher.indexer;
     const registry = binding.dispatcher.registry;
     const pool = registry.pool;
@@ -631,7 +596,6 @@ class ObjectType extends Type<any> {
 
   defineElastic<C>(binding: Binding<C>, field: Field<any>): void {
     const data: any[] = [];
-    field.localBuffer = data;
     field.updateBuffer = () => {/* no-op */};
 
     Object.defineProperty(binding.writableInstance, field.name, {
@@ -660,7 +624,6 @@ class ObjectType extends Type<any> {
 
   defineFixed<C>(binding: Binding<C>, field: Field<boolean>): void {
     const data: any[] = new Array(binding.capacity);
-    field.localBuffer = data;
     field.updateBuffer = () => {/* no-op */};
 
     Object.defineProperty(binding.writableInstance, field.name, {
@@ -699,9 +662,8 @@ class WeakObjectType extends Type<any> {
 
   defineElastic<C>(binding: Binding<C>, field: Field<any>): void {
     const data: WeakRef<any>[] = [];
-    field.localBuffer = data;
     field.updateBuffer = () => {/* no-op */};
-    const finalizers = this.initFinalizers(binding);
+    const finalizers = this.initFinalizers(binding, data);
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
@@ -717,7 +679,7 @@ class WeakObjectType extends Type<any> {
           const weakRef = new WeakRef(value);
           finalizers?.register(
             value,
-            {type: binding.type, field, weakRef, id: binding.entityId, index: binding.index}
+            {type: binding.type, weakRef, id: binding.entityId, index: binding.index}
           );
           value = weakRef;
         }
@@ -740,57 +702,17 @@ class WeakObjectType extends Type<any> {
   }
 
   defineFixed<C>(binding: Binding<C>, field: Field<boolean>): void {
-    const data: WeakRef<any>[] = new Array(binding.capacity);
-    field.localBuffer = data;
-    field.updateBuffer = () => {/* no-op */};
-    const finalizers = this.initFinalizers(binding);
-
-    Object.defineProperty(binding.writableInstance, field.name, {
-      enumerable: true, configurable: true,
-      get(this: C): any {
-        CHECK: checkInvalid(this, binding);
-        const value = data[binding.index];
-        if (value === null || value === undefined) return value;
-        return value.deref();
-      },
-      set(this: C, value: any): void {
-        CHECK: checkInvalid(this, binding);
-        if (value !== null && value !== undefined) {
-          const weakRef = new WeakRef(value);
-          finalizers?.register(
-            value,
-            {type: binding.type, field, weakRef, id: binding.entityId, index: binding.index}
-          );
-          value = weakRef;
-        }
-        data[binding.index] = value;
-      }
-    });
-
-    Object.defineProperty(binding.readonlyInstance, field.name, {
-      enumerable: true, configurable: true,
-      get(this: C): any {
-        CHECK: checkInvalid(this, binding);
-        const value = data[binding.index];
-        if (value === null || value === undefined) return value;
-        return value.deref();
-      },
-      set(this: C, value: any): void {
-        throwNotWritable(binding);
-      }
-    });
+    this.defineElastic(binding, field);
   }
 
-  private initFinalizers(binding: Binding<any>) {
+  private initFinalizers(binding: Binding<any>, data: WeakRef<any>[]) {
     if (!binding.trackedWrites) return;
     if (this.finalizers) return this.finalizers;
     const dispatcher = binding.dispatcher;
     if (!dispatcher.writeLog || typeof FinalizationRegistry === 'undefined') return;
     this.finalizers = new FinalizationRegistry(
-      ({type, field, weakRef, id, index}: FinalizerHeldValue) => {
-        if (field.localBuffer?.[index] === weakRef) {
-          dispatcher.registry.trackWrite(id, type);
-        }
+      ({type, weakRef, id, index}: FinalizerHeldValue) => {
+        if (data[index] === weakRef) dispatcher.registry.trackWrite(id, type);
       }
     );
     return this.finalizers;

@@ -6,6 +6,7 @@ import {RunState, System, SystemBox, SystemType} from './system';
 import {Registry} from './registry';
 import {Stats} from './stats';
 import {RefIndexer} from './refindexer';
+import {Buffers} from './buffers';
 
 
 const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
@@ -18,6 +19,7 @@ type DefsArray = (ComponentType<any> | SystemType<System> | any | DefsArray)[];
 
 export interface WorldOptions {
   defs: DefsArray;
+  threads?: number;
   maxEntities?: number;
   maxLimboEntities?: number;
   maxLimboComponents?: number;
@@ -55,12 +57,15 @@ export class Dispatcher {
   private readonly writeLogFramePointer?: LogPointer;
   readonly stats;
   readonly indexer: RefIndexer;
+  readonly threaded: boolean;
+  readonly buffers: Buffers;
   private readonly userCallbackSystem;
   private readonly callbackSystem;
   private readonly deferredControls = new Map<SystemBox, RunState>();
 
   constructor({
     defs,
+    threads = 1,
     maxEntities = 10000,
     maxLimboEntities = Math.ceil(maxEntities / 5),
     maxLimboComponents = Math.ceil(maxEntities / 5),
@@ -69,6 +74,8 @@ export class Dispatcher {
     maxRefChangesPerFrame = maxEntities,
     defaultComponentStorage = 'sparse'
   }: WorldOptions) {
+    if (threads < 1) throw new Error('Minimum of one thread');
+    if (threads > 1) throw new Error('Multithreading not yet implemented');
     if (maxEntities > MAX_NUM_ENTITIES) {
       throw new Error(`maxEntities too high, the limit is ${MAX_NUM_ENTITIES}`);
     }
@@ -78,9 +85,11 @@ export class Dispatcher {
     }
     // TODO: allocate all shared buffers through a central manager
     STATS: this.stats = new Stats();
+    this.threaded = threads > 1;
+    this.buffers = new Buffers(threads > 1);
     this.maxEntities = maxEntities;
     this.defaultComponentStorage = defaultComponentStorage;
-    this.shapeLog = new Log(maxShapeChangesPerFrame, 'maxShapeChangesPerFrame');
+    this.shapeLog = new Log(maxShapeChangesPerFrame, 'maxShapeChangesPerFrame', this.buffers);
     this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.registry = new Registry(
       maxEntities, maxLimboEntities, maxLimboComponents, componentTypes.flat(Infinity), this);
@@ -88,7 +97,7 @@ export class Dispatcher {
     this.registry.initializeComponentTypes();
     this.systems = this.normalizeAndInitSystems(systemTypes);
     if (this.systems.some(system => system.hasWriteQueries)) {
-      this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame');
+      this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame', this.buffers);
       this.writeLogFramePointer = this.writeLog.createPointer();
     }
     this.userCallbackSystem = new CallbackSystem();

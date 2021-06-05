@@ -26,8 +26,6 @@ export interface Field<JSType> {
   type: Type<JSType>;
   default: JSType;
   seq: number;
-  buffer?: SharedArrayBuffer;
-  localBuffer?: any[];
   updateBuffer?(): void;
   clearRef?(final: boolean, targetId?: EntityId, internalIndex?: number): void;
 }
@@ -136,44 +134,45 @@ class PackedStorage implements Storage {
   }
 
   private growCapacity(): void {
-    STATS: this.binding.dispatcher.stats.for(this.binding.type).capacity = this.binding.capacity;
+    const capacity = this.binding.capacity;
+    STATS: this.binding.dispatcher.stats.for(this.binding.type).capacity = capacity;
     const ArrayType = this.ArrayType;
     const elementSizeChanged = ArrayType.BYTES_PER_ELEMENT !== this.spares?.[0];
     if (!this.index || elementSizeChanged) {
-      const buffer = new SharedArrayBuffer(this.maxEntities * ArrayType.BYTES_PER_ELEMENT);
-      const newIndex = new ArrayType(buffer);
-      if (this.index) newIndex.set(this.index); else newIndex.fill(-1);
-      this.index = newIndex;
+      this.binding.dispatcher.buffers.register(
+        `component.${this.binding.type.id!}.storage.index`, this.maxEntities, ArrayType,
+        (index: any) => {this.index = index;}, -1
+      );
     }
-    if (this.spares && elementSizeChanged) {
-      const buffer = new SharedArrayBuffer(this.spares.length * ArrayType.BYTES_PER_ELEMENT);
-      const newSpares = new ArrayType(buffer);
-      newSpares.set(this.spares);
-      newSpares[0] = ArrayType.BYTES_PER_ELEMENT;
-      this.spares = newSpares;
+    if (elementSizeChanged) {
+      this.binding.dispatcher.buffers.register(
+        `component.${this.binding.type.id!}.storage.spares`,
+        this.spares.length, ArrayType,
+        this.updateSpares.bind(this)
+      );
+    } else {
+      this.spares[2] = capacity;
     }
-    this.spares[2] = this.binding.capacity;
     if (this.binding.elastic) for (const field of this.fields) field.updateBuffer!();
   }
 
   private growSpares(): void {
-    const ArrayType = this.ArrayType;
     const maxSpares = this.spares ? Math.min(this.maxEntities, (this.spares.length - 4) * 2) : 8;
-    const sparesBuffer = new SharedArrayBuffer((4 + maxSpares) * ArrayType.BYTES_PER_ELEMENT);
-    const newSpares = new ArrayType(sparesBuffer);
-    if (this.spares) {
-      newSpares.set(this.spares);
-    } else {
-      newSpares[0] = ArrayType.BYTES_PER_ELEMENT;
-      newSpares[2] = this.binding.capacity;
-    }
-    this.spares = newSpares;
+    this.binding.dispatcher.buffers.register(
+      `component.${this.binding.type.id!}.storage.spares`, 4 + maxSpares, this.ArrayType,
+      this.updateSpares.bind(this)
+    );
+  }
+
+  private updateSpares(spares: Int8Array | Int16Array | Int32Array): void {
+    spares[2] = this.binding.capacity = Math.max(this.binding.capacity, spares[2]);
+    spares[0] = this.ArrayType.BYTES_PER_ELEMENT;
+    this.spares = spares;
   }
 
   private get ArrayType() {
-    const capacity = this.binding.capacity;
-    return capacity <= (1 << 7) - 1 ? Int8Array :
-      capacity <= (1 << 15) - 1 ? Int16Array : Int32Array;
+    const capacity = Math.max(this.spares?.[2] ?? 0, this.binding.capacity);
+    return capacity < (1 << 7) ? Int8Array : capacity < (1 << 15) ? Int16Array : Int32Array;
   }
 }
 
