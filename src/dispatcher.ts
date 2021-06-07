@@ -299,6 +299,7 @@ export class Dispatcher {
   async execute(time?: number, delta?: number): Promise<void> {
     // This largely duplicates the code in Frame, but we lose 5-10% performance by delegating to it
     // so duplicate the code here instead.
+    // TODO: migrate to use the Frame system without loss of performance
     CHECK: if (this.executing) throw new Error('Recursive system execution not allowed');
     this.executing = true;
     if (time === undefined) time = now() / 1000;

@@ -1,5 +1,9 @@
 ### Upcoming
+
+### 0.5.1
 - Only use `SharedArrayBuffer`s when running in multithreaded mode for maximum compatibility with browsers in singlethreaded mode.
+- Added `world.createCustomExecutor` API for applications where not every system gets executed every turn (and some get executed more than once).
+- Wrote a lot of doc comments for API methods.
 
 ### 0.5.0
 - Renamed `@prop` to `@field`.
