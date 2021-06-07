@@ -1,4 +1,5 @@
 ### Upcoming
+- Fixed bug in `weakObject` type.
 
 ### 0.5.1
 - Only using `SharedArrayBuffer`s when running in multithreaded mode for maximum compatibility with browsers in singlethreaded mode.

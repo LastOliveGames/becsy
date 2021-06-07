@@ -652,7 +652,7 @@ class ObjectType extends Type<any> {
 }
 
 type FinalizerHeldValue = {
-  type: ComponentType<any>, field: Field<any>, weakRef: WeakRef<any>, id: EntityId, index: number
+  type: ComponentType<any>, data: WeakRef<any>[], weakRef: WeakRef<any>, id: EntityId, index: number
 };
 
 class WeakObjectType extends Type<any> {
@@ -663,7 +663,7 @@ class WeakObjectType extends Type<any> {
   defineElastic<C>(binding: Binding<C>, field: Field<any>): void {
     const data: WeakRef<any>[] = [];
     field.updateBuffer = () => {/* no-op */};
-    const finalizers = this.initFinalizers(binding, data);
+    const finalizers = this.initFinalizers(binding);
 
     Object.defineProperty(binding.writableInstance, field.name, {
       enumerable: true, configurable: true,
@@ -679,7 +679,7 @@ class WeakObjectType extends Type<any> {
           const weakRef = new WeakRef(value);
           finalizers?.register(
             value,
-            {type: binding.type, weakRef, id: binding.entityId, index: binding.index}
+            {type: binding.type, data, weakRef, id: binding.entityId, index: binding.index}
           );
           value = weakRef;
         }
@@ -705,13 +705,13 @@ class WeakObjectType extends Type<any> {
     this.defineElastic(binding, field);
   }
 
-  private initFinalizers(binding: Binding<any>, data: WeakRef<any>[]) {
+  private initFinalizers(binding: Binding<any>) {
     if (!binding.trackedWrites) return;
     if (this.finalizers) return this.finalizers;
     const dispatcher = binding.dispatcher;
     if (!dispatcher.writeLog || typeof FinalizationRegistry === 'undefined') return;
     this.finalizers = new FinalizationRegistry(
-      ({type, weakRef, id, index}: FinalizerHeldValue) => {
+      ({type, data, weakRef, id, index}: FinalizerHeldValue) => {
         if (data[index] === weakRef) dispatcher.registry.trackWrite(id, type);
       }
     );
