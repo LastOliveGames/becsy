@@ -7,8 +7,11 @@ import type {ComponentType} from './component';
 
 
 export interface SystemType<S extends System> {
+  __system: true;
   new(): S;
 }
+
+type GroupContentsArray = (SystemType<System> | Record<string, unknown> | SystemGroup)[];
 
 export const enum RunState {
   RUNNING, STOPPED
@@ -19,8 +22,39 @@ class Placeholder {
 }
 
 
+export class SystemGroup {
+  static readonly __group = true;
+  static readonly __systemGroup = true;
+
+  __systems: SystemBox[];
+  __executed = false;
+
+  constructor(readonly __contents: GroupContentsArray) { }
+
+  __init(dispatcher: Dispatcher): void {
+    for (const item of this.__contents) {
+      if (item instanceof SystemGroup) item.__init(dispatcher);
+    }
+    this.__systems = [];
+    for (const item of this.__contents) {
+      if (item instanceof Function && item.__system) {
+        this.__systems.push(dispatcher.systemsByClass.get(item)!);
+      } else if (item instanceof SystemGroup) {
+        this.__systems.push(...item.__systems);
+      }
+    }
+    Object.freeze(this.__systems);
+  }
+}
+
+
 export abstract class System {
-  static __system = true;
+  static readonly __system = true;
+
+  static group(...systemTypes: GroupContentsArray): SystemGroup {
+    return new SystemGroup(systemTypes);
+  }
+
   __queryBuilders: QueryBuilder[] | null = [];
   __dispatcher: Dispatcher;
   time: number;
@@ -45,7 +79,7 @@ export abstract class System {
     return new Placeholder(systemType) as unknown as S;
   }
 
-  createEntity(...initialComponents: (ComponentType<any> | any)[]): Entity {
+  createEntity(...initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
     return this.__dispatcher.createEntity(initialComponents);
   }
 

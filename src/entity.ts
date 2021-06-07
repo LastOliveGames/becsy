@@ -28,7 +28,7 @@ export class Entity {
     return this;
   }
 
-  addAll(...args: (ComponentType<any> | any)[]): this {
+  addAll(...args: (ComponentType<any> | Record<string, unknown>)[]): this {
     for (let i = 0; i < args.length; i++) {
       const type = args[i];
       CHECK: {
@@ -36,7 +36,7 @@ export class Entity {
           throw new Error(`Bad arguments to bulk add: expected component type, got: ${type}`);
         }
       }
-      let value = args[i + 1];
+      let value: ComponentType<any> | Record<string, unknown> | undefined = args[i + 1];
       if (typeof value === 'function') value = undefined; else i++;
       this.add(type, value);
     }

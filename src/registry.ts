@@ -106,7 +106,7 @@ export class Registry {
     }
   }
 
-  createEntity(initialComponents: (ComponentType<any> | any)[]): Entity {
+  createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
     const id = this.entityIdPool.take();
     const shapesIndex = id * this.stride;
     this.shapes[shapesIndex] = 1;
@@ -128,7 +128,7 @@ export class Registry {
     this.removalLog.commit();
   }
 
-  processEndOfFrame(): void {
+  completeCycle(): void {
     this.processDeletionLog();
     this.processRemovalLog();
   }

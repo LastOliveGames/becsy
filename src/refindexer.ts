@@ -217,7 +217,7 @@ export class RefIndexer {
     this.registry = dispatcher.registry;
   }
 
-  processEndOfFrame(): void {
+  completeCycle(): void {
     this.flush();  // to handle ref changes coming from registry.processEndOfFrame()
     STATS: this.dispatcher.stats.maxRefChangesPerFrame =
       this.refLog?.countSince(this.refLogStatsPointer!) ?? 0;

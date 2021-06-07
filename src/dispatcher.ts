@@ -2,7 +2,7 @@ import type {ComponentStorage, ComponentType} from './component';
 import type {Entity} from './entity';
 import {MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './consts';
 import {Log, LogPointer} from './datastructures';
-import {RunState, System, SystemBox, SystemType} from './system';
+import {RunState, System, SystemBox, SystemGroup, SystemType} from './system';
 import {Registry} from './registry';
 import {Stats} from './stats';
 import {RefIndexer} from './refindexer';
@@ -15,9 +15,26 @@ const now = typeof window !== 'undefined' && typeof window.performance !== 'unde
 
 // TODO: figure out a better type for interleaved arrays, here and elsewhere
 // https://stackoverflow.com/questions/67467302/type-for-an-interleaved-array-of-classes-and-values
-type DefsArray = (ComponentType<any> | SystemType<System> | any | DefsArray)[];
+type DefsArray =
+  (ComponentType<any> | SystemType<System> | Record<string, unknown> | SystemGroup | DefsArray)[];
 
+/**
+ * All the options needed to create a new world.  Only `defs` is required.
+ *
+ * You can get hints on good values for all the `max` options by printing out the `world.stats`
+ * after running your world for a bit.
+ */
 export interface WorldOptions {
+  /**
+   * A list of all the component types, system types (with optional initializers), and system groups
+   * that the world can make use of.  It's an array in no particular order and can be nested
+   * arbitrarily deep for your convenience -- it'll get flattened.  It should contain:
+   * - component classes
+   * - system classes, each optionally followed by an object to initialize the system's properties
+   * - system groups created with `System.group`
+   *
+   * You must not include duplicates -- this includes systems defined inside groups!
+   */
   defs: DefsArray;
   threads?: number;
   maxEntities?: number;
@@ -29,8 +46,22 @@ export interface WorldOptions {
   defaultComponentStorage?: ComponentStorage;
 }
 
+/**
+ * Instructions for the `control` method.
+ */
 export interface ControlOptions {
+  /**
+   * A list of systems to stop.  It can include anything accepted by the world's `defs` option (with
+   * arbitrarily nested arrays) but only system types and system groups will be processed. No action
+   * will be taken on systems that are already stopped.
+   */
   stop: DefsArray;
+
+  /**
+   * A list of systems to restart.  It can include anything accepted by the world's `defs` option
+   * (with arbitrarily nested arrays) but only system types and system groups will be processed. No
+   * action will be taken on systems that are already running.
+   */
   restart: DefsArray;
 }
 
@@ -43,13 +74,105 @@ class CallbackSystem extends System {
 }
 
 
+export class FrameImpl {
+  private executing: boolean;
+  private time = now() / 1000;
+  private delta: number;
+
+  constructor(private readonly dispatcher: Dispatcher, private readonly groups: SystemGroup[]) {
+    CHECK: if (groups.length === 0) {
+      throw new Error('At least one system group needed');
+    }
+    CHECK: for (const group of groups) {
+      if (!dispatcher.systemGroups.includes(group)) {
+        throw new Error('Some groups in the frame are not parts of the world defs');
+      }
+    }
+  }
+
+  /**
+   * Indicates that execution of a frame has begun and locks in the default `time` and `delta`.
+   * Must be called once at the beginning of each frame, prior to any calls to `execute`.  Must be
+   * bookended by a call to `end`.
+   *
+   * You cannot call `begin` while any other executors are running.
+   */
+  begin(): void {
+    CHECK: if (this.executing) throw new Error('Frame already executing');
+    CHECK: if (this.dispatcher.executing) throw new Error('Another frame already executing');
+    this.executing = this.dispatcher.executing = true;
+    this.time = now() / 1000;
+    this.delta = this.time - this.dispatcher.lastTime;
+    this.dispatcher.lastTime = this.time;
+  }
+
+  /**
+   * Indicates that execution of a frame has completed.  Must be called once at the end of each
+   * frame, after any calls to `execute`.
+   */
+  end(): void {
+    CHECK: if (!this.executing) throw new Error('Frame not executing');
+    DEBUG: if (!this.dispatcher.executing) throw new Error('No frame executing');
+    this.executing = this.dispatcher.executing = false;
+    allExecuted: {
+      for (const group of this.groups) if (!group.__executed) break allExecuted;
+      for (const group of this.groups) group.__executed = false;
+      this.dispatcher.completeCycle();
+    }
+    this.dispatcher.completeFrame();
+  }
+
+  /**
+   * Executes a group of systems.  If your world is single-threaded then execution is synchronous
+   * and you can ignore the returned promise.
+   *
+   * You cannot execute individual systems, unless you create a singleton group to hold them.
+   *
+   * @param group The group of systems to execute.  Must be a member of the group list passed in
+   * when this executor was created.
+   *
+   * @param time The time of this frame's execution.  This will be set on every system's `time`
+   * property and defaults to the time when `begin` was called.  It's not used internally so you can
+   * pass in any numeric value that's expected by your systems.
+   *
+   * @param delta The duration since the last frame's execution.  This will be set on every system's
+   * `delta` property and default to the duration since any previous frame's `begin` was called.
+   * It's not used internally so you can pass in any numeric value that's expected by your systems.
+   */
+  async execute(group: SystemGroup, time?: number, delta?: number): Promise<void> {
+    CHECK: if (!this.groups.includes(group)) throw new Error('Group not included in this frame');
+    CHECK: if (!this.executing) throw new Error('Frame not executing');
+    const dispatcher = this.dispatcher;
+    const registry = dispatcher.registry;
+    const systems = group.__systems;
+    time = time ?? this.time;
+    delta = delta ?? this.delta;
+    group.__executed = true;
+    for (const system of systems) {
+      registry.executingSystem = system;
+      await system.execute(time, delta);
+      dispatcher.flush();
+    }
+    registry.executingSystem = undefined;
+  }
+}
+
+/**
+ * A frame executor that lets you manually run system groups.  You can create one by calling
+ * `world.createCustomExecutor`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface Frame extends FrameImpl {}
+
+
 export class Dispatcher {
   readonly maxEntities;
   readonly defaultComponentStorage;
   readonly registry;
   private readonly systems: SystemBox[];
   readonly systemsByClass = new Map<SystemType<System>, SystemBox>();
-  private lastTime = now() / 1000;
+  readonly systemGroups: SystemGroup[];
+  lastTime = now() / 1000;
   executing: boolean;
   readonly shapeLog: Log;
   readonly writeLog?: Log;
@@ -79,7 +202,7 @@ export class Dispatcher {
     if (maxEntities > MAX_NUM_ENTITIES) {
       throw new Error(`maxEntities too high, the limit is ${MAX_NUM_ENTITIES}`);
     }
-    const {componentTypes, systemTypes} = this.splitDefs(defs);
+    const {componentTypes, systemTypes, systemGroups} = this.splitDefs(defs);
     if (componentTypes.length > MAX_NUM_COMPONENTS) {
       throw new Error(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
     }
@@ -92,10 +215,11 @@ export class Dispatcher {
     this.shapeLog = new Log(maxShapeChangesPerFrame, 'maxShapeChangesPerFrame', this.buffers);
     this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.registry = new Registry(
-      maxEntities, maxLimboEntities, maxLimboComponents, componentTypes.flat(Infinity), this);
+      maxEntities, maxLimboEntities, maxLimboComponents, componentTypes, this);
     this.indexer = new RefIndexer(this, maxRefChangesPerFrame);
     this.registry.initializeComponentTypes();
     this.systems = this.normalizeAndInitSystems(systemTypes);
+    this.systemGroups = this.initSystemGroups(systemGroups);
     if (this.systems.some(system => system.hasWriteQueries)) {
       this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame', this.buffers);
       this.writeLogFramePointer = this.writeLog.createPointer();
@@ -106,13 +230,19 @@ export class Dispatcher {
     this.callbackSystem.rwMasks.write = undefined;
   }
 
-  private normalizeAndInitSystems(systemTypes: (SystemType<System> | any)[]): SystemBox[] {
+  private normalizeAndInitSystems(
+    systemTypes: (SystemType<System> | Record<string, unknown>)[]
+  ): SystemBox[] {
     const systems = [];
-    const flatUserSystems = systemTypes.flat(Infinity);
-    for (let i = 0; i < flatUserSystems.length; i++) {
-      const SystemClass = flatUserSystems[i] as SystemType<System>;
+    const systemClasses = [];
+    for (let i = 0; i < systemTypes.length; i++) {
+      const SystemClass = systemTypes[i] as SystemType<System>;
+      CHECK: if (this.systemsByClass.has(SystemClass)) {
+        throw new Error(`System ${SystemClass.name} included multiple times in world defs`);
+      }
+      systemClasses.push(SystemClass);
       const system = new SystemClass();
-      const props = flatUserSystems[i + 1];
+      const props = systemTypes[i + 1];
       if (props && typeof props !== 'function') {
         Object.assign(system, props);
         i++;
@@ -125,13 +255,32 @@ export class Dispatcher {
     return systems;
   }
 
-  private splitDefs(defs: DefsArray):
-      {componentTypes: ComponentType<any>[], systemTypes: (SystemType<System> | any)[]} {
+  private initSystemGroups(systemGroups: SystemGroup[]): SystemGroup[] {
+    for (const group of systemGroups) group.__init(this);
+    return systemGroups;
+  }
+
+  private splitDefs(defs: DefsArray): {
+    componentTypes: ComponentType<any>[],
+    systemTypes: (SystemType<System> | Record<string, unknown>)[],
+    systemGroups: SystemGroup[]
+  } {
     const componentTypes: ComponentType<any>[] = [];
-    const systemTypes: (SystemType<System> | any)[] = [];
+    const systemTypes: (SystemType<System> | Record<string, unknown>)[] = [];
+    const systemGroups: SystemGroup[] = [];
     let lastDefWasSystem = false;
     for (const def of defs.flat(Infinity)) {
-      if (typeof def === 'function') {
+      if (def.__group) {
+        if (def.__systemGroup) systemGroups.push(def);
+        const {
+          componentTypes: nestedComponentTypes,
+          systemTypes: nestedSystemTypes,
+          systemGroups: nestedSystemGroups
+        } = this.splitDefs(def.__contents);
+        componentTypes.push(...nestedComponentTypes);
+        systemTypes.push(...nestedSystemTypes);
+        systemGroups.push(...nestedSystemGroups);
+      } else if (typeof def === 'function') {
         lastDefWasSystem = def.__system;
         (lastDefWasSystem ? systemTypes : componentTypes).push(def);
       } else {
@@ -140,27 +289,29 @@ export class Dispatcher {
         lastDefWasSystem = false;
       }
     }
-    return {componentTypes, systemTypes};
+    return {componentTypes, systemTypes, systemGroups};
   }
 
   async initialize(): Promise<void> {
     await Promise.all(this.systems.map(system => system.initialize()));
   }
 
-  async execute(time?: number, delta?: number, systems?: SystemBox[]): Promise<void> {
+  async execute(time?: number, delta?: number): Promise<void> {
+    // This largely duplicates the code in Frame, but we lose 5-10% performance by delegating to it
+    // so duplicate the code here instead.
     CHECK: if (this.executing) throw new Error('Recursive system execution not allowed');
     this.executing = true;
     if (time === undefined) time = now() / 1000;
     if (delta === undefined) delta = time - this.lastTime;
     this.lastTime = time;
-    for (const system of systems ?? this.systems) {
+    for (const system of this.systems) {
       this.registry.executingSystem = system;
       system.execute(time, delta);
       this.flush();
     }
     this.registry.executingSystem = undefined;
     this.executing = false;
-    this.processEndOfFrame();
+    this.completeCycle();
   }
 
   executeFunction(fn: (system: System) => void): void {
@@ -174,30 +325,34 @@ export class Dispatcher {
     this.flush();
     this.registry.executingSystem = undefined;
     this.executing = false;
-    this.processEndOfFrame();
+    this.completeCycle();
+    this.completeFrame();
   }
 
-  private processEndOfFrame(): void {
-    this.registry.processEndOfFrame();
-    this.indexer.processEndOfFrame();
+  completeCycle(): void {
+    this.registry.completeCycle();
+    this.indexer.completeCycle();
+  }
+
+  completeFrame(): void {
     STATS: this.gatherFrameStats();
     this.processDeferredControls();
   }
 
-  private gatherFrameStats(): void {
+  gatherFrameStats(): void {
     this.stats.frames += 1;
     this.stats.maxShapeChangesPerFrame = this.shapeLog.countSince(this.shapeLogFramePointer);
     this.stats.maxWritesPerFrame = this.writeLog?.countSince(this.writeLogFramePointer!) ?? 0;
   }
 
-  private flush(): void {
+  flush(): void {
     this.registry.flush();
     this.indexer.flush();  // may update writeLog
     this.shapeLog.commit();
     this.writeLog?.commit();
   }
 
-  createEntity(initialComponents: (ComponentType<any> | any)[]): Entity {
+  createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
     const entity = this.registry.createEntity(initialComponents);
     if (!this.executing) this.flush();
     return entity;
@@ -211,9 +366,9 @@ export class Dispatcher {
   }
 
   private deferRequestedRunState(defs: DefsArray, state: RunState): void {
-    for (const def of defs.flat(Infinity)) {
+    for (const def of this.splitDefs(defs).systemTypes) {
       if (!def.__system) continue;
-      const system = this.systemsByClass.get(def);
+      const system = this.systemsByClass.get(def as SystemType<System>);
       CHECK: if (!system) throw new Error(`System ${def.name} not defined for this world`);
       this.deferredControls!.set(system, state);
     }
@@ -221,17 +376,18 @@ export class Dispatcher {
 
   private checkControlOverlap(options: ControlOptions): void {
     const stopSet = new Set<SystemType<System>>();
-    for (const def of options.stop.flat(Infinity)) {
-      if (!def.__system) continue;
-      stopSet.add(def);
+    for (const def of this.splitDefs(options.stop).systemTypes) {
+      if (def.__system) stopSet.add(def as SystemType<System>);
     }
-    for (const def of options.restart.flat(Infinity)) {
+    for (const def of this.splitDefs(options.restart).systemTypes) {
       if (!def.__system) continue;
-      if (stopSet.has(def)) throw new Error(`Request to both stop and restart system ${def.name}`);
+      if (stopSet.has(def as SystemType<System>)) {
+        throw new Error(`Request to both stop and restart system ${def.name}`);
+      }
     }
   }
 
-  private processDeferredControls(): void {
+  processDeferredControls(): void {
     if (!this.deferredControls.size) return;
     for (const [system, state] of this.deferredControls.entries()) {
       switch (state) {

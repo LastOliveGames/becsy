@@ -6,3 +6,4 @@ export type {SystemType} from './system';
 export {componentTypes, component, field} from './decorators';
 export {Query} from './query';
 export type {ComponentType} from './component';
+export type {Frame} from './dispatcher';

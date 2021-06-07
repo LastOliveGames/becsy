@@ -248,37 +248,37 @@ export class Query {
   __results: Partial<Record<QueryFlavorName, EntityList>> & {all?: PackedArrayEntityList};
   __systemName: string;
 
-  get all(): Entity[] {
+  get all(): readonly Entity[] {
     CHECK: this.__checkList('all');
     return this.__results.all!.entities;
   }
 
-  get added(): Entity[] {
+  get added(): readonly Entity[] {
     CHECK: this.__checkList('added');
     return this.__results.added!.entities;
   }
 
-  get removed(): Entity[] {
+  get removed(): readonly Entity[] {
     CHECK: this.__checkList('removed');
     return this.__results.removed!.entities;
   }
 
-  get changed(): Entity[] {
+  get changed(): readonly Entity[] {
     CHECK: this.__checkList('changed');
     return this.__results.changed!.entities;
   }
 
-  get addedOrChanged(): Entity[] {
+  get addedOrChanged(): readonly Entity[] {
     CHECK: this.__checkList('addedOrChanged');
     return this.__results.addedOrChanged!.entities;
   }
 
-  get changedOrRemoved(): Entity[] {
+  get changedOrRemoved(): readonly Entity[] {
     CHECK: this.__checkList('changedOrRemoved');
     return this.__results.changedOrRemoved!.entities;
   }
 
-  get addedChangedOrRemoved(): Entity[] {
+  get addedChangedOrRemoved(): readonly Entity[] {
     CHECK: this.__checkList('addedChangedOrRemoved');
     return this.__results.addedChangedOrRemoved!.entities;
   }
