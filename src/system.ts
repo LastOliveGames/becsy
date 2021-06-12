@@ -23,9 +23,6 @@ class Placeholder {
 
 
 export class SystemGroup {
-  static readonly __group = true;
-  static readonly __systemGroup = true;
-
   __systems: SystemBox[];
   __executed = false;
 

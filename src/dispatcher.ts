@@ -15,8 +15,8 @@ const now = typeof window !== 'undefined' && typeof window.performance !== 'unde
 
 // TODO: figure out a better type for interleaved arrays, here and elsewhere
 // https://stackoverflow.com/questions/67467302/type-for-an-interleaved-array-of-classes-and-values
-type DefsArray =
-  (ComponentType<any> | SystemType<System> | Record<string, unknown> | SystemGroup | DefsArray)[];
+type DefElement = ComponentType<any> | SystemType<System> | Record<string, unknown> | SystemGroup;
+type DefsArray = (DefElement | DefsArray)[];
 
 /**
  * All the options needed to create a new world.  Only `defs` is required.
@@ -269,9 +269,9 @@ export class Dispatcher {
     const systemTypes: (SystemType<System> | Record<string, unknown>)[] = [];
     const systemGroups: SystemGroup[] = [];
     let lastDefWasSystem = false;
-    for (const def of defs.flat(Infinity)) {
-      if (def.__group) {
-        if (def.__systemGroup) systemGroups.push(def);
+    for (const def of defs.flat(Infinity) as (DefElement)[]) {
+      if (def instanceof SystemGroup) {
+        systemGroups.push(def);
         const {
           componentTypes: nestedComponentTypes,
           systemTypes: nestedSystemTypes,
@@ -281,8 +281,12 @@ export class Dispatcher {
         systemTypes.push(...nestedSystemTypes);
         systemGroups.push(...nestedSystemGroups);
       } else if (typeof def === 'function') {
-        lastDefWasSystem = def.__system;
-        (lastDefWasSystem ? systemTypes : componentTypes).push(def);
+        lastDefWasSystem = !!(def as any).__system;
+        if (lastDefWasSystem) {
+          systemTypes.push(def as SystemType<any>);
+        } else {
+          componentTypes.push(def);
+        }
       } else {
         CHECK: if (!lastDefWasSystem) throw new Error('Unexpected value in world defs: ' + def);
         systemTypes.push(def);
