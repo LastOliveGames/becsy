@@ -1,5 +1,8 @@
 ### Upcoming
 
+### 0.6.1
+- Exported `@system`.
+
 ### 0.6.0
 - Fixed reactive queries.
 - Exported `SystemGroup`.
