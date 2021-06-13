@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.6.0
 - Fixed reactive queries.
 - Exported `SystemGroup`.
 - Made `@component` decorator automatically add the class to a new world's defs.
