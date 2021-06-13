@@ -1,6 +1,8 @@
 ### Upcoming
 - Fixed reactive queries.
 - Exported `SystemGroup`.
+- Made `@component` decorator automatically add the class to a new world's defs.
+- Added a `@system` decorator to automatically add systems to a new world's defs, and optionally group them.
 
 ### 0.5.2
 - Fixed bug in `weakObject` type.

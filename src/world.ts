@@ -21,7 +21,7 @@ export class World {
    *
    * @returns A promise of a new world to do with as you please.
    */
-  static async create(options: WorldOptions): Promise<World> {
+  static async create(options: WorldOptions = {}): Promise<World> {
     const world = new World(options, MAGIC_COOKIE);
     await world.__dispatcher.initialize();
     return world;

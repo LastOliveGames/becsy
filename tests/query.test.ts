@@ -1,6 +1,4 @@
-import {
-  component, ComponentType, componentTypes, field, Query, System, SystemType, Type, World,
-} from '../src';
+import {component, ComponentType, field, Query, System, SystemType, Type, World} from '../src';
 
 
 @component class A {
@@ -125,7 +123,7 @@ class Count extends System {
 }
 
 async function createWorld(...systems: SystemType<System>[]): Promise<World> {
-  return World.create({maxEntities: 100, defs: [componentTypes, systems, Count]});
+  return World.create({maxEntities: 100, defs: [systems, Count]});
 }
 
 
@@ -231,7 +229,7 @@ describe('creating and deleting entities', () => {
 
   test('recycle entity IDs', async() => {
     const world = await World.create({
-      maxEntities: 9, maxLimboEntities: 7, defs: [componentTypes, CreateAForEachC, DeleteA]
+      maxEntities: 9, maxLimboEntities: 7, defs: [CreateAForEachC, DeleteA]
     });
     world.createEntity(C, {value: 1});
     world.createEntity(C, {value: 2});

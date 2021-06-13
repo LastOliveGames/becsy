@@ -9,6 +9,9 @@ import {Registry} from './registry';
 import {Stats} from './stats';
 import {RefIndexer} from './refindexer';
 import {Buffers} from './buffers';
+import {
+  componentTypes as decoratedComponentTypes, systemTypes as decoratedSystemTypes
+} from './decorators';
 
 
 const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
@@ -21,7 +24,7 @@ type DefElement = ComponentType<any> | SystemType<System> | Record<string, unkno
 type DefsArray = (DefElement | DefsArray)[];
 
 /**
- * All the options needed to create a new world.  Only `defs` is required.
+ * All the options needed to create a new world.
  *
  * You can get hints on good values for all the `max` options by printing out the `world.stats`
  * after running your world for a bit.
@@ -35,9 +38,10 @@ export interface WorldOptions {
    * - system classes, each optionally followed by an object to initialize the system's properties
    * - system groups created with `System.group`
    *
-   * You must not include duplicates -- this includes systems defined inside groups!
+   * You must not include duplicates -- this includes systems defined inside groups!  Any classes
+   * decorated with @component or @system will be included automatically.
    */
-  defs: DefsArray;
+  defs?: DefsArray;
   threads?: number;
   maxEntities?: number;
   maxLimboEntities?: number;
@@ -204,7 +208,8 @@ export class Dispatcher {
     if (maxEntities > MAX_NUM_ENTITIES) {
       throw new Error(`maxEntities too high, the limit is ${MAX_NUM_ENTITIES}`);
     }
-    const {componentTypes, systemTypes, systemGroups} = this.splitDefs(defs);
+    const {componentTypes, systemTypes, systemGroups} =
+      this.splitDefs([defs ?? [], decoratedComponentTypes, decoratedSystemTypes]);
     if (componentTypes.length > MAX_NUM_COMPONENTS) {
       throw new Error(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
     }

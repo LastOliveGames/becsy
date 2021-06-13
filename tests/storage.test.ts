@@ -8,7 +8,7 @@ class A {
 describe('using packed component storage', () => {
 
   test('store and read values', async() => {
-    const world = await World.create({defs: [A]});
+    const world = await World.create();
     world.build(system => {
       const entity1 = system.createEntity(A, {value: 1});
       const entity2 = system.createEntity(A, {value: 2});
@@ -19,7 +19,7 @@ describe('using packed component storage', () => {
   });
 
   test('expand capacity', async() => {
-    const world = await World.create({defs: [A]});
+    const world = await World.create();
     world.build(system => {
       const entity1 = system.createEntity(A, {value: 1});
       const entity2 = system.createEntity(A, {value: 2});
@@ -34,7 +34,7 @@ describe('using packed component storage', () => {
   });
 
   test('reuse spare slots', async() => {
-    const world = await World.create({defs: [A]});
+    const world = await World.create();
     world.build(system => {
       const entity1 = system.createEntity(A, {value: 1});
       const entity2 = system.createEntity(A, {value: 2});
@@ -57,7 +57,7 @@ describe('using packed component storage', () => {
   });
 
   test('grow spares list', async() => {
-    const world = await World.create({defs: [A]});
+    const world = await World.create();
     world.build(system => {
       const entities = [];
       for (let i = 0; i < 9; i++) entities[i] = system.createEntity(A);
@@ -74,7 +74,7 @@ describe('using packed component storage', () => {
   });
 
   test('access removed components', async() => {
-    const world = await World.create({defs: [A]});
+    const world = await World.create();
     world.build(system => {
       const entity1 = system.createEntity(A, {value: 1});
       entity1.remove(A);
@@ -87,7 +87,7 @@ describe('using packed component storage', () => {
   });
 
   test('resurrect components', async() => {
-    const world = await World.create({defs: [A]});
+    const world = await World.create();
     let entity1: Entity;  // will be released, but there's nothing to overwrite it
     world.build(system => {
       entity1 = system.createEntity(A, {value: 1});
@@ -101,7 +101,7 @@ describe('using packed component storage', () => {
   });
 
   test('switch to bigger array type', async() => {
-    const world = await World.create({defs: [A]});
+    const world = await World.create();
     world.build(system => {
       for (let i = 0; i < 128; i++) system.createEntity(A);
       expect(world.stats.for(A).capacity).toBe(128);

@@ -15,7 +15,7 @@ class SystemB extends System {
 describe('exercising component validity checks', () => {
 
   test('reuse readable component', async() => {
-    const world = await World.create({defs: [A]});
+    const world = await World.create();
     world.build(system => {
       const entity1 = system.createEntity(A, {value: 1});
       const a1 = entity1.read(A);
@@ -25,7 +25,7 @@ describe('exercising component validity checks', () => {
   });
 
   test('reuse writable component', async() => {
-    const world = await World.create({defs: [A]});
+    const world = await World.create();
     world.build(system => {
       const entity1 = system.createEntity(A, {value: 1});
       const a1 = entity1.write(A);

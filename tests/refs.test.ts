@@ -1,5 +1,5 @@
 import {
-  component, ComponentType, componentTypes, Entity, field, Query, System, SystemType, Type, World,
+  component, ComponentType, Entity, field, Query, System, SystemType, Type, World
 } from '../src';
 
 
@@ -33,6 +33,9 @@ import {
   @field(Type.uint8) declare value: number;
   @field(Type.backrefs(undefined, undefined, true)) declare targeters: Entity[];
 }
+
+const componentTypes =
+  [Origin, MultiOrigin, PreciseDest, TypeDest, GlobalDest, GlobalDestWithStales];
 
 
 class IncrementTargetedDests extends System {
@@ -106,7 +109,7 @@ class Count extends System {
 }
 
 async function createWorld(...systems: SystemType<System>[]): Promise<World> {
-  return World.create({maxEntities: 200, defs: [componentTypes, systems, Count]});
+  return World.create({maxEntities: 200, defs: [systems, Count]});
 }
 
 

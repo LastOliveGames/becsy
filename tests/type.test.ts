@@ -22,7 +22,7 @@ class Stuff {
 }
 
 async function testReadWrite(prop: string, values: any[]): Promise<void> {
-  const world = await World.create({defs: [Big]});
+  const world = await World.create();
   world.build(system => {
     const entity = system.createEntity(Big);
     for (const value of values) {
@@ -80,7 +80,7 @@ describe('getting and setting fields of various types', () => {
   });
 
   test('ref', async() => {
-    const world = await World.create({defs: [Big]});
+    const world = await World.create();
     world.build(system => {
       const a = system.createEntity(Big);
       const b = system.createEntity(Big);
@@ -105,7 +105,7 @@ describe('getting and setting fields of various types', () => {
   // https://stackoverflow.com/questions/65175380.
   test.skip('weakObject garbage collection', async() => {
     const a: any[] = [new Stuff()];
-    const world = await World.create({defs: [Big]});
+    const world = await World.create();
     let entity: Entity;  // this will get released, but nothing will overwrite it
     world.build(system => {
       entity = system.createEntity(Big);
