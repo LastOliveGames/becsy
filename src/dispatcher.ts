@@ -2,7 +2,9 @@ import type {ComponentStorage, ComponentType} from './component';
 import type {Entity} from './entity';
 import {MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './consts';
 import {Log, LogPointer} from './datastructures';
-import {RunState, System, SystemBox, SystemGroup, SystemType} from './system';
+import {
+  initSystemGroup, RunState, System, SystemBox, SystemGroup, SystemGroupImpl, SystemType
+} from './system';
 import {Registry} from './registry';
 import {Stats} from './stats';
 import {RefIndexer} from './refindexer';
@@ -255,21 +257,21 @@ export class Dispatcher {
   }
 
   private initSystemGroups(systemGroups: SystemGroup[]): SystemGroup[] {
-    for (const group of systemGroups) group.__init(this);
+    for (const group of systemGroups) initSystemGroup(group, this);
     return systemGroups;
   }
 
   private splitDefs(defs: DefsArray): {
     componentTypes: ComponentType<any>[],
     systemTypes: (SystemType<System> | Record<string, unknown>)[],
-    systemGroups: SystemGroup[]
+    systemGroups: SystemGroupImpl[]
   } {
     const componentTypes: ComponentType<any>[] = [];
     const systemTypes: (SystemType<System> | Record<string, unknown>)[] = [];
-    const systemGroups: SystemGroup[] = [];
+    const systemGroups: SystemGroupImpl[] = [];
     let lastDefWasSystem = false;
     for (const def of defs.flat(Infinity) as DefElement[]) {
-      if (def instanceof SystemGroup) {
+      if (def instanceof SystemGroupImpl) {
         systemGroups.push(def);
         const {
           componentTypes: nestedComponentTypes,

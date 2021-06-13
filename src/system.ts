@@ -22,26 +22,30 @@ class Placeholder {
 }
 
 
-export class SystemGroup {
+export class SystemGroupImpl {
   __systems: SystemBox[];
   __executed = false;
 
   constructor(readonly __contents: GroupContentsArray) { }
+}
 
-  __init(dispatcher: Dispatcher): void {
-    for (const item of this.__contents) {
-      if (item instanceof SystemGroup) item.__init(dispatcher);
-    }
-    this.__systems = [];
-    for (const item of this.__contents) {
-      if (item instanceof Function && item.__system) {
-        this.__systems.push(dispatcher.systemsByClass.get(item)!);
-      } else if (item instanceof SystemGroup) {
-        this.__systems.push(...item.__systems);
-      }
-    }
-    Object.freeze(this.__systems);
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface SystemGroup extends SystemGroupImpl {}
+
+
+export function initSystemGroup(group: SystemGroupImpl, dispatcher: Dispatcher): void {
+  for (const item of group.__contents) {
+    if (item instanceof SystemGroupImpl) initSystemGroup(item, dispatcher);
   }
+  group.__systems = [];
+  for (const item of group.__contents) {
+    if (item instanceof Function && item.__system) {
+      group.__systems.push(dispatcher.systemsByClass.get(item)!);
+    } else if (item instanceof SystemGroupImpl) {
+      group.__systems.push(...item.__systems);
+    }
+  }
+  Object.freeze(group.__systems);
 }
 
 
@@ -49,7 +53,7 @@ export abstract class System {
   static readonly __system = true;
 
   static group(...systemTypes: GroupContentsArray): SystemGroup {
-    return new SystemGroup(systemTypes);
+    return new SystemGroupImpl(systemTypes);
   }
 
   __queryBuilders: QueryBuilder[] | null = [];
