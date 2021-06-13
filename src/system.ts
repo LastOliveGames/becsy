@@ -93,6 +93,8 @@ export class SystemBox {
   shapeQueries: QueryBox[] = [];
   writeQueries: QueryBox[] = [];
   hasWriteQueries: boolean;
+  private hasTransientQueries: boolean;
+  private ranQueriesLastFrame = false;
   private processedEntities: Bitset;
   private shapeLogPointer: LogPointer;
   private writeLogPointer?: LogPointer;
@@ -103,14 +105,19 @@ export class SystemBox {
   constructor(private readonly system: System, readonly dispatcher: Dispatcher) {
     system.__dispatcher = dispatcher;
     this.shapeLogPointer = dispatcher.shapeLog.createPointer();
-    this.writeLogPointer = dispatcher.writeLog?.createPointer();
     this.processedEntities = new Bitset(dispatcher.maxEntities);
     for (const builder of system.__queryBuilders!) builder.__build(this);
     system.__queryBuilders = null;
     this.hasWriteQueries = !!this.writeQueries.length;
+    this.hasTransientQueries = this.shapeQueries.some(query => query.hasTransientResults);
   }
 
-  replaceAttachmentPlaceholders(): void {
+  finishConstructing(): void {
+    this.writeLogPointer = this.dispatcher.writeLog?.createPointer();
+    this.replaceAttachmentPlaceholders();
+  }
+
+  private replaceAttachmentPlaceholders(): void {
     for (const prop in this.system) {
       if ((this.system as any)[prop] instanceof Placeholder) {
         const targetSystemType = (this.system as any)[prop].type;
@@ -140,12 +147,19 @@ export class SystemBox {
     const writesMade =
       this.hasWriteQueries &&
       this.dispatcher.writeLog!.hasUpdatesSince(this.writeLogPointer!);
-    if (shapesChanged || writesMade) {
-      this.processedEntities.clear();
+    if (shapesChanged || writesMade || this.hasTransientQueries && this.ranQueriesLastFrame) {
       // Every write query is a shape query too.
       for (const query of this.shapeQueries) query.clearTransientResults();
-      if (shapesChanged) this.__updateShapeQueries();
-      if (writesMade) this.__updateWriteQueries();
+      if (shapesChanged || writesMade) {
+        this.ranQueriesLastFrame = true;
+        this.processedEntities.clear();
+        if (shapesChanged) this.__updateShapeQueries();
+        if (writesMade) this.__updateWriteQueries();
+      } else {
+        this.ranQueriesLastFrame = false;
+      }
+    } else {
+      this.ranQueriesLastFrame = false;
     }
   }
 

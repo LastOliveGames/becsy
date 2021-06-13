@@ -206,7 +206,6 @@ export class Dispatcher {
     if (componentTypes.length > MAX_NUM_COMPONENTS) {
       throw new Error(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
     }
-    // TODO: allocate all shared buffers through a central manager
     STATS: this.stats = new Stats();
     this.threaded = threads > 1;
     this.buffers = new Buffers(threads > 1);
@@ -224,6 +223,7 @@ export class Dispatcher {
       this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame', this.buffers);
       this.writeLogFramePointer = this.writeLog.createPointer();
     }
+    for (const box of this.systems) box.finishConstructing();
     this.userCallbackSystem = new CallbackSystem();
     this.callbackSystem = new SystemBox(this.userCallbackSystem, this);
     this.callbackSystem.rwMasks.read = undefined;
@@ -251,7 +251,6 @@ export class Dispatcher {
       systems.push(box);
       this.systemsByClass.set(SystemClass, box);
     }
-    for (const box of systems) box.replaceAttachmentPlaceholders();
     return systems;
   }
 
@@ -269,7 +268,7 @@ export class Dispatcher {
     const systemTypes: (SystemType<System> | Record<string, unknown>)[] = [];
     const systemGroups: SystemGroup[] = [];
     let lastDefWasSystem = false;
-    for (const def of defs.flat(Infinity) as (DefElement)[]) {
+    for (const def of defs.flat(Infinity) as DefElement[]) {
       if (def instanceof SystemGroup) {
         systemGroups.push(def);
         const {

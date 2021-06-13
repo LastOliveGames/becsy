@@ -1,5 +1,10 @@
 ### Upcoming
+- Fixed reactive queries.
+- Exported `SystemGroup`.
+
+### 0.5.2
 - Fixed bug in `weakObject` type.
+- Fixed system groups.
 
 ### 0.5.1
 - Only using `SharedArrayBuffer`s when running in multithreaded mode for maximum compatibility with browsers in singlethreaded mode.

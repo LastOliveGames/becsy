@@ -29,7 +29,7 @@ export class QueryBox {
   withMask: number[] | undefined;
   withoutMask: number[] | undefined;
   trackMask: number[] | undefined;
-  private hasTransientResults: boolean;
+  hasTransientResults: boolean;
   hasChangedResults: boolean;
   private currentEntities: Bitset | undefined;
   private changedEntities: Bitset | undefined;
@@ -111,14 +111,17 @@ export class QueryBox {
     }
   }
 
-  handleWrite(entityId: EntityId, componentFlagOffset: number, componentFlagMask: number): void {
-    if (!this.changedEntities!.get(entityId) &&
-      (this.trackMask![componentFlagOffset] ?? 0) & componentFlagMask) {
-      this.changedEntities!.set(entityId);
-      this.results.changed?.add(entityId);
-      this.results.addedOrChanged?.add(entityId);
-      this.results.changedOrRemoved?.add(entityId);
-      this.results.addedChangedOrRemoved?.add(entityId);
+  handleWrite(id: EntityId, componentFlagOffset: number, componentFlagMask: number): void {
+    const registry = this.system.dispatcher.registry;
+    if (!this.changedEntities!.get(id) &&
+      registry.matchShape(id, this.withMask, this.withoutMask) &&
+      (this.trackMask![componentFlagOffset] ?? 0) & componentFlagMask
+    ) {
+      this.changedEntities!.set(id);
+      this.results.changed?.add(id);
+      this.results.addedOrChanged?.add(id);
+      this.results.changedOrRemoved?.add(id);
+      this.results.addedChangedOrRemoved?.add(id);
     }
   }
 
