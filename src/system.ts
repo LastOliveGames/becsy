@@ -1,4 +1,5 @@
-import {Bitset, LogPointer} from './datastructures';
+import {Bitset} from './datatypes/bitset';
+import type {LogPointer} from './datatypes/log';
 import type {Dispatcher} from './dispatcher';
 import type {Entity, ReadWriteMasks} from './entity';
 import {ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';

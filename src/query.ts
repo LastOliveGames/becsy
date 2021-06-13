@@ -1,8 +1,8 @@
-import {Bitset} from './datastructures';
+import {Bitset} from './datatypes/bitset';
 import type {ComponentType} from './component';
 import {Entity, EntityId, extendMaskAndSetFlag} from './entity';
 import type {SystemBox} from './system';
-import {ArrayEntityList, EntityList, PackedArrayEntityList} from './entitylists';
+import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/entitylists';
 
 type MaskKind = 'withMask' | 'withoutMask' | 'trackMask';
 

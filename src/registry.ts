@@ -1,5 +1,6 @@
 import {ComponentType, assimilateComponentType, defineAndAllocateComponentType} from './component';
-import {Log, LogPointer, SharedAtomicPool, Uint32Pool, UnsharedPool} from './datastructures';
+import {Log, LogPointer} from './datatypes/log';
+import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/pool';
 import type {Dispatcher} from './dispatcher';
 import {Entity, EntityId} from './entity';
 import {ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';

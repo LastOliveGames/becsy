@@ -1,7 +1,7 @@
 import type {ComponentStorage, ComponentType} from './component';
 import type {Entity} from './entity';
 import {MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './consts';
-import {Log, LogPointer} from './datastructures';
+import {Log, LogPointer} from './datatypes/log';
 import {
   initSystemGroup, RunState, System, SystemBox, SystemGroup, SystemGroupImpl, SystemType
 } from './system';

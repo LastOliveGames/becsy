@@ -1,5 +1,5 @@
 import {checkTypeDefined, ComponentType} from './component';
-import {Log, LogPointer} from './datastructures';
+import {Log, LogPointer} from './datatypes/log';
 import {checkMask, Entity, EntityId} from './entity';
 import {
   COMPONENT_ID_BITS, COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK, FIELD_SEQ_BITS,
