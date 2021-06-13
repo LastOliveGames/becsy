@@ -66,7 +66,9 @@ class Count extends System {
 }
 
 async function createWorld(...systems: SystemType<System>[]): Promise<World> {
-  return World.create({maxEntities: 100, defs: [systems, Count]});
+  return World.create({
+    maxEntities: 100, defaultComponentStorage: 'sparse', defs: [systems, Count]
+  });
 }
 
 

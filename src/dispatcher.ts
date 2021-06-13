@@ -201,7 +201,7 @@ export class Dispatcher {
     maxShapeChangesPerFrame = maxEntities * 2,
     maxWritesPerFrame = maxEntities * 4,
     maxRefChangesPerFrame = maxEntities,
-    defaultComponentStorage = 'sparse'
+    defaultComponentStorage = 'packed'
   }: WorldOptions) {
     if (threads < 1) throw new Error('Minimum of one thread');
     if (threads > 1) throw new Error('Multithreading not yet implemented');

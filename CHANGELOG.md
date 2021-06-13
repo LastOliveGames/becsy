@@ -3,6 +3,7 @@
 - Exported `SystemGroup`.
 - Made `@component` decorator automatically add the class to a new world's defs.
 - Added a `@system` decorator to automatically add systems to a new world's defs, and optionally group them.
+- Chaned default component storage strategy to `packed` and elastic.  This will use less memory but decrease performance.  You can change the storage strategy back to the old `sparse` either by setting a component type's `storage` option, or by passing `defaultComponentStorage: 'sparse'` to the world options.
 
 ### 0.5.2
 - Fixed bug in `weakObject` type.
