@@ -6,6 +6,10 @@ import type {System, SystemGroup} from './system';
 const MAGIC_COOKIE = {};
 
 
+/**
+ * A container for entities, components, and systems, and the sole entry point to all functionality.
+ * Normally you'll create just one world for your game or app.
+ */
 export class World {
   private readonly __dispatcher: Dispatcher;
 
@@ -27,6 +31,9 @@ export class World {
     return world;
   }
 
+  /**
+   * This is a private constructor, please use the World.create() method instead.
+   */
   private constructor(options: WorldOptions, magicCookie: any) {
     if (magicCookie !== MAGIC_COOKIE) {
       throw new Error(`Don't call World constructor directly; use World.create instead`);
