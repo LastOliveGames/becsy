@@ -1,4 +1,5 @@
 ### Upcoming
+- Renamed `all` to `current` in queries.
 
 ### 0.6.1
 - Exported `@system`.

@@ -5,7 +5,7 @@
   "scripts": {
     "test": "jest --config jestconfig.json --detectOpenHandles",
     "test:watch": "jest --watch --config jestconfig.json --detectOpenHandles",
-    "perf": "tsc && rollup --config rollup.benchmarks.config.mjs && cp index.* perf.* lib && env NODE_ENV=test node --expose-gc --enable-source-maps --es-module-specifier-resolution=node lib/benchmarks/index.js",
+    "perf": "rollup --config rollup.benchmarks.config.mjs && cp index.* perf.* lib && tsc && env NODE_ENV=test node --expose-gc --enable-source-maps --es-module-specifier-resolution=node lib/benchmarks/index.js",
     "deopt": "rm *.log && node --trace-ic --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js && mv *.log v8.pre.log && node striplog.cjs && deoptigate",
     "flame": "clinic flame -- node --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js",
     "build": "rollup --config",

@@ -17,23 +17,23 @@ import {component, ComponentType, field, Query, System, SystemType, Type, World}
 
 
 class IncrementA extends System {
-  entities = this.query(q => q.all.with(A).write);
+  entities = this.query(q => q.current.with(A).write);
   execute() {
-    for (const entity of this.entities.all) entity.write(A).value += 1;
+    for (const entity of this.entities.current) entity.write(A).value += 1;
   }
 }
 
 class IncrementC extends System {
-  entities = this.query(q => q.all.with(C).write);
+  entities = this.query(q => q.current.with(C).write);
   execute() {
-    for (const entity of this.entities.all) entity.write(C).value += 1;
+    for (const entity of this.entities.current) entity.write(C).value += 1;
   }
 }
 
 class IncrementAC extends System {
-  entities = this.query(q => q.all.with(A, C).write);
+  entities = this.query(q => q.current.with(A, C).write);
   execute() {
-    for (const entity of this.entities.all) {
+    for (const entity of this.entities.current) {
       entity.write(A).value += 1;
       entity.write(C).value += 1;
     }
@@ -41,36 +41,36 @@ class IncrementAC extends System {
 }
 
 class IncrementANotC extends System {
-  entities = this.query(q => q.all.with(A).write.but.without(C));
+  entities = this.query(q => q.current.with(A).write.but.without(C));
   execute() {
-    for (const entity of this.entities.all) {
+    for (const entity of this.entities.current) {
       entity.write(A).value += 1;
     }
   }
 }
 
 class IncrementAWithD extends System {
-  entities = this.query(q => q.all.with(A).write.with(D));
+  entities = this.query(q => q.current.with(A).write.with(D));
   execute() {
-    for (const entity of this.entities.all) {
+    for (const entity of this.entities.current) {
       entity.write(A).value += 1;
     }
   }
 }
 
 class AddCToA extends System {
-  entities = this.query(q => q.all.with(A).write.and.using(C).write);
+  entities = this.query(q => q.current.with(A).write.and.using(C).write);
   execute() {
-    for (const entity of this.entities.all) {
+    for (const entity of this.entities.current) {
       if (!entity.has(C)) entity.add(C);
     }
   }
 }
 
 class RemoveCFromAC extends System {
-  entities = this.query(q => q.all.with(A).and.with(C).write);
+  entities = this.query(q => q.current.with(A).and.with(C).write);
   execute() {
-    for (const entity of this.entities.all) {
+    for (const entity of this.entities.current) {
       entity.remove(C);
     }
   }
@@ -85,18 +85,18 @@ class CreateA extends System {
 }
 
 class DeleteA extends System {
-  entities = this.query(q => q.all.with(A).write.and.using(C).write);
+  entities = this.query(q => q.current.with(A).write.and.using(C).write);
   execute() {
-    for (const entity of this.entities.all) {
+    for (const entity of this.entities.current) {
       entity.delete();
     }
   }
 }
 
 class CreateAForEachC extends System {
-  entities = this.query(q => q.all.with(C).and.using(A).write);
+  entities = this.query(q => q.current.with(C).and.using(A).write);
   execute() {
-    for (const entity of this.entities.all) {
+    for (const entity of this.entities.current) {
       this.createEntity(A, {value: entity.read(C).value});
     }
   }
@@ -107,15 +107,15 @@ let total: {[key: string]: number} = {a: 0, b: 0, c: 0};
 
 class Count extends System {
   private readonly items: {[key: string]: {type: ComponentType<any>, query: Query}} = {
-    a: {type: A, query: this.query(q => q.all.with(A))},
-    b: {type: B, query: this.query(q => q.all.with(B))},
-    c: {type: C, query: this.query(q => q.all.with(C))}
+    a: {type: A, query: this.query(q => q.current.with(A))},
+    b: {type: B, query: this.query(q => q.current.with(B))},
+    c: {type: C, query: this.query(q => q.current.with(C))}
   };
 
   execute() {
     total = {a: 0, b: 0, c: 0};
     for (const key in this.items) {
-      for (const entity of this.items[key].query.all) {
+      for (const entity of this.items[key].query.current) {
         total[key] += entity.read(this.items[key].type).value;
       }
     }

@@ -40,16 +40,16 @@ const componentTypes =
 
 class IncrementTargetedDests extends System {
   originEntities = this.query(q =>
-    q.all.with(Origin).and.using(PreciseDest, TypeDest, GlobalDest).write);
+    q.current.with(Origin).and.using(PreciseDest, TypeDest, GlobalDest).write);
 
   multiOriginEntities = this.query(q =>
-    q.all.with(MultiOrigin).and.using(PreciseDest, TypeDest, GlobalDest).write);
+    q.current.with(MultiOrigin).and.using(PreciseDest, TypeDest, GlobalDest).write);
 
   execute() {
-    for (const entity of this.originEntities.all) {
+    for (const entity of this.originEntities.current) {
       this.processTarget(entity.read(Origin).target);
     }
-    for (const entity of this.multiOriginEntities.all) {
+    for (const entity of this.multiOriginEntities.current) {
       this.processTarget(entity.read(MultiOrigin).target1);
       this.processTarget(entity.read(MultiOrigin).target2);
     }
@@ -64,18 +64,20 @@ class IncrementTargetedDests extends System {
 }
 
 class IncrementTargeters extends System {
-  preciseEntities = this.query(q => q.all.with(PreciseDest).and.using(Origin, MultiOrigin).write);
-  typeEntities = this.query(q => q.all.with(TypeDest).and.using(Origin, MultiOrigin).write);
-  globalEntities = this.query(q => q.all.with(GlobalDest).and.using(Origin, MultiOrigin).write);
+  preciseEntities = this.query(
+    q => q.current.with(PreciseDest).and.using(Origin, MultiOrigin).write);
+
+  typeEntities = this.query(q => q.current.with(TypeDest).and.using(Origin, MultiOrigin).write);
+  globalEntities = this.query(q => q.current.with(GlobalDest).and.using(Origin, MultiOrigin).write);
 
   execute() {
-    for (const entity of this.preciseEntities.all) {
+    for (const entity of this.preciseEntities.current) {
       this.processTargeters(entity.read(PreciseDest).targeters);
     }
-    for (const entity of this.typeEntities.all) {
+    for (const entity of this.typeEntities.current) {
       this.processTargeters(entity.read(TypeDest).targeters);
     }
-    for (const entity of this.globalEntities.all) {
+    for (const entity of this.globalEntities.current) {
       this.processTargeters(entity.read(GlobalDest).targeters);
     }
   }
@@ -95,13 +97,13 @@ class Count extends System {
   private readonly items: {[key: string]: {type: ComponentType<any>, query: Query}} =
     Object.fromEntries(componentTypes.map(type => [
       type.name[0].toLowerCase() + type.name.substring(1),
-      {type, query: this.query(q => q.all.with(type))}
+      {type, query: this.query(q => q.current.with(type))}
     ]));
 
   execute() {
     total = Object.fromEntries(Object.keys(this.items).map(key => [key, 0]));
     for (const key in this.items) {
-      for (const entity of this.items[key].query.all) {
+      for (const entity of this.items[key].query.current) {
         total[key] += entity.read(this.items[key].type).value;
       }
     }
@@ -230,7 +232,7 @@ describe('follow backward references', () => {
 
 describe('backrefs storage variants', () => {
 
-  test('small entities list', async() => {
+  test('smcurrent entities list', async() => {
     const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);

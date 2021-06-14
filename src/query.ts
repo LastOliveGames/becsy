@@ -7,7 +7,7 @@ import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/en
 type MaskKind = 'withMask' | 'withoutMask' | 'trackMask';
 
 const enum QueryFlavor {
-  all = 1, added = 2, removed = 4, changed = 8, addedOrChanged = 16, changedOrRemoved = 32,
+  current = 1, added = 2, removed = 4, changed = 8, addedOrChanged = 16, changedOrRemoved = 32,
   addedChangedOrRemoved = 64
 }
 
@@ -24,7 +24,7 @@ const changedFlavorsMask =
 
 
 export class QueryBox {
-  results: Partial<Record<QueryFlavorName, EntityList>> & {all?: PackedArrayEntityList} = {};
+  results: Partial<Record<QueryFlavorName, EntityList>> & {current?: PackedArrayEntityList} = {};
   flavors = 0;
   withMask: number[] | undefined;
   withoutMask: number[] | undefined;
@@ -46,8 +46,8 @@ export class QueryBox {
     CHECK: if (this.hasChangedResults && !this.trackMask) {
       throw new Error(`Query for changed entities must track at least one component`);
     }
-    if (this.flavors & QueryFlavor.all) {
-      this.results.all =
+    if (this.flavors & QueryFlavor.current) {
+      this.results.current =
         new PackedArrayEntityList(dispatcher.registry.pool, dispatcher.maxEntities);
     } else {
       this.currentEntities = new Bitset(dispatcher.maxEntities);
@@ -89,22 +89,22 @@ export class QueryBox {
 
   clearAllResults(): void {
     this.clearTransientResults();
-    this.results.all?.clear();
+    this.results.current?.clear();
   }
 
   handleShapeUpdate(id: EntityId): void {
     const registry = this.system.dispatcher.registry;
-    const oldMatch = this.results.all?.has(id) ?? this.currentEntities!.get(id);
+    const oldMatch = this.results.current?.has(id) ?? this.currentEntities!.get(id);
     const newMatch = registry.matchShape(id, this.withMask, this.withoutMask);
     if (newMatch && !oldMatch) {
       this.currentEntities?.set(id);
-      this.results.all?.add(id);
+      this.results.current?.add(id);
       this.results.added?.add(id);
       this.results.addedOrChanged?.add(id);
       this.results.addedChangedOrRemoved?.add(id);
     } else if (!newMatch && oldMatch) {
       this.currentEntities?.unset(id);
-      this.results.all?.remove(id);
+      this.results.current?.remove(id);
       this.results.removed?.add(id);
       this.results.changedOrRemoved?.add(id);
       this.results.addedChangedOrRemoved?.add(id);
@@ -161,8 +161,8 @@ export class QueryBuilder {
     return this;
   }
 
-  get all(): this {
-    this.__query.flavors |= QueryFlavor.all;
+  get current(): this {
+    this.__query.flavors |= QueryFlavor.current;
     return this;
   }
 
@@ -248,12 +248,12 @@ export class QueryBuilder {
 
 
 export class Query {
-  __results: Partial<Record<QueryFlavorName, EntityList>> & {all?: PackedArrayEntityList};
+  __results: Partial<Record<QueryFlavorName, EntityList>> & {current?: PackedArrayEntityList};
   __systemName: string;
 
-  get all(): readonly Entity[] {
-    CHECK: this.__checkList('all');
-    return this.__results.all!.entities;
+  get current(): readonly Entity[] {
+    CHECK: this.__checkList('current');
+    return this.__results.current!.entities;
   }
 
   get added(): readonly Entity[] {

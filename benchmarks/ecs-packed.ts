@@ -53,80 +53,80 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
 
 
   class SystemA extends becsy.System {
-    entities = this.query(q => q.all.with(A).write);
+    entities = this.query(q => q.current.with(A).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         entity.write(A).value *= 2;
       }
     }
   }
 
   class SystemB extends becsy.System {
-    entities = this.query(q => q.all.with(B).write);
+    entities = this.query(q => q.current.with(B).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         entity.write(B).value *= 2;
       }
     }
   }
 
   class SystemC extends becsy.System {
-    entities = this.query(q => q.all.with(C).write);
+    entities = this.query(q => q.current.with(C).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         entity.write(C).value *= 2;
       }
     }
   }
 
   class SystemD extends becsy.System {
-    entities = this.query(q => q.all.with(D).write);
+    entities = this.query(q => q.current.with(D).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         entity.write(D).value *= 2;
       }
     }
   }
 
   class SystemE extends becsy.System {
-    entities = this.query(q => q.all.with(E).write);
+    entities = this.query(q => q.current.with(E).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         entity.write(E).value *= 2;
       }
     }
   }
 
   class AddB extends becsy.System {
-    entities = this.query(q => q.all.with(A).but.without(B).write);
+    entities = this.query(q => q.current.with(A).but.without(B).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         entity.add(B);
       }
     }
   }
 
   class RemoveB extends becsy.System {
-    entities = this.query(q => q.all.with(B).write);
+    entities = this.query(q => q.current.with(B).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         entity.remove(B);
       }
     }
   }
 
   class SpawnB extends becsy.System {
-    entities = this.query(q => q.all.with(A).also.using(B).write);
+    entities = this.query(q => q.current.with(A).also.using(B).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         const value = entity.read(A).value;
         this.createEntity(B, {value});
         this.createEntity(B, {value});
@@ -135,20 +135,20 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
   }
 
   class KillB extends becsy.System {
-    entities = this.query(q => q.all.with(B).write);
+    entities = this.query(q => q.current.with(B).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         entity.delete();
       }
     }
   }
 
   class SystemAB extends becsy.System {
-    entities = this.query(q => q.all.with(A).write.with(B).write);
+    entities = this.query(q => q.current.with(A).write.with(B).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         const a = entity.write(A);
         const b = entity.write(B);
         const x = a.value;
@@ -159,10 +159,10 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
   }
 
   class SystemCD extends becsy.System {
-    entities = this.query(q => q.all.with(C).write.with(D).write);
+    entities = this.query(q => q.current.with(C).write.with(D).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         const c = entity.write(C);
         const d = entity.write(D);
         const x = c.value;
@@ -173,10 +173,10 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
   }
 
   class SystemCE extends becsy.System {
-    entities = this.query(q => q.all.with(C).write.with(E).write);
+    entities = this.query(q => q.current.with(C).write.with(E).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         const c = entity.write(C);
         const e = entity.write(E);
         const x = c.value;
@@ -187,10 +187,10 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
   }
 
   class DataSystem extends becsy.System {
-    entities = this.query(q => q.all.with(Data).write);
+    entities = this.query(q => q.current.with(Data).write);
 
     execute() {
-      for (const entity of this.entities.all) {
+      for (const entity of this.entities.current) {
         entity.write(Data).value *= 2;
       }
     }

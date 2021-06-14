@@ -40,9 +40,9 @@ class CreateA extends System {
 }
 
 class RemoveA extends System {
-  entities = this.query(q => q.all.with(A).write);
+  entities = this.query(q => q.current.with(A).write);
   execute() {
-    for (const entity of this.entities.all) entity.remove(A);
+    for (const entity of this.entities.current) entity.remove(A);
   }
 }
 
@@ -51,14 +51,14 @@ let total: {[key: string]: number} = {a: 0, b: 0};
 
 class Count extends System {
   private readonly items: {[key: string]: {type: ComponentType<any>, query: Query}} = {
-    a: {type: A, query: this.query(q => q.all.with(A))},
-    b: {type: B, query: this.query(q => q.all.with(B))},
+    a: {type: A, query: this.query(q => q.current.with(A))},
+    b: {type: B, query: this.query(q => q.current.with(B))},
   };
 
   execute() {
     total = {a: 0, b: 0};
     for (const key in this.items) {
-      for (const entity of this.items[key].query.all) {
+      for (const entity of this.items[key].query.current) {
         total[key] += entity.read(this.items[key].type).value;
       }
     }
