@@ -231,7 +231,7 @@ describe('creating and deleting entities', () => {
 
   test('recycle entity IDs', async() => {
     const world = await World.create({
-      maxEntities: 9, maxLimboEntities: 7, defaultComponentStorage: 'sparse',
+      maxEntities: 9, maxLimboEntities: 7, maxLimboComponents: 6, defaultComponentStorage: 'sparse',
       defs: [CreateAForEachC, DeleteA]
     });
     world.createEntity(C, {value: 1});

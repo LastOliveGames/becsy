@@ -96,6 +96,13 @@ export class Log {
     return pointer;
   }
 
+  copyPointer(pointer: LogPointer): LogPointer {
+    return {
+      index: pointer.index, generation: pointer.generation,
+      corralIndex: pointer.corralIndex, corralGeneration: pointer.corralGeneration
+    };
+  }
+
   hasUpdatesSince(pointer: LogPointer): boolean {
     CHECK: this.checkPointer(pointer);
     return !(

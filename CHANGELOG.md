@@ -1,5 +1,6 @@
 ### Upcoming
 - Renamed `all` to `current` in queries.
+- Fixed issue with resurrected then re-removed components being freed prematurely.
 
 ### 0.6.1
 - Exported `@system`.

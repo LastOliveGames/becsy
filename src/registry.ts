@@ -57,6 +57,7 @@ export class Registry {
   private readonly stride: number;
   private shapes: Uint32Array;
   private staleShapes: Uint32Array;
+  private removedShapes: Uint32Array;
   private readonly entityIdPool: Uint32Pool;
   readonly pool: EntityPool;
   executingSystem?: SystemBox;
@@ -67,6 +68,7 @@ export class Registry {
   private readonly removalLog: Log;
   private readonly prevRemovalPointer: LogPointer;
   private readonly oldRemovalPointer: LogPointer;
+  private readonly aheadRemovalPointer: LogPointer;
   readonly Alive = class Alive {};
 
   constructor(
@@ -80,6 +82,9 @@ export class Registry {
     dispatcher.buffers.register(
       'registry.staleShapes', length, Uint32Array,
       staleShapes => {this.staleShapes = staleShapes;});
+    dispatcher.buffers.register(
+      'registry.removedShapes', length, Uint32Array,
+      removedShapes => {this.removedShapes = removedShapes;});
     this.entityIdPool = dispatcher.threaded ?
       new SharedAtomicPool(maxEntities, 'maxEntities', dispatcher.buffers) :
       new UnsharedPool(maxEntities, 'maxEntities');
@@ -91,6 +96,7 @@ export class Registry {
     this.removalLog = new Log(maxLimboComponents, 'maxLimboComponents', dispatcher.buffers);
     this.prevRemovalPointer = this.removalLog.createPointer();
     this.oldRemovalPointer = this.removalLog.createPointer();
+    this.aheadRemovalPointer = this.removalLog.createPointer();
   }
 
   initializeComponentTypes(): void {
@@ -171,19 +177,19 @@ export class Registry {
         const type = this.types[componentId];
         const shapeIndex = entityId * this.stride + type.__binding!.shapeOffset;
         const mask = type.__binding!.shapeMask;
-        // TODO: somehow check that the component wasn't resurrected and then removed again in the
-        // next frame, or we'll finalize the removal too early!
-        if ((this.shapes[shapeIndex] & mask) === 0) {
+        if ((this.shapes[shapeIndex] & mask) === 0 &&
+            (this.removedShapes[shapeIndex] & mask) === 0) {
           this.staleShapes[shapeIndex] &= ~mask;
           this.clearRefs(entityId, type, true);
           type.__free?.(entityId);
         }
       }
-      numRemovedComponents += endIndex! - startIndex!;
+      STATS: numRemovedComponents += endIndex! - startIndex!;
     }
     STATS: {
       this.dispatcher.stats.maxLimboComponents = numRemovedComponents;
     }
+    this.removedShapes.fill(0);
     this.removalLog.createPointer(this.prevRemovalPointer);
   }
 
@@ -205,9 +211,12 @@ export class Registry {
   }
 
   clearShape(id: EntityId, type: ComponentType<any>): void {
-    const hasRefs = this.clearRefs(id, type, false);
-    if (type.__free || hasRefs) this.removalLog.push(id | (type.id! << ENTITY_ID_BITS));
-    this.shapes[id * this.stride + type.__binding!.shapeOffset] &= ~type.__binding!.shapeMask;
+    this.clearRefs(id, type, false);
+    const shapeIndex = id * this.stride + type.__binding!.shapeOffset;
+    const mask = type.__binding!.shapeMask;
+    if (type !== this.Alive) this.removalLog.push(id | (type.id! << ENTITY_ID_BITS));
+    this.shapes[shapeIndex] &= ~mask;
+    this.removedShapes[shapeIndex] |= mask;
     this.dispatcher.shapeLog.push(id);
     STATS: this.dispatcher.stats.for(type).numEntities -= 1;
   }
@@ -216,13 +225,12 @@ export class Registry {
     this.dispatcher.writeLog!.push(id | (type.id! << ENTITY_ID_BITS));
   }
 
-  private clearRefs(id: EntityId, type: ComponentType<any>, final: boolean): boolean {
+  private clearRefs(id: EntityId, type: ComponentType<any>, final: boolean): void {
     const hasRefs = !!type.__binding!.refFields.length;
     if (hasRefs) {
       type.__bind!(id, true);
       for (const field of type.__binding!.refFields) field.clearRef!(final);
     }
-    return hasRefs;
   }
 
   matchShape(id: EntityId, positiveMask?: number[], negativeMask?: number[]): boolean {

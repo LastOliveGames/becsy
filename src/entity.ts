@@ -77,6 +77,9 @@ export class Entity {
 
   delete(): void {
     const Alive = this.__registry.Alive;
+    CHECK: if (!this.__registry.hasShape(this.__id, Alive, false)) {
+      throw new Error('Entity already deleted');
+    }
     for (const type of this.__registry.types) {
       if (this.__registry.hasShape(this.__id, type, false)) {
         CHECK: if (type !== Alive) this.__checkMask(type, true);
