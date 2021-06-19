@@ -86,7 +86,6 @@ export class Entity {
         this.__registry.clearShape(this.__id, type);
       }
     }
-    this.__registry.queueDeletion(this.__id);
     this.__registry.dispatcher.indexer.clearAllRefs(this.__id, false);
   }
 

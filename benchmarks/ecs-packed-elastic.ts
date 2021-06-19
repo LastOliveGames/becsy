@@ -239,7 +239,7 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
     async entityCycle() {
       const count = 1000;
       const world = await becsy.World.create({
-        maxEntities: count * 8, maxLimboEntities: count * 6, maxLimboComponents: count * 6,
+        maxEntities: count * 8, maxLimboComponents: count * 12,
         defs: [A, B, SpawnB, KillB], defaultComponentStorage: 'packed'
       });
       for (let i = 0; i < count; i++) world.createEntity(A, {value: i});

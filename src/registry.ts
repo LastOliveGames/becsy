@@ -3,7 +3,7 @@ import {Log, LogPointer} from './datatypes/log';
 import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/pool';
 import type {Dispatcher} from './dispatcher';
 import {Entity, EntityId} from './entity';
-import {ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
+import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {SystemBox} from './system';
 
 
@@ -62,18 +62,14 @@ export class Registry {
   readonly pool: EntityPool;
   executingSystem?: SystemBox;
   includeRecentlyDeleted = false;
-  private readonly deletionLog: Log;
-  private readonly prevDeletionPointer: LogPointer;
-  private readonly oldDeletionPointer: LogPointer;
   private readonly removalLog: Log;
   private readonly prevRemovalPointer: LogPointer;
   private readonly oldRemovalPointer: LogPointer;
-  private readonly aheadRemovalPointer: LogPointer;
   readonly Alive = class Alive {};
 
   constructor(
-    maxEntities: number, maxLimboEntities: number, maxLimboComponents: number,
-    readonly types: ComponentType<any>[], readonly dispatcher: Dispatcher
+    maxEntities: number, maxLimboComponents: number, readonly types: ComponentType<any>[],
+    readonly dispatcher: Dispatcher
   ) {
     this.stride = Math.ceil(types.length / 32);
     const length = maxEntities * this.stride;
@@ -90,13 +86,9 @@ export class Registry {
       new UnsharedPool(maxEntities, 'maxEntities');
     this.entityIdPool.fillWithDescendingIntegers(0);
     this.pool = new EntityPool(this, maxEntities);
-    this.deletionLog = new Log(maxLimboEntities, 'maxLimboEntities', dispatcher.buffers);
-    this.prevDeletionPointer = this.deletionLog.createPointer();
-    this.oldDeletionPointer = this.deletionLog.createPointer();
     this.removalLog = new Log(maxLimboComponents, 'maxLimboComponents', dispatcher.buffers);
     this.prevRemovalPointer = this.removalLog.createPointer();
     this.oldRemovalPointer = this.removalLog.createPointer();
-    this.aheadRemovalPointer = this.removalLog.createPointer();
   }
 
   initializeComponentTypes(): void {
@@ -124,48 +116,23 @@ export class Registry {
     return entity;
   }
 
-  queueDeletion(id: EntityId): void {
-    this.deletionLog.push(id);
-  }
-
   flush(): void {
     this.includeRecentlyDeleted = false;
     this.pool.returnTemporaryBorrows();
-    this.deletionLog.commit();
     this.removalLog.commit();
   }
 
   completeCycle(): void {
-    this.processDeletionLog();
     this.processRemovalLog();
   }
 
-  private processDeletionLog(): void {
-    this.deletionLog.commit();
-    let numDeletedEntities = 0;
-    let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
-    while (true) {
-      [log, startIndex, endIndex] =
-        this.deletionLog.processSince(this.oldDeletionPointer, this.prevDeletionPointer);
-      if (!log) break;
-      for (let i = startIndex!; i < endIndex!; i++) {
-        this.dispatcher.indexer.clearAllRefs(log[i], true);
-      }
-      const segment = log.subarray(startIndex, endIndex);
-      this.entityIdPool.refill(segment);
-      numDeletedEntities += segment.length;
-    }
-    STATS: {
-      this.dispatcher.stats.numEntities -= numDeletedEntities;
-      this.dispatcher.stats.maxLimboEntities = numDeletedEntities;
-    }
-    this.deletionLog.createPointer(this.prevDeletionPointer);
-  }
-
   private processRemovalLog(): void {
+    const indexer = this.dispatcher.indexer;
     this.removalLog.commit();
+    let numDeletedEntities = 0;
     let numRemovedComponents = 0;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
+
     while (true) {
       [log, startIndex, endIndex] =
         this.removalLog.processSince(this.oldRemovalPointer, this.prevRemovalPointer);
@@ -173,20 +140,27 @@ export class Registry {
       for (let i = startIndex!; i < endIndex!; i++) {
         const entry = log[i];
         const entityId = entry & ENTITY_ID_MASK;
-        const componentId = entry >>> ENTITY_ID_BITS;
+        const componentId = (entry >>> ENTITY_ID_BITS) & COMPONENT_ID_MASK;
         const type = this.types[componentId];
         const shapeIndex = entityId * this.stride + type.__binding!.shapeOffset;
         const mask = type.__binding!.shapeMask;
         if ((this.shapes[shapeIndex] & mask) === 0 &&
             (this.removedShapes[shapeIndex] & mask) === 0) {
           this.staleShapes[shapeIndex] &= ~mask;
-          this.clearRefs(entityId, type, true);
+          if (type === this.Alive) {
+            indexer.clearAllRefs(entityId, true);
+            this.entityIdPool.return(entityId);
+            STATS: numDeletedEntities += 1;
+          } else {
+            this.clearRefs(entityId, type, true);
+          }
           type.__free?.(entityId);
         }
       }
       STATS: numRemovedComponents += endIndex! - startIndex!;
     }
     STATS: {
+      this.dispatcher.stats.numEntities -= numDeletedEntities;
       this.dispatcher.stats.maxLimboComponents = numRemovedComponents;
     }
     this.removedShapes.fill(0);
@@ -214,7 +188,7 @@ export class Registry {
     this.clearRefs(id, type, false);
     const shapeIndex = id * this.stride + type.__binding!.shapeOffset;
     const mask = type.__binding!.shapeMask;
-    if (type !== this.Alive) this.removalLog.push(id | (type.id! << ENTITY_ID_BITS));
+    this.removalLog.push(id | (type.id! << ENTITY_ID_BITS));
     this.shapes[shapeIndex] &= ~mask;
     this.removedShapes[shapeIndex] |= mask;
     this.dispatcher.shapeLog.push(id);

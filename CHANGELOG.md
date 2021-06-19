@@ -1,6 +1,7 @@
 ### Upcoming
 - Renamed `all` to `current` in queries.
 - Fixed issue with resurrected then re-removed components being freed prematurely.
+- Merged entity deletion and component removal logs, so the `maxLimboEntities` world parameter is redundant and has been removed.
 
 ### 0.6.1
 - Exported `@system`.

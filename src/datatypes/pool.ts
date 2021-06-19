@@ -4,11 +4,12 @@ import type {Buffers} from '../buffers';
 export interface Uint32Pool {
   length: number;
   take(): number;
-  refill(source: Uint32Array): void;
+  return(id: number): void;
+  refill(source: number[]): void;
   fillWithDescendingIntegers(first: number): void;
 }
 
-export class UnsharedPool {
+export class UnsharedPool implements Uint32Pool {
   private readonly data: Uint32Array;
 
   constructor(private readonly maxItems: number, private readonly configParamName: string) {
@@ -29,14 +30,21 @@ export class UnsharedPool {
     return this.data[length];
   }
 
-  refill(source: Uint32Array): void {
+  return(id: number): void {
+    const length = this.length + 1;
+    DEBUG: if (length > this.maxItems) {
+      throw new Error('Internal error, returned entity ID exceeded pool capacity');
+    }
+    this.data[0] = length;
+    this.data[length] = id;
+  }
+
+  refill(source: number[]): void {
     if (!source.length) return;
     const length = this.length;
     const newLength = length + source.length;
-    DEBUG: {
-      if (newLength > this.maxItems) {
-        throw new Error('Internal error, refill exceeded pool capacity');
-      }
+    DEBUG: if (newLength > this.maxItems) {
+      throw new Error('Internal error, returned entity ID exceeded pool capacity');
     }
     this.data.set(source, length + 1);
     this.data[0] = newLength;
@@ -54,7 +62,7 @@ export class UnsharedPool {
 
 /**
  * A shared pool of u32's that uses atomic operations to deconflict concurrent callers of `take`.
- * The `refill` method is not threadsafe.
+ * The `return` method is not threadsafe.
  */
 export class SharedAtomicPool {
   private data: Uint32Array;
@@ -81,14 +89,21 @@ export class SharedAtomicPool {
     return this.data[length];
   }
 
-  refill(source: Uint32Array): void {
+  return(id: number): void {
+    const length = this.length + 1;
+    DEBUG: if (length > this.maxItems) {
+      throw new Error('Internal error, returned entity ID exceeded pool capacity');
+    }
+    this.data[0] = length;
+    this.data[length] = id;
+  }
+
+  refill(source: number[]): void {
     if (!source.length) return;
     const length = this.length;
     const newLength = length + source.length;
-    DEBUG: {
-      if (newLength > this.maxItems) {
-        throw new Error('Internal error, refill exceeded pool capacity');
-      }
+    DEBUG: if (newLength > this.maxItems) {
+      throw new Error('Internal error, returned entity ID exceeded pool capacity');
     }
     this.data.set(source, length + 1);
     this.data[0] = newLength;
