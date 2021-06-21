@@ -5,6 +5,7 @@ import type {Dispatcher} from './dispatcher';
 import {Entity, EntityId} from './entity';
 import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {SystemBox} from './system';
+import {AtomicSharedShapeArray, ShapeArray, UnsharedShapeArray} from './datatypes/shapearray';
 
 
 export class EntityPool {
@@ -54,10 +55,9 @@ export class EntityPool {
 
 
 export class Registry {
-  private readonly stride: number;
-  private shapes: Uint32Array;
-  private staleShapes: Uint32Array;
-  private removedShapes: Uint32Array;
+  private readonly shapes: ShapeArray;
+  private readonly staleShapes: ShapeArray;
+  private readonly removedShapes: ShapeArray;
   private readonly entityIdPool: Uint32Pool;
   readonly pool: EntityPool;
   executingSystem?: SystemBox;
@@ -71,16 +71,13 @@ export class Registry {
     maxEntities: number, maxLimboComponents: number, readonly types: ComponentType<any>[],
     readonly dispatcher: Dispatcher
   ) {
-    this.stride = Math.ceil(types.length / 32);
-    const length = maxEntities * this.stride;
-    dispatcher.buffers.register(
-      'registry.shapes', length, Uint32Array, shapes => {this.shapes = shapes;});
-    dispatcher.buffers.register(
-      'registry.staleShapes', length, Uint32Array,
-      staleShapes => {this.staleShapes = staleShapes;});
-    dispatcher.buffers.register(
-      'registry.removedShapes', length, Uint32Array,
-      removedShapes => {this.removedShapes = removedShapes;});
+    const ShapeArrayClass = dispatcher.threaded ? AtomicSharedShapeArray : UnsharedShapeArray;
+    this.shapes = new ShapeArrayClass(
+      'registry.shapes', types.length, maxEntities, dispatcher.buffers);
+    this.staleShapes = new ShapeArrayClass(
+      'registry.staleShapes', types.length, maxEntities, dispatcher.buffers);
+    this.removedShapes = new ShapeArrayClass(
+      'registry.removedShapes', types.length, maxEntities, dispatcher.buffers);
     this.entityIdPool = dispatcher.threaded ?
       new SharedAtomicPool(maxEntities, 'maxEntities', dispatcher.buffers) :
       new UnsharedPool(maxEntities, 'maxEntities');
@@ -107,9 +104,9 @@ export class Registry {
 
   createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
     const id = this.entityIdPool.take();
-    this.shapes[id * this.stride] = 1;
+    this.setShape(id, this.Alive);
     const entity = this.pool.borrowTemporarily(id);
-    if (initialComponents) entity.addAll(...initialComponents);
+    entity.addAll(...initialComponents);
     STATS: this.dispatcher.stats.numEntities += 1;
     return entity;
   }
@@ -140,11 +137,8 @@ export class Registry {
         const entityId = entry & ENTITY_ID_MASK;
         const componentId = (entry >>> ENTITY_ID_BITS) & COMPONENT_ID_MASK;
         const type = this.types[componentId];
-        const shapeIndex = entityId * this.stride + type.__binding!.shapeOffset;
-        const mask = type.__binding!.shapeMask;
-        if ((this.shapes[shapeIndex] & mask) === 0 &&
-            (this.removedShapes[shapeIndex] & mask) === 0) {
-          this.staleShapes[shapeIndex] &= ~mask;
+        if (!this.shapes.isSet(entityId, type) && !this.removedShapes.isSet(entityId, type)) {
+          this.staleShapes.unset(entityId, type);
           if (type === this.Alive) {
             indexer.clearAllRefs(entityId, true);
             this.entityIdPool.return(entityId);
@@ -161,34 +155,28 @@ export class Registry {
       this.dispatcher.stats.numEntities -= numDeletedEntities;
       this.dispatcher.stats.maxLimboComponents = numRemovedComponents;
     }
-    this.removedShapes.fill(0);
+    this.removedShapes.clear();
     this.removalLog.createPointer(this.prevRemovalPointer);
   }
 
   hasShape(id: EntityId, type: ComponentType<any>, allowRecentlyDeleted: boolean): boolean {
-    const shapeIndex = id * this.stride + type.__binding!.shapeOffset;
-    const mask = type.__binding!.shapeMask;
-    if ((this.shapes[shapeIndex] & mask) !== 0) return true;
+    if (this.shapes.isSet(id, type)) return true;
     if (allowRecentlyDeleted && this.includeRecentlyDeleted &&
-        (this.staleShapes[shapeIndex] & mask) !== 0) return true;
+        this.staleShapes.isSet(id, type)) return true;
     return false;
   }
 
   setShape(id: EntityId, type: ComponentType<any>): void {
-    const shapeIndex = id * this.stride + type.__binding!.shapeOffset;
-    const mask = type.__binding!.shapeMask;
-    this.shapes[shapeIndex] |= mask;
-    this.staleShapes[shapeIndex] |= mask;
+    this.shapes.set(id, type);
+    this.staleShapes.set(id, type);
     this.dispatcher.shapeLog.push(id);
   }
 
   clearShape(id: EntityId, type: ComponentType<any>): void {
     this.clearRefs(id, type, false);
-    const shapeIndex = id * this.stride + type.__binding!.shapeOffset;
-    const mask = type.__binding!.shapeMask;
     this.removalLog.push(id | (type.id! << ENTITY_ID_BITS));
-    this.shapes[shapeIndex] &= ~mask;
-    this.removedShapes[shapeIndex] |= mask;
+    this.shapes.unset(id, type);
+    this.removedShapes.set(id, type);
     this.dispatcher.shapeLog.push(id);
     STATS: this.dispatcher.stats.for(type).numEntities -= 1;
   }
@@ -206,19 +194,8 @@ export class Registry {
   }
 
   matchShape(id: EntityId, positiveMask?: number[], negativeMask?: number[]): boolean {
-    const offset = id * this.stride;
-    if (positiveMask) {
-      for (let i = 0; i < positiveMask.length; i++) {
-        const maskByte = positiveMask[i];
-        if ((this.shapes[offset + i] & maskByte) !== maskByte) return false;
-      }
-    }
-    if (negativeMask) {
-      for (let i = 0; i < negativeMask.length; i++) {
-        const maskByte = negativeMask[i];
-        if ((this.shapes[offset + i] & maskByte) !== 0) return false;
-      }
-    }
+    if (positiveMask && !this.shapes.match(id, positiveMask)) return false;
+    if (negativeMask && !this.shapes.matchNot(id, negativeMask)) return false;
     return true;
   }
 }

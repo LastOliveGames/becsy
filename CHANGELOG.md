@@ -2,6 +2,8 @@
 - Renamed `all` to `current` in queries.
 - Fixed issue with resurrected then re-removed components being freed prematurely.
 - Merged entity deletion and component removal logs, so the `maxLimboEntities` world parameter is redundant and has been removed.
+- Fixed entity creation to record a shape change, so that a component-less entity can satisfy queries.
+- Refactored shape tracking arrays to prepare for multithreading.  This caused as 5%-15% performance impact on some workloads in the perf version.
 
 ### 0.6.1
 - Exported `@system`.
