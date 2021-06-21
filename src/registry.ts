@@ -1,6 +1,6 @@
 import {ComponentType, assimilateComponentType, defineAndAllocateComponentType} from './component';
 import {Log, LogPointer} from './datatypes/log';
-import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/pool';
+import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/intpool';
 import type {Dispatcher} from './dispatcher';
 import {Entity, EntityId} from './entity';
 import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
@@ -107,9 +107,7 @@ export class Registry {
 
   createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
     const id = this.entityIdPool.take();
-    const shapesIndex = id * this.stride;
-    this.shapes[shapesIndex] = 1;
-    if (this.stride > 1) this.shapes.fill(0, shapesIndex + 1, shapesIndex + this.stride);
+    this.shapes[id * this.stride] = 1;
     const entity = this.pool.borrowTemporarily(id);
     if (initialComponents) entity.addAll(...initialComponents);
     STATS: this.dispatcher.stats.numEntities += 1;

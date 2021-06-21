@@ -2,7 +2,7 @@ import {Bitset} from './datatypes/bitset';
 import type {ComponentType} from './component';
 import {Entity, EntityId, extendMaskAndSetFlag} from './entity';
 import type {SystemBox} from './system';
-import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/entitylists';
+import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/entitylist';
 
 type MaskKind = 'withMask' | 'withoutMask' | 'trackMask';
 
@@ -229,18 +229,15 @@ export class QueryBuilder {
   }
 
   protected set(
-    mask: MaskKind | number[] | undefined, types?: ComponentType<any>[], onlyOne?: string
+    mask: MaskKind | number[] | undefined, types?: ComponentType<any>[]
   ): void {
     if (!mask) return;
     if (!types) types = this.__lastTypes;
     if (!types) throw new Error('No component type to apply query modifier to');
     this.__lastTypes = types;
     if (typeof mask === 'string') {
-      if (onlyOne && this.__query[mask]) throw new Error(`Only one ${onlyOne} allowed`);
       if (!this.__query[mask]) this.__query[mask] = [];
       mask = this.__query[mask]!;
-    } else if (onlyOne && mask.some(n => n !== 0)) {
-      throw new Error(`Only one ${onlyOne} allowed`);
     }
     for (const type of types) extendMaskAndSetFlag(mask, type);
   }
