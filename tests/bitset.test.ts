@@ -1,4 +1,4 @@
-import {Bitset} from '../src/datastructures';
+import {Bitset} from '../src/datatypes/bitset';
 
 describe('bitset operations', () => {
 
