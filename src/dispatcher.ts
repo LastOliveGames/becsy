@@ -155,7 +155,7 @@ export class FrameImpl {
     group.__executed = true;
     for (const system of systems) {
       registry.executingSystem = system;
-      await system.execute(time, delta);
+      system.execute(time, delta);
       dispatcher.flush();
     }
     registry.executingSystem = undefined;
@@ -177,6 +177,8 @@ export class Dispatcher {
   private readonly systems: SystemBox[];
   readonly systemsByClass = new Map<SystemType<System>, SystemBox>();
   readonly systemGroups: SystemGroup[];
+  private allSystemsGroup: SystemGroup;
+  private defaultFrame: Frame;
   lastTime = now() / 1000;
   executing: boolean;
   readonly shapeLog: Log;
@@ -187,8 +189,9 @@ export class Dispatcher {
   readonly indexer: RefIndexer;
   readonly threaded: boolean;
   readonly buffers: Buffers;
-  private readonly userCallbackSystem;
-  private readonly callbackSystem;
+  private userCallbackSystem: CallbackSystem;
+  private callbackSystemGroup: SystemGroup;
+  private callbackFrame: Frame;
   private readonly deferredControls = new Map<SystemBox, RunState>();
 
   constructor({
@@ -221,17 +224,15 @@ export class Dispatcher {
     this.registry = new Registry(maxEntities, maxLimboComponents, componentTypes, this);
     this.indexer = new RefIndexer(this, maxRefChangesPerFrame);
     this.registry.initializeComponentTypes();
+    this.systemGroups = systemGroups;
     this.systems = this.normalizeAndInitSystems(systemTypes);
-    this.systemGroups = this.initSystemGroups(systemGroups);
+    this.initCallbackSystem();
+    for (const group of this.systemGroups) initSystemGroup(group, this);
     if (this.systems.some(system => system.hasWriteQueries)) {
       this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame', this.buffers);
       this.writeLogFramePointer = this.writeLog.createPointer();
     }
     for (const box of this.systems) box.finishConstructing();
-    this.userCallbackSystem = new CallbackSystem();
-    this.callbackSystem = new SystemBox(this.userCallbackSystem, this);
-    this.callbackSystem.rwMasks.read = undefined;
-    this.callbackSystem.rwMasks.write = undefined;
   }
 
   private normalizeAndInitSystems(
@@ -255,12 +256,21 @@ export class Dispatcher {
       systems.push(box);
       this.systemsByClass.set(SystemClass, box);
     }
+    this.allSystemsGroup = new SystemGroupImpl(systemClasses);
+    this.systemGroups.push(this.allSystemsGroup);
+    this.defaultFrame = new FrameImpl(this, [this.allSystemsGroup]);
     return systems;
   }
 
-  private initSystemGroups(systemGroups: SystemGroup[]): SystemGroup[] {
-    for (const group of systemGroups) initSystemGroup(group, this);
-    return systemGroups;
+  private initCallbackSystem(): void {
+    this.userCallbackSystem = new CallbackSystem();
+    const box = new SystemBox(this.userCallbackSystem, this);
+    box.rwMasks.read = undefined;
+    box.rwMasks.write = undefined;
+    this.systemsByClass.set(CallbackSystem, box);
+    this.callbackSystemGroup = new SystemGroupImpl([CallbackSystem]);
+    this.systemGroups.push(this.callbackSystemGroup);
+    this.callbackFrame = new FrameImpl(this, [this.callbackSystemGroup]);
   }
 
   private splitDefs(defs: DefsArray): {
@@ -304,37 +314,17 @@ export class Dispatcher {
   }
 
   async execute(time?: number, delta?: number): Promise<void> {
-    // This largely duplicates the code in Frame, but we lose 5-10% performance by delegating to it
-    // so duplicate the code here instead.
-    // TODO: migrate to use the Frame system without loss of performance
-    CHECK: if (this.executing) throw new Error('Recursive system execution not allowed');
-    this.executing = true;
-    if (time === undefined) time = now() / 1000;
-    if (delta === undefined) delta = time - this.lastTime;
-    this.lastTime = time;
-    for (const system of this.systems) {
-      this.registry.executingSystem = system;
-      system.execute(time, delta);
-      this.flush();
-    }
-    this.registry.executingSystem = undefined;
-    this.executing = false;
-    this.completeCycle();
+    this.defaultFrame.begin();
+    await this.defaultFrame.execute(this.allSystemsGroup, time, delta);
+    this.defaultFrame.end();
   }
 
   executeFunction(fn: (system: System) => void): void {
-    DEBUG: if (this.executing) {
-      throw new Error('Ad hoc function execution not allowed while world is executing');
-    }
-    this.executing = true;
-    this.registry.executingSystem = this.callbackSystem;
+    this.callbackFrame.begin();
     this.userCallbackSystem.__callback = fn;
-    this.callbackSystem.execute(0, 0);
-    this.flush();
-    this.registry.executingSystem = undefined;
-    this.executing = false;
-    this.completeCycle();
-    this.completeFrame();
+    // We know this execution will always be synchronous.
+    this.callbackFrame.execute(this.callbackSystemGroup, 0, 0);
+    this.callbackFrame.end();
   }
 
   completeCycle(): void {
