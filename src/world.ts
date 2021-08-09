@@ -1,7 +1,8 @@
 import type {ComponentType} from './component';
-import {ControlOptions, Dispatcher, Frame, FrameImpl, WorldOptions} from './dispatcher';
+import {ControlOptions, Dispatcher, WorldOptions} from './dispatcher';
+import {Frame, FrameImpl, SystemGroup} from './schedules';
 import type {Stats} from './stats';
-import type {System, SystemGroup} from './system';
+import type {System} from './system';
 
 const MAGIC_COOKIE = {};
 
@@ -58,8 +59,7 @@ export class World {
 
   /**
    * Creates a new entity and add it to the world.  The entity is not returned -- if you need that,
-   * use `build` instead.  You can only invoke this method when the world is not executing, e.g.
-   * during initial setup or between frames.
+   * use `build` instead.
    *
    * @param initialComponents The types of the components to add to the new entity, optionally
    * interleaved with their initial properties.
@@ -69,10 +69,10 @@ export class World {
   }
 
   /**
-   * Executes all the systems defined during the world's creation.  Currently they're executed in
-   * the order they were defined but you shouldn't rely on that, as becsy will reorder systems based
-   * on scheduling constraints in the near future.  If your world is single-threaded then execution
-   * is synchronous and you can ignore the returned promise.
+   * Executes all the systems defined during the world's creation.  The systems will be executed as
+   * ordered by their constraints, *not* in the order they were defined.  See
+   * {@link System.schedule} for details.  If your world is single-threaded then execution is
+   * synchronous and you can ignore the returned promise.
    *
    * @param time The time of this frame's execution.  This will be set on every system's `time`
    * property and defaults to the time when `execute` was called.  It's not used internally so you

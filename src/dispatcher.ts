@@ -2,9 +2,7 @@ import type {ComponentStorage, ComponentType} from './component';
 import type {Entity} from './entity';
 import {MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './consts';
 import {Log, LogPointer} from './datatypes/log';
-import {
-  initSystemGroup, RunState, System, SystemBox, SystemGroup, SystemGroupImpl, SystemType
-} from './system';
+import {RunState, System, SystemBox, SystemType} from './system';
 import {Registry} from './registry';
 import {Stats} from './stats';
 import {RefIndexer} from './refindexer';
@@ -12,10 +10,7 @@ import {Buffers} from './buffers';
 import {
   componentTypes as decoratedComponentTypes, systemTypes as decoratedSystemTypes
 } from './decorators';
-
-
-const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
-  performance.now.bind(performance) : Date.now.bind(Date);
+import {Frame, FrameImpl, Planner, SystemGroup, SystemGroupImpl} from './schedules';
 
 
 // TODO: figure out a better type for interleaved arrays, here and elsewhere
@@ -79,97 +74,6 @@ class CallbackSystem extends System {
 }
 
 
-export class FrameImpl {
-  private executing: boolean;
-  private time = now() / 1000;
-  private delta: number;
-
-  constructor(private readonly dispatcher: Dispatcher, private readonly groups: SystemGroup[]) {
-    CHECK: if (groups.length === 0) {
-      throw new Error('At least one system group needed');
-    }
-    CHECK: for (const group of groups) {
-      if (!dispatcher.systemGroups.includes(group)) {
-        throw new Error('Some groups in the frame are not parts of the world defs');
-      }
-    }
-  }
-
-  /**
-   * Indicates that execution of a frame has begun and locks in the default `time` and `delta`.
-   * Must be called once at the beginning of each frame, prior to any calls to `execute`.  Must be
-   * bookended by a call to `end`.
-   *
-   * You cannot call `begin` while any other executors are running.
-   */
-  begin(): void {
-    CHECK: if (this.executing) throw new Error('Frame already executing');
-    CHECK: if (this.dispatcher.executing) throw new Error('Another frame already executing');
-    this.executing = this.dispatcher.executing = true;
-    this.time = now() / 1000;
-    this.delta = this.time - this.dispatcher.lastTime;
-    this.dispatcher.lastTime = this.time;
-  }
-
-  /**
-   * Indicates that execution of a frame has completed.  Must be called once at the end of each
-   * frame, after any calls to `execute`.
-   */
-  end(): void {
-    CHECK: if (!this.executing) throw new Error('Frame not executing');
-    DEBUG: if (!this.dispatcher.executing) throw new Error('No frame executing');
-    this.executing = this.dispatcher.executing = false;
-    allExecuted: {
-      for (const group of this.groups) if (!group.__executed) break allExecuted;
-      for (const group of this.groups) group.__executed = false;
-      this.dispatcher.completeCycle();
-    }
-    this.dispatcher.completeFrame();
-  }
-
-  /**
-   * Executes a group of systems.  If your world is single-threaded then execution is synchronous
-   * and you can ignore the returned promise.
-   *
-   * You cannot execute individual systems, unless you create a singleton group to hold them.
-   *
-   * @param group The group of systems to execute.  Must be a member of the group list passed in
-   * when this executor was created.
-   *
-   * @param time The time of this frame's execution.  This will be set on every system's `time`
-   * property and defaults to the time when `begin` was called.  It's not used internally so you can
-   * pass in any numeric value that's expected by your systems.
-   *
-   * @param delta The duration since the last frame's execution.  This will be set on every system's
-   * `delta` property and default to the duration since any previous frame's `begin` was called.
-   * It's not used internally so you can pass in any numeric value that's expected by your systems.
-   */
-  async execute(group: SystemGroup, time?: number, delta?: number): Promise<void> {
-    CHECK: if (!this.groups.includes(group)) throw new Error('Group not included in this frame');
-    CHECK: if (!this.executing) throw new Error('Frame not executing');
-    const dispatcher = this.dispatcher;
-    const registry = dispatcher.registry;
-    const systems = group.__systems;
-    time = time ?? this.time;
-    delta = delta ?? this.delta;
-    group.__executed = true;
-    for (const system of systems) {
-      registry.executingSystem = system;
-      system.execute(time, delta);
-      dispatcher.flush();
-    }
-    registry.executingSystem = undefined;
-  }
-}
-
-/**
- * A frame executor that lets you manually run system groups.  You can create one by calling
- * `world.createCustomExecutor`.
- */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface Frame extends FrameImpl {}
-
-
 export class Dispatcher {
   readonly maxEntities;
   readonly defaultComponentStorage;
@@ -177,9 +81,8 @@ export class Dispatcher {
   private readonly systems: SystemBox[];
   readonly systemsByClass = new Map<SystemType<System>, SystemBox>();
   readonly systemGroups: SystemGroup[];
-  private allSystemsGroup: SystemGroup;
-  private defaultFrame: Frame;
-  lastTime = now() / 1000;
+  private default: {group: SystemGroup, frame: Frame};
+  lastTime: number;
   executing: boolean;
   readonly shapeLog: Log;
   readonly writeLog?: Log;
@@ -187,11 +90,11 @@ export class Dispatcher {
   private readonly writeLogFramePointer?: LogPointer;
   readonly stats;
   readonly indexer: RefIndexer;
-  readonly threaded: boolean;
+  readonly planner: Planner;
+  readonly threads: number;
   readonly buffers: Buffers;
   private userCallbackSystem: CallbackSystem;
-  private callbackSystemGroup: SystemGroup;
-  private callbackFrame: Frame;
+  private callback: {group: SystemGroup, frame: Frame};
   private readonly deferredControls = new Map<SystemBox, RunState>();
 
   constructor({
@@ -215,7 +118,7 @@ export class Dispatcher {
       throw new Error(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
     }
     STATS: this.stats = new Stats();
-    this.threaded = threads > 1;
+    this.threads = threads;
     this.buffers = new Buffers(threads > 1);
     this.maxEntities = maxEntities;
     this.defaultComponentStorage = defaultComponentStorage;
@@ -227,13 +130,16 @@ export class Dispatcher {
     this.systemGroups = systemGroups;
     this.systems = this.normalizeAndInitSystems(systemTypes);
     this.initCallbackSystem();
-    for (const group of this.systemGroups) initSystemGroup(group, this);
+    this.planner = new Planner(this, this.systems, this.systemGroups);
+    this.planner.organize();
     if (this.systems.some(system => system.hasWriteQueries)) {
       this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame', this.buffers);
       this.writeLogFramePointer = this.writeLog.createPointer();
     }
     for (const box of this.systems) box.finishConstructing();
   }
+
+  get threaded(): boolean {return this.threads > 1;}
 
   private normalizeAndInitSystems(
     systemTypes: (SystemType<System> | Record<string, unknown>)[]
@@ -247,6 +153,7 @@ export class Dispatcher {
       }
       systemClasses.push(SystemClass);
       const system = new SystemClass();
+      system.id = i + 1;  // 0 is reserved for the callback system
       const props = systemTypes[i + 1];
       if (props && typeof props !== 'function') {
         Object.assign(system, props);
@@ -256,21 +163,27 @@ export class Dispatcher {
       systems.push(box);
       this.systemsByClass.set(SystemClass, box);
     }
-    this.allSystemsGroup = new SystemGroupImpl(systemClasses);
-    this.systemGroups.push(this.allSystemsGroup);
-    this.defaultFrame = new FrameImpl(this, [this.allSystemsGroup]);
+    this.default = this.createSingleGroupFrame(systemClasses);
     return systems;
   }
 
   private initCallbackSystem(): void {
     this.userCallbackSystem = new CallbackSystem();
+    this.userCallbackSystem.id = 0;
     const box = new SystemBox(this.userCallbackSystem, this);
     box.rwMasks.read = undefined;
     box.rwMasks.write = undefined;
+    this.systems.push(box);
     this.systemsByClass.set(CallbackSystem, box);
-    this.callbackSystemGroup = new SystemGroupImpl([CallbackSystem]);
-    this.systemGroups.push(this.callbackSystemGroup);
-    this.callbackFrame = new FrameImpl(this, [this.callbackSystemGroup]);
+    this.callback = this.createSingleGroupFrame([CallbackSystem]);
+  }
+
+  private createSingleGroupFrame(
+      systemTypes: SystemType<System>[]): {group: SystemGroup, frame: Frame} {
+    const group = new SystemGroupImpl(systemTypes);
+    this.systemGroups.push(group);
+    const frame = new FrameImpl(this, [group]);
+    return {group, frame};
   }
 
   private splitDefs(defs: DefsArray): {
@@ -314,17 +227,17 @@ export class Dispatcher {
   }
 
   async execute(time?: number, delta?: number): Promise<void> {
-    this.defaultFrame.begin();
-    await this.defaultFrame.execute(this.allSystemsGroup, time, delta);
-    this.defaultFrame.end();
+    this.default.frame.begin();
+    await this.default.frame.execute(this.default.group, time, delta);
+    this.default.frame.end();
   }
 
   executeFunction(fn: (system: System) => void): void {
-    this.callbackFrame.begin();
+    this.callback.frame.begin();
     this.userCallbackSystem.__callback = fn;
     // We know this execution will always be synchronous.
-    this.callbackFrame.execute(this.callbackSystemGroup, 0, 0);
-    this.callbackFrame.end();
+    this.callback.frame.execute(this.callback.group, 0, 0);
+    this.callback.frame.end();
   }
 
   completeCycle(): void {

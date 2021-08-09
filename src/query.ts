@@ -1,5 +1,5 @@
 import {Bitset} from './datatypes/bitset';
-import type {ComponentType} from './component';
+import type {Component, ComponentType} from './component';
 import {Entity, EntityId, extendMaskAndSetFlag} from './entity';
 import type {SystemBox} from './system';
 import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/entitylist';
@@ -128,6 +128,7 @@ export class QueryBox {
 }
 
 
+// TODO: document the query builder and query classes
 export class QueryBuilder {
   private __query: QueryBox;
   private __system: SystemBox;
@@ -239,7 +240,13 @@ export class QueryBuilder {
       if (!this.__query[mask]) this.__query[mask] = [];
       mask = this.__query[mask]!;
     }
-    for (const type of types) extendMaskAndSetFlag(mask, type);
+    let map: Map<ComponentType<Component>, Set<SystemBox>> | undefined;
+    if (mask === this.__system.rwMasks.read) map = this.__system.dispatcher.planner.readers!;
+    else if (mask === this.__system.rwMasks.write) map = this.__system.dispatcher.planner.writers!;
+    for (const type of types) {
+      extendMaskAndSetFlag(mask, type);
+      if (map) map.get(type)!.add(this.__system);
+    }
   }
 }
 

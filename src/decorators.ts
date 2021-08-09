@@ -1,5 +1,6 @@
 import type {ComponentOptions, ComponentType} from './component';
-import type {SystemGroup, SystemType} from './system';
+import type {SystemGroup} from './schedules';
+import type {SystemType} from './system';
 import type {Type} from './type';
 
 interface PropOptions<JSType> {

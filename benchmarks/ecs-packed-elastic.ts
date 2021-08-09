@@ -106,6 +106,7 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
   }
 
   class RemoveB extends becsy.System {
+    sked = this.schedule(s => s.after(AddB));
     entities = this.query(q => q.current.with(B).write);
 
     execute() {
@@ -128,6 +129,7 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
   }
 
   class KillB extends becsy.System {
+    sked = this.schedule(s => s.after(SpawnB));
     entities = this.query(q => q.current.with(B).write);
 
     execute() {
@@ -166,6 +168,7 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
   }
 
   class SystemCE extends becsy.System {
+    sked = this.schedule(s => s.inAnyOrderWith(SystemCD));
     entities = this.query(q => q.current.with(C).write.with(E).write);
 
     execute() {

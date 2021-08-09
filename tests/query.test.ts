@@ -17,6 +17,7 @@ import {component, ComponentType, field, Query, System, SystemType, Type, World}
 
 
 class IncrementA extends System {
+  sked = this.schedule(s => s.afterWritesTo(A));
   entities = this.query(q => q.current.with(A).write);
   execute() {
     for (const entity of this.entities.current) entity.write(A).value += 1;
@@ -24,6 +25,7 @@ class IncrementA extends System {
 }
 
 class IncrementC extends System {
+  sked = this.schedule(s => s.afterWritesTo(C));
   entities = this.query(q => q.current.with(C).write);
   execute() {
     for (const entity of this.entities.current) entity.write(C).value += 1;
@@ -31,6 +33,7 @@ class IncrementC extends System {
 }
 
 class IncrementAC extends System {
+  sked = this.schedule(s => s.afterWritesTo(A, C));
   entities = this.query(q => q.current.with(A, C).write);
   execute() {
     for (const entity of this.entities.current) {
@@ -41,6 +44,7 @@ class IncrementAC extends System {
 }
 
 class IncrementANotC extends System {
+  sked = this.schedule(s => s.afterWritesTo(A));
   entities = this.query(q => q.current.with(A).write.but.without(C));
   execute() {
     for (const entity of this.entities.current) {
@@ -50,6 +54,7 @@ class IncrementANotC extends System {
 }
 
 class IncrementAWithD extends System {
+  sked = this.schedule(s => s.afterWritesTo(A));
   entities = this.query(q => q.current.with(A).write.with(D));
   execute() {
     for (const entity of this.entities.current) {
@@ -94,6 +99,7 @@ class DeleteA extends System {
 }
 
 class CreateAForEachC extends System {
+  sked = this.schedule(s => s.before(DeleteA));
   entities = this.query(q => q.current.with(C).and.using(A).write);
   execute() {
     for (const entity of this.entities.current) {
