@@ -1,5 +1,5 @@
 ### Upcoming
-- Implemented automatic ordering of systems for execution.  Systems will *not* be executed in order of definition any more!  You'll need to read the docs for `System.schedule` and add scheduling constraints to your systems.
+- Implemented automatic ordering of systems for execution.  Systems will *not* be executed in order of definition any more!  You'll need to read the docs for `System.schedule` and add scheduling constraints to your systems.  (You can also schedule whole groups at a time, which can come in handy! Don't forget that `@system` takes an optional group argument to easily group systems together.)
 
 ### 0.7.0
 - Renamed `all` to `current` in queries.

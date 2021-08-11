@@ -6,31 +6,6 @@ import type {System, SystemBox, SystemType} from './system';
 const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
   performance.now.bind(performance) : Date.now.bind(Date);
 
-export type GroupContentsArray = (SystemType<System> | Record<string, unknown> | SystemGroup)[];
-
-export class SystemGroupImpl {
-  __plan: Plan;
-  __executed = false;
-
-  constructor(readonly __contents: GroupContentsArray) { }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface SystemGroup extends SystemGroupImpl { }
-
-
-export function collectSystems(group: SystemGroup, dispatcher: Dispatcher): SystemBox[] {
-  const systems = [];
-  for (const item of group.__contents) {
-    if (item instanceof Function && item.__system) {
-      systems.push(dispatcher.systemsByClass.get(item)!);
-    } else if (item instanceof SystemGroupImpl) {
-      systems.push(...collectSystems(item, dispatcher));
-    }
-  }
-  return systems;
-}
-
 
 /**
  * A fluent DSL for specifying a system's scheduling constraints.
@@ -50,61 +25,69 @@ export function collectSystems(group: SystemGroup, dispatcher: Dispatcher): Syst
  * break the cycles by adding scheduling constraints to the systems involved.
  */
 export class ScheduleBuilder {
-  private __system: SystemBox;
+  private __systems: SystemBox[];
+  private __dispatcher: Dispatcher;
 
   constructor(
     private readonly __callback: (s: ScheduleBuilder) => void,
     private readonly __schedule: Schedule
   ) {}
 
-  __build(system: SystemBox): void {
+  __build(systems: SystemBox[], name: string): void {
     try {
-      this.__system = system;
+      this.__systems = systems;
+      this.__dispatcher = systems[0].dispatcher;
       this.__callback(this);
     } catch (e) {
-      e.message = `Failed to build schedule in system ${system.name}: ${e.message}`;
+      e.message = `Failed to build schedule in ${name}: ${e.message}`;
       throw e;
     }
   }
 
   /**
    * Schedule this system before all the given ones (highest priority).
-   * @param systemTypes The systems that this one should precede.
+   * @param systemTypes The systems or groups that this one should precede.
    * @returns The builder for chaining calls.
    */
-  before(...systemTypes: SystemType<System>[]): this {
+  before(...systemTypes: (SystemType<System> | SystemGroup)[]): this {
     for (const type of systemTypes) {
-      const system = this.__system.dispatcher.systemsByClass.get(type);
-      if (!system) throw new Error(`System ${type} not registered in world`);
-      this.__system.dispatcher.planner.graph.addEdge(this.__system, system, 4);
+      for (const other of this.__dispatcher.getSystems(type)) {
+        for (const system of this.__systems) {
+          this.__dispatcher.planner.graph.addEdge(system, other, 4);
+        }
+      }
     }
     return this;
   }
 
   /**
    * Schedule this system after all the given ones (highest priority).
-   * @param systemTypes The systems that this one should follow.
+   * @param systemTypes The systems or groups that this one should follow.
    * @returns The builder for chaining calls.
    */
-  after(...systemTypes: SystemType<System>[]): this {
+  after(...systemTypes: (SystemType<System> | SystemGroup)[]): this {
     for (const type of systemTypes) {
-      const system = this.__system.dispatcher.systemsByClass.get(type);
-      if (!system) throw new Error(`System ${type} not registered in world`);
-      this.__system.dispatcher.planner.graph.addEdge(system, this.__system, 4);
+      for (const other of this.__dispatcher.getSystems(type)) {
+        for (const system of this.__systems) {
+          this.__dispatcher.planner.graph.addEdge(other, system, 4);
+        }
+      }
     }
     return this;
   }
 
   /**
    * Schedule this system in any order relative to the given ones (high priority).
-   * @param systemTypes The systems whose order doesn't matter relative to this one.
+   * @param systemTypes The systems or groups whose order doesn't matter relative to this one.
    * @returns The builder for chaining calls.
    */
-  inAnyOrderWith(...systemTypes: SystemType<System>[]): this {
+  inAnyOrderWith(...systemTypes: (SystemType<System> | SystemGroup)[]): this {
     for (const type of systemTypes) {
-      const system = this.__system.dispatcher.systemsByClass.get(type);
-      if (!system) throw new Error(`System ${type} not registered in world`);
-      this.__system.dispatcher.planner.graph.denyEdge(this.__system, system, 3);
+      for (const other of this.__dispatcher.getSystems(type)) {
+        for (const system of this.__systems) {
+          this.__dispatcher.planner.graph.denyEdge(system, other, 3);
+        }
+      }
     }
     return this;
   }
@@ -117,8 +100,10 @@ export class ScheduleBuilder {
    */
   beforeReadsFrom(...componentTypes: ComponentType<any>[]): this {
     for (const componentType of componentTypes) {
-      for (const system of this.__system.dispatcher.planner.readers!.get(componentType)!) {
-        this.__system.dispatcher.planner.graph.addEdge(this.__system, system, 2);
+      for (const other of this.__dispatcher.planner.readers!.get(componentType)!) {
+        for (const system of this.__systems) {
+          this.__dispatcher.planner.graph.addEdge(system, other, 2);
+        }
       }
     }
     return this;
@@ -132,8 +117,10 @@ export class ScheduleBuilder {
    */
   afterReadsFrom(...componentTypes: ComponentType<any>[]): this {
     for (const componentType of componentTypes) {
-      for (const system of this.__system.dispatcher.planner.readers!.get(componentType)!) {
-        this.__system.dispatcher.planner.graph.addEdge(system, this.__system, 2);
+      for (const other of this.__dispatcher.planner.readers!.get(componentType)!) {
+        for (const system of this.__systems) {
+          this.__dispatcher.planner.graph.addEdge(other, system, 2);
+        }
       }
     }
     return this;
@@ -147,8 +134,10 @@ export class ScheduleBuilder {
    */
   beforeWritesTo(...componentTypes: ComponentType<any>[]): this {
     for (const componentType of componentTypes) {
-      for (const system of this.__system.dispatcher.planner.writers!.get(componentType)!) {
-        this.__system.dispatcher.planner.graph.addEdge(this.__system, system, 2);
+      for (const other of this.__dispatcher.planner.writers!.get(componentType)!) {
+        for (const system of this.__systems) {
+          this.__dispatcher.planner.graph.addEdge(system, other, 2);
+        }
       }
     }
     return this;
@@ -162,8 +151,10 @@ export class ScheduleBuilder {
    */
   afterWritesTo(...componentTypes: ComponentType<any>[]): this {
     for (const componentType of componentTypes) {
-      for (const system of this.__system.dispatcher.planner.writers!.get(componentType)!) {
-        this.__system.dispatcher.planner.graph.addEdge(system, this.__system, 2);
+      for (const other of this.__dispatcher.planner.writers!.get(componentType)!) {
+        for (const system of this.__systems) {
+          this.__dispatcher.planner.graph.addEdge(other, system, 2);
+        }
       }
     }
     return this;
@@ -176,6 +167,58 @@ export class ScheduleBuilder {
  */
 export class Schedule {
 }
+
+
+export type GroupContentsArray = (SystemType<System> | Record<string, unknown> | SystemGroup)[];
+
+export class SystemGroupImpl {
+  __plan: Plan;
+  __executed = false;
+  __systems: SystemBox[];
+  __scheduleBuilder: ScheduleBuilder | undefined | null;
+
+  constructor(readonly __contents: GroupContentsArray) { }
+
+  __collectSystems(dispatcher: Dispatcher): SystemBox[] {
+    if (!this.__systems) {
+      this.__systems = [];
+      for (const item of this.__contents) {
+        if (item instanceof Function && item.__system) {
+          this.__systems.push(dispatcher.systemsByClass.get(item)!);
+        } else if (item instanceof SystemGroupImpl) {
+          this.__systems.push(...item.__collectSystems(dispatcher));
+        }
+      }
+    }
+    return this.__systems;
+  }
+
+  __buildSchedule(): void {
+    this.__scheduleBuilder?.__build(this.__systems, `a group`);
+    this.__scheduleBuilder = null;
+  }
+
+  /**
+   * Creates scheduling constraints for all systems in the group; this works exactly as if the
+   * call was made individually to every {@link System.schedule}.  Can be called at most once.
+   * @param buildCallback A function that constrains the schedule using a small DSL.  See
+   * {@link ScheduleBuilder} for the API.
+   * @returns This group for chaining calls.
+   */
+  schedule(buildCallback: (s: ScheduleBuilder) => void): this {
+    CHECK: if (this.__scheduleBuilder === null) {
+      throw new Error(`Attempt to define group schedule after world initialized`);
+    }
+    CHECK: if (this.__scheduleBuilder) {
+      throw new Error(`Attempt to define multiple schedules in a group`);
+    }
+    this.__scheduleBuilder = new ScheduleBuilder(buildCallback, new Schedule());
+    return this;
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface SystemGroup extends SystemGroupImpl { }
 
 
 export class FrameImpl {
@@ -260,23 +303,22 @@ export interface Frame extends FrameImpl { }
 
 
 export abstract class Plan {
-  protected systems: SystemBox[] = [];
   protected readonly graph: Graph<SystemBox>;
 
   constructor(protected readonly planner: Planner, protected readonly group: SystemGroup) {
-    this.systems = collectSystems(group, planner.dispatcher);
-    this.graph = planner.graph.induceSubgraph(this.systems);
+    this.graph = planner.graph.induceSubgraph(group.__systems);
     CHECK: this.graph.checkForCycles();
-    this.prepare();
   }
 
-  abstract prepare(): void;
   abstract execute(time: number, delta: number): Promise<void>;
 }
 
 
 class SimplePlan extends Plan {
-  prepare(): void {
+  private readonly systems: SystemBox[];
+
+  constructor(protected readonly planner: Planner, protected readonly group: SystemGroup) {
+    super(planner, group);
     this.systems = this.graph.sortTopologically();
   }
 
@@ -298,10 +340,6 @@ class SimplePlan extends Plan {
 
 
 class ThreadedPlan extends Plan {
-  prepare(): void {
-    throw new Error('Method not implemented.');
-  }
-
   execute(time: number, delta: number): Promise<void> {
     throw new Error('Method not implemented.');
   }
@@ -325,8 +363,10 @@ export class Planner {
   }
 
   organize(): void {
+    for (const group of this.groups) group.__collectSystems(this.dispatcher);
     for (const system of this.systems) system.buildQueries();
     for (const system of this.systems) system.buildSchedule();
+    for (const group of this.groups) group.__buildSchedule();
     for (const [componentType, systems] of this.readers!.entries()) {
       for (const reader of systems) {
         for (const writer of this.writers!.get(componentType)!) {

@@ -199,7 +199,7 @@ export class SystemBox {
   }
 
   buildSchedule(): void {
-    this.system.__scheduleBuilder?.__build(this);
+    this.system.__scheduleBuilder?.__build([this], `system ${this.name}`);
     this.system.__scheduleBuilder = null;
   }
 

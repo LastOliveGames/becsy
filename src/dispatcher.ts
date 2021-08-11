@@ -222,6 +222,13 @@ export class Dispatcher {
     return {componentTypes, systemTypes, systemGroups};
   }
 
+  getSystems(designator: SystemType<System> | SystemGroup): SystemBox[] {
+    if (designator instanceof SystemGroupImpl) return designator.__systems;
+    const system = this.systemsByClass.get(designator);
+    if (!system) throw new Error(`System ${designator.name} not registered in world`);
+    return [system];
+  }
+
   async initialize(): Promise<void> {
     await Promise.all(this.systems.map(system => system.initialize()));
   }
