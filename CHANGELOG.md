@@ -1,5 +1,6 @@
 ### Upcoming
 - Implemented automatic ordering of systems for execution.  Systems will *not* be executed in order of definition any more!  You'll need to read the docs for `System.schedule` and add scheduling constraints to your systems.  (You can also schedule whole groups at a time, which can come in handy! Don't forget that `@system` takes an optional group argument to easily group systems together.)
+- The execution order gets logged to the console on startup when running in dev mode (unless `NODE_ENV=test` or `production`).  This should help you debug ordering issues.  Eventually, I'd like to draw the actual precedence graph but that's trickier.
 
 ### 0.7.0
 - Renamed `all` to `current` in queries.
