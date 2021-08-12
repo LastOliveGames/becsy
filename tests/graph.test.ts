@@ -73,14 +73,15 @@ describe('bitset operations', () => {
     expect(graph.findCycles()).toEqual([['a', 'b'], ['b', 'c'], ['c', 'd', 'e']]);
   });
 
-  test('sort topologically', () => {
+  test('topological sort', () => {
     graph.addEdge('h', 'f', 1);
     graph.addEdge('g', 'e', 1);
     graph.addEdge('h', 'e', 1);
     graph.addEdge('f', 'd', 1);
     graph.addEdge('d', 'c', 1);
     graph.addEdge('e', 'c', 1);
-    expect(graph.sortTopologically()).toEqual(['a', 'b', 'g', 'h', 'e', 'f', 'd', 'c']);
+    graph.seal();
+    expect(graph.topologicallSortedVertices).toEqual(['a', 'b', 'g', 'h', 'e', 'f', 'd', 'c']);
   });
 
   test('subgraph', () => {
@@ -88,7 +89,8 @@ describe('bitset operations', () => {
     graph.addEdge('b', 'c', 1);
     graph.addEdge('c', 'a', 1);
     const subgraph = graph.induceSubgraph(['a', 'b']);
-    expect(subgraph.sortTopologically()).toEqual(['a', 'b']);
+    subgraph.seal();
+    expect(subgraph.topologicallSortedVertices).toEqual(['a', 'b']);
   });
 
   test('ignore self loops', () => {

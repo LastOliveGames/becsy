@@ -307,7 +307,8 @@ export abstract class Plan {
 
   constructor(protected readonly planner: Planner, protected readonly group: SystemGroup) {
     this.graph = planner.graph.induceSubgraph(group.__systems);
-    CHECK: this.graph.checkForCycles();
+    this.graph.seal();
+    // TODO: in dev mode, pretty-print the graph to the console (but not in tests!)
   }
 
   abstract execute(time: number, delta: number): Promise<void>;
@@ -319,7 +320,7 @@ class SimplePlan extends Plan {
 
   constructor(protected readonly planner: Planner, protected readonly group: SystemGroup) {
     super(planner, group);
-    this.systems = this.graph.sortTopologically();
+    this.systems = this.graph.topologicallSortedVertices;
   }
 
   async execute(time: number, delta: number): Promise<void> {
@@ -376,8 +377,6 @@ export class Planner {
     }
     delete this.readers;
     delete this.writers;
-    // TODO: simplify graph by removing redundant edges
-    // TODO: in dev mode, pretty-print the graph to the console (but not in tests!)
     for (const group of this.groups) {
       group.__plan =
         this.dispatcher.threaded ? new ThreadedPlan(this, group) : new SimplePlan(this, group);

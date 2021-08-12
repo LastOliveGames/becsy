@@ -13,6 +13,8 @@ export class Graph<V extends Printable> {
   private readonly numVertices: number;
   private readonly edges: number[];
   private readonly vertexIndexMap = new Map<V, number>();
+  private sealed = false;
+  private sortedVertices: V[];
 
   constructor(private readonly vertices: V[]) {
     this.numVertices = vertices.length;
@@ -20,6 +22,12 @@ export class Graph<V extends Printable> {
       this.vertexIndexMap.set(vertices[i], i);
     }
     this.edges = new Array(this.numVertices ** 2).fill(0);
+  }
+
+  get topologicallSortedVertices(): V[] {
+    DEBUG: if (!this.sealed) throw new Error('Graph not yet sealed');
+    if (!this.sortedVertices) this.sortedVertices = this.sortTopologically();
+    return this.sortedVertices;
   }
 
   private getEdgeIndex(source: V, target: V): number {
@@ -31,6 +39,7 @@ export class Graph<V extends Printable> {
   }
 
   private setEdge(source: V, target: V, weight: number): void {
+    DEBUG: if (this.sealed) throw new Error('Graph already sealed');
     if (source === target) return;
     const sourceToTarget = this.getEdgeIndex(source, target);
     const targetToSource = this.getEdgeIndex(target, source);
@@ -72,7 +81,14 @@ export class Graph<V extends Printable> {
     return false;
   }
 
-  checkForCycles(): void {
+  seal(): void {
+    DEBUG: if (this.sealed) throw new Error('Graph already sealed');
+    this.sealed = true;
+    CHECK: this.checkForCycles();
+    this.simplify();
+  }
+
+  private checkForCycles(): void {
     const cycles = this.findCycles();
     if (cycles.length) {
       cycles.sort((x, y) => x.length - y.length);
@@ -199,11 +215,11 @@ export class Graph<V extends Printable> {
         }
       }
     }
+    if (this.sealed) subgraph.seal();
     return subgraph;
   }
 
-  sortTopologically(): V[] {
-    CHECK: this.checkForCycles();
+  private sortTopologically(): V[] {
     const edgeCounts = new Array(this.numVertices).fill(0);
     for (let i = 0; i < this.numVertices; i++) {
       for (let j = 0; j < this.numVertices; j++) {
@@ -227,6 +243,35 @@ export class Graph<V extends Printable> {
       DEBUG: if (!changed) throw new Error('Graph has a cycle, topological sort not possible');
     }
     return vertices;
+  }
+
+  private simplify(): void {
+    const n = this.numVertices;
+
+    // Remove denial edges, no longer needed
+    for (let i = 0; i < this.edges.length; i++) {
+      if (this.edges[i] < 0) this.edges[i] = 0;
+    }
+
+    // Derive path matrix using a variant of the Floyd-Warshal algorithm
+    const paths = this.edges.slice();
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        for (let k = 0; k < n; k++) {
+          if (paths[i * n + k] && paths[k * n + j]) paths[i * n + j] = 1;
+        }
+      }
+    }
+
+    // Perform a transitive reduction
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (!this.edges[i * n + j]) continue;
+        for (let k = 0; k < n; k++) {
+          if (paths[i * n + k] && paths[k * n + j]) this.edges[i * n + j] = 0;
+        }
+      }
+    }
   }
 
 }
