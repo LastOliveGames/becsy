@@ -56,8 +56,8 @@
   "ecs-packed/simpleIter": {
     "devOps": 1072,
     "devRel": 0.026706527154957648,
-    "perfOps": 38692,
-    "perfRel": 0.9639262580966617
+    "perfOps": 42458,
+    "perfRel": 1.0682064055148817
   },
   "ecs-packed/fragIter": {
     "devOps": 11625,
