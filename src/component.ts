@@ -189,6 +189,9 @@ export function initComponent(type: ComponentType<any>, id: EntityId, values: an
     }
   }
   const component = type.__allocate!(id);
+  // TODO: optimize component initialization
+  // 1. If no default values provided, use Object.assign with a predefined default values object.
+  // 2. Try generating custom init functions for the field to avoid a loop.
   for (const field of type.__binding!.fields) {
     (component as any)[field.name] = values?.[field.name] ?? field.default;
   }

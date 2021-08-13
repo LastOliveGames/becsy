@@ -169,6 +169,7 @@ export class Registry {
   setShape(id: EntityId, type: ComponentType<any>): void {
     this.shapes.set(id, type);
     this.staleShapes.set(id, type);
+    // TODO: log type, reorder entries, and apply RLE on the component type.
     this.dispatcher.shapeLog.push(id);
   }
 
@@ -182,6 +183,7 @@ export class Registry {
   }
 
   trackWrite(id: EntityId, type: ComponentType<any>): void {
+    // TODO: reorder entries and apply RLE on the component type.
     this.dispatcher.writeLog!.push(id | (type.id! << ENTITY_ID_BITS));
   }
 
