@@ -1,4 +1,3 @@
-import {Bitset} from './datatypes/bitset';
 import type {LogPointer} from './datatypes/log';
 import type {Dispatcher} from './dispatcher';
 import type {Entity, ReadWriteMasks} from './entity';
@@ -171,12 +170,14 @@ export abstract class System {
 
 export class SystemBox {
   readonly rwMasks: ReadWriteMasks = {read: [], write: []};
-  shapeQueries: QueryBox[] = [];
-  writeQueries: QueryBox[] = [];
+  readonly shapeQueries: QueryBox[] = [];
+  readonly shapeQueriesByComponent: QueryBox[][] = [];
+  readonly writeQueries: QueryBox[] = [];
+  readonly writeQueriesByComponent: QueryBox[][] = [];
+  hasNegativeQueries: boolean;
   hasWriteQueries: boolean;
   private hasTransientQueries: boolean;
-  private ranQueriesLastFrame = false;
-  private processedEntities: Bitset;
+  private ranQueriesLastFrame: boolean;
   private shapeLogPointer: LogPointer;
   private writeLogPointer?: LogPointer;
   private state: RunState = RunState.RUNNING;
@@ -188,12 +189,12 @@ export class SystemBox {
   constructor(private readonly system: System, readonly dispatcher: Dispatcher) {
     system.__dispatcher = dispatcher;
     this.shapeLogPointer = dispatcher.shapeLog.createPointer();
-    this.processedEntities = new Bitset(dispatcher.maxEntities);
   }
 
   buildQueries(): void {
     for (const builder of this.system.__queryBuilders!) builder.__build(this);
     this.system.__queryBuilders = null;
+    this.hasNegativeQueries = !!this.shapeQueriesByComponent[this.dispatcher.registry.Alive.id!];
     this.hasWriteQueries = !!this.writeQueries.length;
     this.hasTransientQueries = this.shapeQueries.some(query => query.hasTransientResults);
   }
@@ -234,37 +235,39 @@ export class SystemBox {
   }
 
   private runQueries(): void {
+    const ranQueriesLastFrame = this.ranQueriesLastFrame;
+    this.ranQueriesLastFrame = false;
     const shapesChanged = this.dispatcher.shapeLog.hasUpdatesSince(this.shapeLogPointer);
     const writesMade =
       this.hasWriteQueries &&
       this.dispatcher.writeLog!.hasUpdatesSince(this.writeLogPointer!);
-    if (shapesChanged || writesMade || this.hasTransientQueries && this.ranQueriesLastFrame) {
-      // Every write query is a shape query too.
-      for (const query of this.shapeQueries) query.clearTransientResults();
+    if (shapesChanged || writesMade || this.hasTransientQueries && ranQueriesLastFrame) {
+      if (this.hasTransientQueries) {
+        // Every write query is a shape query too.
+        for (const query of this.shapeQueries) query.clearTransientResults();
+      }
       if (shapesChanged || writesMade) {
         this.ranQueriesLastFrame = true;
-        this.processedEntities.clear();
         if (shapesChanged) this.__updateShapeQueries();
         if (writesMade) this.__updateWriteQueries();
-      } else {
-        this.ranQueriesLastFrame = false;
       }
-    } else {
-      this.ranQueriesLastFrame = false;
     }
   }
 
   private __updateShapeQueries(): void {
+    for (const query of this.shapeQueries) query.clearProcessedEntities();
     const shapeLog = this.dispatcher.shapeLog;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
     while (true) {
       [log, startIndex, endIndex] = shapeLog.processSince(this.shapeLogPointer);
       if (!log) break;
       for (let i = startIndex!; i < endIndex!; i++) {
-        const id = log[i];
-        if (!this.processedEntities.get(id)) {
-          this.processedEntities.set(id);
-          for (const query of this.shapeQueries) query.handleShapeUpdate(id);
+        const entry = log[i];
+        const componentId = entry >>> ENTITY_ID_BITS;
+        const queries = this.shapeQueriesByComponent[componentId];
+        if (queries) {
+          const entityId = entry & ENTITY_ID_MASK;
+          for (let j = 0; j < queries.length; j++) queries[j].handleShapeUpdate(entityId);
         }
       }
     }
@@ -278,12 +281,15 @@ export class SystemBox {
       if (!log) break;
       for (let i = startIndex!; i < endIndex!; i++) {
         const entry = log[i];
-        const entityId = entry & ENTITY_ID_MASK;
-        if (!this.processedEntities.get(entityId)) {
-          const componentId = entry >>> ENTITY_ID_BITS;
-          for (const query of this.writeQueries) {
-            // Manually recompute flag offset and mask instead of looking up component type.
-            query.handleWrite(entityId, componentId >> 5, 1 << (componentId & 31));
+        const componentId = entry >>> ENTITY_ID_BITS;
+        const queries = this.writeQueriesByComponent[componentId];
+        if (queries) {
+          const entityId = entry & ENTITY_ID_MASK;
+          // Manually recompute flag offset and mask instead of looking up component type.
+          const componentFlagOffset = componentId >> 5;
+          const componentFlagMask = 1 << (componentId & 31);
+          for (let j = 0; j < queries.length; j++) {
+            queries[j].handleWrite(entityId, componentFlagOffset, componentFlagMask);
           }
         }
       }
@@ -300,6 +306,7 @@ export class SystemBox {
     if (this.state === RunState.STOPPED) {
       const registry = this.dispatcher.registry;
       const Alive = registry.Alive;
+      for (const query of this.shapeQueries) query.clearProcessedEntities();
       for (let id = 0; id < this.dispatcher.maxEntities; id++) {
         if (registry.hasShape(id, Alive, false)) {
           for (const query of this.shapeQueries) query.handleShapeUpdate(id);

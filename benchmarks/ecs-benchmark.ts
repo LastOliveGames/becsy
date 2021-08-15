@@ -196,7 +196,8 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
     async packed1() {
       const count = 5000;
       const world = await becsy.World.create({
-        maxEntities: count, defaultComponentStorage: 'sparse', defs: [A, B, C, D, E, SystemA]
+        maxEntities: count, maxShapeChangesPerFrame: count * 6,  defaultComponentStorage: 'sparse',
+        defs: [A, B, C, D, E, SystemA]
       });
       for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
       return world;
@@ -205,7 +206,7 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
     async packed5() {
       const count = 1000;
       const world = await becsy.World.create({
-        maxEntities: count, defaultComponentStorage: 'sparse',
+        maxEntities: count, maxShapeChangesPerFrame: count * 6, defaultComponentStorage: 'sparse',
         defs: [A, B, C, D, E, SystemA, SystemB, SystemC, SystemD, SystemE]
       });
       for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
@@ -215,8 +216,8 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
     async simpleIter() {
       const count = 1000;
       const world = await becsy.World.create({
-        maxEntities: count * 4, defaultComponentStorage: 'sparse',
-        defs: [A, B, C, D, E, SystemAB, SystemCD, SystemCE]
+        maxEntities: count * 4, maxShapeChangesPerFrame: count * 17,
+        defaultComponentStorage: 'sparse', defs: [A, B, C, D, E, SystemAB, SystemCD, SystemCE]
       });
       for (let i = 0; i < count; i++) {
         world.createEntity(A, B, {value: 1});
@@ -230,8 +231,8 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
     async fragIter() {
       const count = 100;
       const world = await becsy.World.create({
-        maxEntities: count * COMPS.length, defaultComponentStorage: 'sparse',
-        defs: [COMPS, Data, DataSystem]
+        maxEntities: count * COMPS.length, maxShapeChangesPerFrame: count * 80,
+        defaultComponentStorage: 'sparse', defs: [COMPS, Data, DataSystem]
       });
       for (let i = 0; i < count; i++) {
         for (const Comp of COMPS) world.createEntity(Comp, Data);
@@ -252,7 +253,7 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
     async addRemove() {
       const count = 1000;
       const world = await becsy.World.create({
-        maxEntities: count, maxShapeChangesPerFrame: count * 3, maxLimboComponents: count * 2,
+        maxEntities: count, maxShapeChangesPerFrame: count * 4, maxLimboComponents: count * 2,
         defaultComponentStorage: 'sparse', defs: [A, B, AddB, RemoveB]
       });
       for (let i = 0; i < count; i++) world.createEntity(A);

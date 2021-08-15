@@ -1,5 +1,5 @@
 import {Bitset} from './datatypes/bitset';
-import type {Component, ComponentType} from './component';
+import type {ComponentType} from './component';
 import {Entity, EntityId, extendMaskAndSetFlag} from './entity';
 import type {SystemBox} from './system';
 import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/entitylist';
@@ -32,6 +32,7 @@ export class QueryBox {
   hasTransientResults: boolean;
   hasChangedResults: boolean;
   private currentEntities: Bitset | undefined;
+  private processedEntities: Bitset;
   private changedEntities: Bitset | undefined;
 
   constructor(private readonly query: Query, private readonly system: SystemBox) {
@@ -52,6 +53,7 @@ export class QueryBox {
     } else {
       this.currentEntities = new Bitset(dispatcher.maxEntities);
     }
+    this.processedEntities = new Bitset(dispatcher.maxEntities);
     if (this.hasTransientResults) this.allocateTransientResultLists();
     if (this.flavors) this.system.shapeQueries.push(this);
     if (this.hasChangedResults) {
@@ -92,18 +94,26 @@ export class QueryBox {
     this.results.current?.clear();
   }
 
+  clearProcessedEntities(): void {
+    this.processedEntities.clear();
+  }
+
   handleShapeUpdate(id: EntityId): void {
+    if (this.processedEntities.get(id)) return;
+    this.processedEntities.set(id);
     const registry = this.system.dispatcher.registry;
     const oldMatch = this.results.current?.has(id) ?? this.currentEntities!.get(id);
     const newMatch = registry.matchShape(id, this.withMask, this.withoutMask);
     if (newMatch && !oldMatch) {
       this.currentEntities?.set(id);
+      // this.changedEntities?.set(id);
       this.results.current?.add(id);
       this.results.added?.add(id);
       this.results.addedOrChanged?.add(id);
       this.results.addedChangedOrRemoved?.add(id);
     } else if (!newMatch && oldMatch) {
       this.currentEntities?.unset(id);
+      // this.changedEntities?.set(id);
       this.results.current?.remove(id);
       this.results.removed?.add(id);
       this.results.changedOrRemoved?.add(id);
@@ -112,9 +122,8 @@ export class QueryBox {
   }
 
   handleWrite(id: EntityId, componentFlagOffset: number, componentFlagMask: number): void {
-    const registry = this.system.dispatcher.registry;
     if (!this.changedEntities!.get(id) &&
-      registry.matchShape(id, this.withMask, this.withoutMask) &&
+      this.system.dispatcher.registry.matchShape(id, this.withMask, this.withoutMask) &&
       (this.trackMask![componentFlagOffset] ?? 0) & componentFlagMask
     ) {
       this.changedEntities!.set(id);
@@ -143,6 +152,12 @@ export class QueryBuilder {
       this.__system = system;
       this.__query = new QueryBox(this.__userQuery, system);
       this.__callback(this);
+      if (!this.__query.withMask && this.__query.flavors) {
+        this.categorize(
+          this.__system.shapeQueriesByComponent,
+          this.__system.dispatcher.registry.Alive
+        );
+      }
       this.__query.complete();
     } catch (e) {
       e.message = `Failed to build query in system ${system.name}: ${e.message}`;
@@ -205,7 +220,7 @@ export class QueryBuilder {
 
   without(...types: ComponentType<any>[]): this {
     this.set(this.__system.rwMasks.read, types);
-    this.set('withoutMask', types);
+    this.set('withoutMask');
     return this;
   }
 
@@ -229,7 +244,7 @@ export class QueryBuilder {
     return this;
   }
 
-  protected set(
+  private set(
     mask: MaskKind | number[] | undefined, types?: ComponentType<any>[]
   ): void {
     if (!mask) return;
@@ -240,13 +255,25 @@ export class QueryBuilder {
       if (!this.__query[mask]) this.__query[mask] = [];
       mask = this.__query[mask]!;
     }
-    let map: Map<ComponentType<Component>, Set<SystemBox>> | undefined;
-    if (mask === this.__system.rwMasks.read) map = this.__system.dispatcher.planner.readers!;
-    else if (mask === this.__system.rwMasks.write) map = this.__system.dispatcher.planner.writers!;
+    const readMask = mask === this.__system.rwMasks.read;
+    const writeMask = mask === this.__system.rwMasks.write;
+    const shapeMask = mask === this.__query.withMask || mask === this.__query.withoutMask;
+    const trackMask = mask === this.__query.trackMask;
+    const map =
+      readMask ? this.__system.dispatcher.planner.readers! :
+        writeMask ? this.__system.dispatcher.planner.writers! : undefined;
     for (const type of types) {
       extendMaskAndSetFlag(mask, type);
       if (map) map.get(type)!.add(this.__system);
+      if (shapeMask) this.categorize(this.__system.shapeQueriesByComponent, type);
+      if (trackMask) this.categorize(this.__system.writeQueriesByComponent, type);
     }
+  }
+
+  private categorize(index: QueryBox[][], type: ComponentType<any>): void {
+    const id = type.id!;
+    if (!index[id]) index[id] = [];
+    if (!index[id].includes(this.__query)) index[id].push(this.__query);
   }
 }
 

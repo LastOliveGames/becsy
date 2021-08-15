@@ -62,10 +62,11 @@ export class Registry {
   readonly pool: EntityPool;
   executingSystem?: SystemBox;
   includeRecentlyDeleted = false;
+  hasNegativeQueries = false;
   private readonly removalLog: Log;
   private readonly prevRemovalPointer: LogPointer;
   private readonly oldRemovalPointer: LogPointer;
-  readonly Alive = class Alive {};
+  readonly Alive: ComponentType<any> = class Alive {};
 
   constructor(
     maxEntities: number, maxLimboComponents: number, readonly types: ComponentType<any>[],
@@ -169,21 +170,22 @@ export class Registry {
   setShape(id: EntityId, type: ComponentType<any>): void {
     this.shapes.set(id, type);
     this.staleShapes.set(id, type);
-    // TODO: log type, reorder entries, and apply RLE on the component type.
-    this.dispatcher.shapeLog.push(id);
+    if (type !== this.Alive || this.hasNegativeQueries) {
+      this.dispatcher.shapeLog.push(id | (type.id! << ENTITY_ID_BITS));
+    }
   }
 
   clearShape(id: EntityId, type: ComponentType<any>): void {
     this.clearRefs(id, type, false);
-    this.removalLog.push(id | (type.id! << ENTITY_ID_BITS));
     this.shapes.unset(id, type);
     this.removedShapes.set(id, type);
-    this.dispatcher.shapeLog.push(id);
+    const logEntry = id | (type.id! << ENTITY_ID_BITS);
+    this.removalLog.push(logEntry);
+    if (type !== this.Alive || this.hasNegativeQueries) this.dispatcher.shapeLog.push(logEntry);
     STATS: this.dispatcher.stats.for(type).numEntities -= 1;
   }
 
   trackWrite(id: EntityId, type: ComponentType<any>): void {
-    // TODO: reorder entries and apply RLE on the component type.
     this.dispatcher.writeLog!.push(id | (type.id! << ENTITY_ID_BITS));
   }
 

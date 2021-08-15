@@ -130,6 +130,7 @@ export class Dispatcher {
     this.systemGroups = systemGroups;
     this.systems = this.normalizeAndInitSystems(systemTypes);
     this.initCallbackSystem();
+    this.registry.hasNegativeQueries = this.systems.some(system => system.hasNegativeQueries);
     this.planner = new Planner(this, this.systems, this.systemGroups);
     this.planner.organize();
     if (this.systems.some(system => system.hasWriteQueries)) {
