@@ -135,7 +135,7 @@ async function createWorld(...systems: SystemType<System>[]): Promise<World> {
 }
 
 
-describe('basic queries, all iteration, reads and writes', () => {
+describe('basic queries, current iteration, reads and writes', () => {
 
   test('iterate one type', async() => {
     const world = await createWorld(IncrementA);

@@ -190,67 +190,79 @@ describe('benchmarks', () => {
   test('packed1', async() => {
     const count = 5000;
     const world = await World.create({
-      maxEntities: count, maxShapeChangesPerFrame: count * 6, defaultComponentStorage: 'sparse',
+      maxEntities: count, maxShapeChangesPerFrame: count * 5 + 5, defaultComponentStorage: 'sparse',
       defs: [A, B, C, D, E, SystemA]
     });
-    for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
+    world.build(() => {
+      for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
+    });
     await world.execute();
   });
 
   test('packed5', async() => {
     const count = 1000;
     const world = await World.create({
-      maxEntities: count, maxShapeChangesPerFrame: count * 6, defaultComponentStorage: 'sparse',
+      maxEntities: count, maxShapeChangesPerFrame: count * 5 + 5, defaultComponentStorage: 'sparse',
       defs: [A, B, C, D, E, SystemA, SystemB, SystemC, SystemD, SystemE]
     });
-    for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
+    world.build(() => {
+      for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
+    });
     await world.execute();
   });
 
   test('simpleIter', async() => {
     const count = 1000;
     const world = await World.create({
-      maxEntities: count * 4, maxShapeChangesPerFrame: count * 17,
+      maxEntities: count * 4, maxShapeChangesPerFrame: count * 13 + 5,
       defaultComponentStorage: 'sparse', defs: [A, B, C, D, E, SystemAB, SystemCD, SystemCE]
     });
-    for (let i = 0; i < count; i++) {
-      world.createEntity(A, B, {value: 1});
-      world.createEntity(A, B, {value: 1}, C, {value: 2});
-      world.createEntity(A, B, {value: 1}, C, {value: 2}, D, {value: 3});
-      world.createEntity(A, B, {value: 1}, C, {value: 2}, E, {value: 4});
-    }
+    world.build(() => {
+      for (let i = 0; i < count; i++) {
+        world.createEntity(A, B, {value: 1});
+        world.createEntity(A, B, {value: 1}, C, {value: 2});
+        world.createEntity(A, B, {value: 1}, C, {value: 2}, D, {value: 3});
+        world.createEntity(A, B, {value: 1}, C, {value: 2}, E, {value: 4});
+      }
+    });
     await world.execute();
   });
 
   test('fragIter', async() => {
     const count = 100;
     const world = await World.create({
-      maxEntities: count * COMPS.length, maxShapeChangesPerFrame: count * 80,
+      maxEntities: count * COMPS.length, maxShapeChangesPerFrame: count * 53,
       defaultComponentStorage: 'sparse', defs: [COMPS, Data, DataSystem]
     });
-    for (let i = 0; i < count; i++) {
-      for (const Comp of COMPS) world.createEntity(Comp, Data);
-    }
+    world.build(() => {
+      for (let i = 0; i < count; i++) {
+        for (const Comp of COMPS) world.createEntity(Comp, Data);
+      }
+    });
     await world.execute();
   });
 
   test('entityCycle', async() => {
     const count = 1000;
     const world = await World.create({
-      maxEntities: count * 8, maxLimboComponents: count * 4,
+      maxEntities: count * 8, maxLimboComponents: count * 8,
       defaultComponentStorage: 'sparse', defs: [A, B, SpawnB, KillB]
     });
-    for (let i = 0; i < count; i++) world.createEntity(A, {value: i});
+    world.build(() => {
+      for (let i = 0; i < count; i++) world.createEntity(A, {value: i});
+    });
     await world.execute();
   });
 
   test('addRemove', async() => {
     const count = 1000;
     const world = await World.create({
-      maxEntities: count, maxShapeChangesPerFrame: count * 4, maxLimboComponents: count * 2,
+      maxEntities: count, maxShapeChangesPerFrame: count * 2 + 2, maxLimboComponents: count * 2,
       defaultComponentStorage: 'sparse', defs: [A, B, AddB, RemoveB]
     });
-    for (let i = 0; i < count; i++) world.createEntity(A);
+    world.build(() => {
+      for (let i = 0; i < count; i++) world.createEntity(A);
+    });
     await world.execute();
   });
 

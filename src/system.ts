@@ -1,7 +1,7 @@
 import type {LogPointer} from './datatypes/log';
 import type {Dispatcher} from './dispatcher';
 import type {Entity, ReadWriteMasks} from './entity';
-import {ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
+import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {World} from './world';  // eslint-disable-line @typescript-eslint/no-unused-vars
 import {Query, QueryBox, QueryBuilder} from './query';
 import type {ComponentType} from './component';
@@ -35,6 +35,7 @@ class Placeholder {
 export abstract class System {
   static readonly __system = true;
 
+  // TODO: document
   static group(...systemTypes: GroupContentsArray): SystemGroup {
     return new SystemGroupImpl(systemTypes);
   }
@@ -257,41 +258,84 @@ export class SystemBox {
   private __updateShapeQueries(): void {
     for (const query of this.shapeQueries) query.clearProcessedEntities();
     const shapeLog = this.dispatcher.shapeLog;
+    let queries: QueryBox[] | undefined, runLength = 0;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
     while (true) {
       [log, startIndex, endIndex] = shapeLog.processSince(this.shapeLogPointer);
       if (!log) break;
+      if (runLength && !queries) {
+        startIndex! += runLength;
+        runLength = 0;
+      }
       for (let i = startIndex!; i < endIndex!; i++) {
         const entry = log[i];
-        const componentId = entry >>> ENTITY_ID_BITS;
-        const queries = this.shapeQueriesByComponent[componentId];
-        if (queries) {
-          const entityId = entry & ENTITY_ID_MASK;
-          for (let j = 0; j < queries.length; j++) queries[j].handleShapeUpdate(entityId);
+        const entityId = entry & ENTITY_ID_MASK;
+        if (!queries) {
+          const typeId = (entry >>> ENTITY_ID_BITS) & COMPONENT_ID_MASK;
+          const runHeader = entry & 2 ** 31;
+          queries = this.shapeQueriesByComponent[typeId];
+          if (runHeader) {
+            runLength = entityId;
+            if (!queries) {
+              const skip = Math.min(runLength, endIndex! - i);
+              i += skip;
+              runLength -= skip;
+            }
+            continue;
+          }
+          if (!queries) continue;
+          runLength = 1;
         }
+        DEBUG: if (entry & 2 ** 31) {
+          throw new Error('Trying to process run header as entry in shape log');
+        }
+        for (let j = 0; j < queries.length; j++) queries[j].handleShapeUpdate(entityId);
+        if (--runLength === 0) queries = undefined;
       }
     }
   }
 
   private __updateWriteQueries(): void {
     const writeLog = this.dispatcher.writeLog!;
+    let queries: QueryBox[] | undefined, runLength = 0;
+    let componentFlagOffset: number, componentFlagMask: number;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
     while (true) {
       [log, startIndex, endIndex] = writeLog.processSince(this.writeLogPointer!);
       if (!log) break;
+      if (runLength && !queries) {
+        startIndex! += runLength;
+        runLength = 0;
+      }
       for (let i = startIndex!; i < endIndex!; i++) {
         const entry = log[i];
-        const componentId = entry >>> ENTITY_ID_BITS;
-        const queries = this.writeQueriesByComponent[componentId];
-        if (queries) {
-          const entityId = entry & ENTITY_ID_MASK;
+        const entityId = entry & ENTITY_ID_MASK;
+        if (!queries) {
+          const typeId = (entry >>> ENTITY_ID_BITS) & COMPONENT_ID_MASK;
+          const runHeader = entry & 2 ** 31;
           // Manually recompute flag offset and mask instead of looking up component type.
-          const componentFlagOffset = componentId >> 5;
-          const componentFlagMask = 1 << (componentId & 31);
-          for (let j = 0; j < queries.length; j++) {
-            queries[j].handleWrite(entityId, componentFlagOffset, componentFlagMask);
+          componentFlagOffset = typeId >> 5;
+          componentFlagMask = 1 << (typeId & 31);
+          queries = this.writeQueriesByComponent[typeId];
+          if (runHeader) {
+            runLength = entityId;
+            if (!queries) {
+              const skip = Math.min(runLength, endIndex! - i);
+              i += skip;
+              runLength -= skip;
+            }
+            continue;
           }
+          if (!queries) continue;
+          runLength = 1;
         }
+        DEBUG: if (entry & 2 ** 31) {
+          throw new Error('Trying to process run header as entry in write log');
+        }
+        for (let j = 0; j < queries.length; j++) {
+          queries[j].handleWrite(entityId, componentFlagOffset!, componentFlagMask!);
+        }
+        if (--runLength === 0) queries = undefined;
       }
     }
   }

@@ -122,11 +122,14 @@ export class Dispatcher {
     this.buffers = new Buffers(threads > 1);
     this.maxEntities = maxEntities;
     this.defaultComponentStorage = defaultComponentStorage;
-    this.shapeLog = new Log(maxShapeChangesPerFrame, 'maxShapeChangesPerFrame', this.buffers);
-    this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.registry = new Registry(maxEntities, maxLimboComponents, componentTypes, this);
     this.indexer = new RefIndexer(this, maxRefChangesPerFrame);
     this.registry.initializeComponentTypes();
+    this.shapeLog = new Log(
+      maxShapeChangesPerFrame, 'maxShapeChangesPerFrame', this.buffers,
+      {sortedByComponentType: true, numComponentTypes: this.registry.types.length}
+    );
+    this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.systemGroups = systemGroups;
     this.systems = this.normalizeAndInitSystems(systemTypes);
     this.initCallbackSystem();
@@ -134,7 +137,10 @@ export class Dispatcher {
     this.planner = new Planner(this, this.systems, this.systemGroups);
     this.planner.organize();
     if (this.systems.some(system => system.hasWriteQueries)) {
-      this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame', this.buffers);
+      this.writeLog = new Log(
+        maxWritesPerFrame, 'maxWritesPerFrame', this.buffers,
+        {sortedByComponentType: true, numComponentTypes: this.registry.types.length}
+      );
       this.writeLogFramePointer = this.writeLog.createPointer();
     }
     for (const box of this.systems) box.finishConstructing();
@@ -246,6 +252,8 @@ export class Dispatcher {
     // We know this execution will always be synchronous.
     this.callback.frame.execute(this.callback.group, 0, 0);
     this.callback.frame.end();
+    // This is not really a frame, so back out the count.
+    STATS: this.stats.frames -= 1;
   }
 
   completeCycle(): void {

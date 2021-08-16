@@ -196,72 +196,83 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
     async packed1() {
       const count = 5000;
       const world = await becsy.World.create({
-        maxEntities: count, defs: [A, B, C, D, E, SystemA], maxShapeChangesPerFrame: count * 6,
-        defaultComponentStorage: 'packed'
+        maxEntities: count, maxShapeChangesPerFrame: count * 5 + 5,
+        defaultComponentStorage: 'packed', defs: [A, B, C, D, E, SystemA]
       });
-      for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
+      world.build(() => {
+        for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
+      });
       return world;
     },
 
     async packed5() {
       const count = 1000;
       const world = await becsy.World.create({
-        maxEntities: count, maxShapeChangesPerFrame: count * 6,
-        defs: [A, B, C, D, E, SystemA, SystemB, SystemC, SystemD, SystemE],
-        defaultComponentStorage: 'packed'
+        maxEntities: count, maxShapeChangesPerFrame: count * 5 + 5,
+        defaultComponentStorage: 'packed',
+        defs: [A, B, C, D, E, SystemA, SystemB, SystemC, SystemD, SystemE]
       });
-      for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
+      world.build(() => {
+        for (let i = 0; i < count; i++) world.createEntity(A, B, C, D, E);
+      });
       return world;
     },
 
     async simpleIter() {
       const count = 1000;
       const world = await becsy.World.create({
-        maxEntities: count * 4, maxShapeChangesPerFrame: count * 17,
-        defs: [A, B, C, D, E, SystemAB, SystemCD, SystemCE],
-        defaultComponentStorage: 'packed'
+        maxEntities: count * 4, maxShapeChangesPerFrame: count * 13 + 5,
+        defaultComponentStorage: 'packed', defs: [A, B, C, D, E, SystemAB, SystemCD, SystemCE]
       });
-      for (let i = 0; i < count; i++) {
-        world.createEntity(A, B, {value: 1});
-        world.createEntity(A, B, {value: 1}, C, {value: 2});
-        world.createEntity(A, B, {value: 1}, C, {value: 2}, D, {value: 3});
-        world.createEntity(A, B, {value: 1}, C, {value: 2}, E, {value: 4});
-      }
+      world.build(() => {
+        for (let i = 0; i < count; i++) {
+          world.createEntity(A, B, {value: 1});
+          world.createEntity(A, B, {value: 1}, C, {value: 2});
+          world.createEntity(A, B, {value: 1}, C, {value: 2}, D, {value: 3});
+          world.createEntity(A, B, {value: 1}, C, {value: 2}, E, {value: 4});
+        }
+      });
       return world;
     },
 
     async fragIter() {
       const count = 100;
       const world = await becsy.World.create({
-        maxEntities: count * COMPS.length, maxShapeChangesPerFrame: count * 80,
-        defs: [COMPS, Data, DataSystem],
-        defaultComponentStorage: 'packed'
+        maxEntities: count * COMPS.length, maxShapeChangesPerFrame: count * 53,
+        defaultComponentStorage: 'packed', defs: [COMPS, Data, DataSystem]
       });
-      for (let i = 0; i < count; i++) {
-        for (const Comp of COMPS) world.createEntity(Comp, Data);
-      }
+      world.build(() => {
+        for (let i = 0; i < count; i++) {
+          for (const Comp of COMPS) world.createEntity(Comp, Data);
+        }
+      });
       return world;
     },
 
     async entityCycle() {
       const count = 1000;
       const world = await becsy.World.create({
-        maxEntities: count * 8, maxLimboComponents: count * 12,
-        defs: [A, B, SpawnB, KillB], defaultComponentStorage: 'packed'
+        maxEntities: count * 8, maxLimboComponents: count * 8,
+        defaultComponentStorage: 'packed', defs: [A, B, SpawnB, KillB]
       });
-      for (let i = 0; i < count; i++) world.createEntity(A, {value: i});
+      world.build(() => {
+        for (let i = 0; i < count; i++) world.createEntity(A, {value: i});
+      });
       return world;
     },
 
     async addRemove() {
       const count = 1000;
       const world = await becsy.World.create({
-        maxEntities: count, maxShapeChangesPerFrame: count * 4, maxLimboComponents: count * 3,
-        defs: [A, B, AddB, RemoveB], defaultComponentStorage: 'packed'
+        maxEntities: count, maxShapeChangesPerFrame: count * 2 + 2, maxLimboComponents: count * 2,
+        defaultComponentStorage: 'packed', defs: [A, B, AddB, RemoveB]
       });
-      for (let i = 0; i < count; i++) world.createEntity(A);
+      world.build(() => {
+        for (let i = 0; i < count; i++) world.createEntity(A);
+      });
       return world;
     }
   };
+
 
 };

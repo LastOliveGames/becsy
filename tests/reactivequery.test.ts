@@ -136,7 +136,7 @@ describe('removed queries', () => {
 
 describe('changed queries', () => {
 
-  test('find changed entities', async() => {
+  test('finds changed entities', async() => {
     const world = await createWorld(IncrementBWithChangedA, IncrementAddedALate);
     world.createEntity(A);
     world.createEntity(A, B);

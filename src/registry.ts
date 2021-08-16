@@ -126,9 +126,12 @@ export class Registry {
     const indexer = this.dispatcher.indexer;
     this.removalLog.commit();
     let numDeletedEntities = 0;
-    let numRemovedComponents = 0;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
 
+    STATS: {
+      this.dispatcher.stats.maxLimboComponents =
+        this.removalLog.countSince(this.removalLog.copyPointer(this.oldRemovalPointer));
+    }
     while (true) {
       [log, startIndex, endIndex] =
         this.removalLog.processSince(this.oldRemovalPointer, this.prevRemovalPointer);
@@ -150,12 +153,8 @@ export class Registry {
           type.__free?.(entityId);
         }
       }
-      STATS: numRemovedComponents += endIndex! - startIndex!;
     }
-    STATS: {
-      this.dispatcher.stats.numEntities -= numDeletedEntities;
-      this.dispatcher.stats.maxLimboComponents = numRemovedComponents;
-    }
+    STATS: this.dispatcher.stats.numEntities -= numDeletedEntities;
     this.removedShapes.clear();
     this.removalLog.createPointer(this.prevRemovalPointer);
   }
@@ -171,7 +170,7 @@ export class Registry {
     this.shapes.set(id, type);
     this.staleShapes.set(id, type);
     if (type !== this.Alive || this.hasNegativeQueries) {
-      this.dispatcher.shapeLog.push(id | (type.id! << ENTITY_ID_BITS));
+      this.dispatcher.shapeLog.push(id | (type.id! << ENTITY_ID_BITS), type);
     }
   }
 
@@ -181,12 +180,14 @@ export class Registry {
     this.removedShapes.set(id, type);
     const logEntry = id | (type.id! << ENTITY_ID_BITS);
     this.removalLog.push(logEntry);
-    if (type !== this.Alive || this.hasNegativeQueries) this.dispatcher.shapeLog.push(logEntry);
+    if (type !== this.Alive || this.hasNegativeQueries) {
+      this.dispatcher.shapeLog.push(logEntry, type);
+    }
     STATS: this.dispatcher.stats.for(type).numEntities -= 1;
   }
 
   trackWrite(id: EntityId, type: ComponentType<any>): void {
-    this.dispatcher.writeLog!.push(id | (type.id! << ENTITY_ID_BITS));
+    this.dispatcher.writeLog!.push(id | (type.id! << ENTITY_ID_BITS), type);
   }
 
   private clearRefs(id: EntityId, type: ComponentType<any>, final: boolean): void {

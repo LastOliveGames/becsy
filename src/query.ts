@@ -106,14 +106,14 @@ export class QueryBox {
     const newMatch = registry.matchShape(id, this.withMask, this.withoutMask);
     if (newMatch && !oldMatch) {
       this.currentEntities?.set(id);
-      // this.changedEntities?.set(id);
+      this.changedEntities?.set(id);
       this.results.current?.add(id);
       this.results.added?.add(id);
       this.results.addedOrChanged?.add(id);
       this.results.addedChangedOrRemoved?.add(id);
     } else if (!newMatch && oldMatch) {
       this.currentEntities?.unset(id);
-      // this.changedEntities?.set(id);
+      this.changedEntities?.set(id);
       this.results.current?.remove(id);
       this.results.removed?.add(id);
       this.results.changedOrRemoved?.add(id);

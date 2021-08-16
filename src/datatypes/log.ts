@@ -1,4 +1,6 @@
+import type {ComponentType} from '../component';
 import type {Buffers} from '../buffers';
+import {ENTITY_ID_BITS} from '../consts';
 
 
 export interface LogPointer {
@@ -6,6 +8,12 @@ export interface LogPointer {
   generation: number;
   corralIndex: number;
   corralGeneration: number;
+}
+
+interface LogOptions {
+  localProcessingAllowed?: boolean;
+  sortedByComponentType?: boolean;
+  numComponentTypes?: number;
 }
 
 
@@ -23,10 +31,15 @@ export class Log {
   private data: Uint32Array;
   /* layout: [length, generation, ...entries] */
   private corral: Uint32Array;
+  /* layout: [...entries] */
+  private staging: Uint32Array;
+  private typeCounters: Uint32Array;
 
   constructor(
-    private readonly maxEntries: number, private readonly configParamName: string,
-    buffers: Buffers, private readonly localProcessingAllowed = false
+    private readonly maxEntries: number, private readonly configParamName: string, buffers: Buffers,
+    private readonly options: LogOptions = {
+      localProcessingAllowed: false, sortedByComponentType: false, numComponentTypes: 0
+    }
   ) {
     buffers.register(
       `log.${configParamName}.buffer`, maxEntries + LOG_HEADER_LENGTH, Uint32Array,
@@ -36,50 +49,100 @@ export class Log {
       `log.${configParamName}.corral`, maxEntries + CORRAL_HEADER_LENGTH, Uint32Array,
       (corral: Uint32Array) => {this.corral = corral;}
     );
+    if (options.sortedByComponentType) {
+      DEBUG: if (options.numComponentTypes === undefined) {
+        throw new Error(
+          `numComponentTypes required when ${this.configParamName} is sortedByComponentType`);
+      }
+      buffers.register(
+        `log.${configParamName}.staging`, maxEntries, Uint32Array,
+        (staging: Uint32Array) => {this.staging = staging;}
+      );
+      this.typeCounters = new Uint32Array(this.options.numComponentTypes!);
+    }
   }
 
-  push(value: number): void {
+  push(value: number, type?: ComponentType<any>): void {
     const corralLength = this.corral[0];
     CHECK: if (corralLength >= this.maxEntries) this.throwCapacityExceeded();
     if (corralLength && this.corral[corralLength] === value) return;
     this.corral[corralLength + CORRAL_HEADER_LENGTH] = value;
     this.corral[0] += 1;
+    DEBUG: if (!!type !== !!this.options.sortedByComponentType) {
+      throw new Error(
+        `Pushing value ${type ? 'with' : 'without'} type to log ${this.configParamName} ` +
+        `${this.options.sortedByComponentType ? '' : 'not '}sorted by component type`);
+    }
+    if (type) this.typeCounters[type.id!] += 1;
   }
 
   commit(pointer?: LogPointer): boolean {
-    DEBUG: if (!pointer && this.localProcessingAllowed) {
+    DEBUG: if (!pointer && this.options.localProcessingAllowed) {
       throw new Error('Cannot use blind commit when log local processing is allowed');
     }
     const corralLength = this.corral[0];
     if (!corralLength) return true;
     let index = this.data[0];
+    let generation = this.data[1];
     if (pointer && !(
-      pointer.generation === this.data[1] && pointer.index === index &&
+      pointer.generation === generation && pointer.index === index &&
       pointer.corralGeneration === this.corral[1] && pointer.corralIndex === this.corral[0]
     )) return false;
-    const firstSegmentLength = Math.min(corralLength, this.maxEntries - index);
-    this.data.set(
-      this.corral.subarray(CORRAL_HEADER_LENGTH, firstSegmentLength + CORRAL_HEADER_LENGTH),
-      index + LOG_HEADER_LENGTH);
-    if (firstSegmentLength < corralLength) {
-      this.data.set(
-        this.corral.subarray(
-          firstSegmentLength + CORRAL_HEADER_LENGTH, corralLength + CORRAL_HEADER_LENGTH),
-        LOG_HEADER_LENGTH);
+    if (this.staging) {
+      const stagingLength = this.sortCorralIntoStaging();
+      this.copyToData(this.staging, stagingLength, index);
+      index += stagingLength;
+    } else {
+      this.copyToData(this.corral, corralLength, index);
+      index += corralLength;
     }
-    index += corralLength;
     while (index >= this.maxEntries) {
       index -= this.maxEntries;
-      this.data[1] += 1;
+      generation += 1;
     }
     this.data[0] = index;
+    this.data[1] = generation;
     this.corral[0] = 0;
     this.corral[1] += 1;
     if (pointer) {
       pointer.index = index;
-      pointer.generation = this.data[1];
+      pointer.generation = generation;
     }
     return true;
+  }
+
+  private sortCorralIntoStaging(): number {
+    let offset = 0;
+    for (let typeId = 0; typeId < this.typeCounters.length; typeId++) {
+      const count = this.typeCounters[typeId];
+      if (!count) continue;
+      this.typeCounters[typeId] = offset + 1;
+      this.staging[offset] = count | (typeId << ENTITY_ID_BITS) | 2 ** 31;
+      offset += count + 1;
+    }
+    const corralLength = this.corral[0] + CORRAL_HEADER_LENGTH;
+    for (let i = CORRAL_HEADER_LENGTH; i < corralLength; i++) {
+      const value = this.corral[i];
+      const typeId = value >>> ENTITY_ID_BITS;
+      this.staging[this.typeCounters[typeId]++] = value;
+    }
+    this.typeCounters.fill(0);
+    return offset;
+  }
+
+  private copyToData(sourceArray: Uint32Array, length: number, index: number): void {
+    const sourceHeaderLength = sourceArray === this.corral ? CORRAL_HEADER_LENGTH : 0;
+    const firstSegmentLength = Math.min(length, this.maxEntries - index);
+    this.data.set(
+      sourceArray.subarray(sourceHeaderLength, firstSegmentLength + sourceHeaderLength),
+      index + LOG_HEADER_LENGTH
+    );
+    if (firstSegmentLength < length) {
+      this.data.set(
+        sourceArray.subarray(firstSegmentLength + sourceHeaderLength, length + sourceHeaderLength),
+        LOG_HEADER_LENGTH
+      );
+    }
   }
 
   createPointer(pointer?: LogPointer): LogPointer {
@@ -158,11 +221,12 @@ export class Log {
     CHECK: this.checkPointers(startPointer, endPointer);
     DEBUG: if (this.corral[0]) throw new Error(`Internal error, should commit log before counting`);
     const startIndex = startPointer.index;
+    const startGeneration = startPointer.generation;
     const endIndex = endPointer?.index ?? this.data[0];
     const endGeneration = endPointer?.generation ?? this.data[1];
     startPointer.index = endIndex;
     startPointer.generation = endGeneration;
-    if (startIndex === endIndex && startPointer.generation === endGeneration) return 0;
+    if (startIndex === endIndex && startGeneration === endGeneration) return 0;
     if (startIndex < endIndex) return endIndex - startIndex;
     return this.maxEntries - (startIndex - endIndex);
   }
