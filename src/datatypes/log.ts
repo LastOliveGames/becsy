@@ -18,7 +18,6 @@ interface LogOptions {
 
 
 const LOG_HEADER_LENGTH = 2;
-const CORRAL_HEADER_LENGTH = 2;
 const EMPTY_TUPLE: [] = [];
 
 
@@ -31,7 +30,7 @@ export class Log {
   private data: Uint32Array;
   /* layout: [length, generation, ...entries] */
   private corral: Uint32Array;
-  /* layout: [...entries] */
+  /* layout: [length, unused, ...entries] */
   private staging: Uint32Array;
   private typeCounters: Uint32Array;
 
@@ -46,7 +45,7 @@ export class Log {
       (data: Uint32Array) => {this.data = data;}
     );
     buffers.register(
-      `log.${configParamName}.corral`, maxEntries + CORRAL_HEADER_LENGTH, Uint32Array,
+      `log.${configParamName}.corral`, maxEntries + LOG_HEADER_LENGTH, Uint32Array,
       (corral: Uint32Array) => {this.corral = corral;}
     );
     if (options.sortedByComponentType) {
@@ -55,7 +54,7 @@ export class Log {
           `numComponentTypes required when ${this.configParamName} is sortedByComponentType`);
       }
       buffers.register(
-        `log.${configParamName}.staging`, maxEntries, Uint32Array,
+        `log.${configParamName}.staging`, maxEntries + LOG_HEADER_LENGTH, Uint32Array,
         (staging: Uint32Array) => {this.staging = staging;}
       );
       this.typeCounters = new Uint32Array(this.options.numComponentTypes!);
@@ -66,7 +65,7 @@ export class Log {
     const corralLength = this.corral[0];
     CHECK: if (corralLength >= this.maxEntries) this.throwCapacityExceeded();
     if (corralLength && this.corral[corralLength] === value) return;
-    this.corral[corralLength + CORRAL_HEADER_LENGTH] = value;
+    this.corral[corralLength + LOG_HEADER_LENGTH] = value;
     this.corral[0] += 1;
     DEBUG: if (!!type !== !!this.options.sortedByComponentType) {
       throw new Error(
@@ -80,69 +79,81 @@ export class Log {
     DEBUG: if (!pointer && this.options.localProcessingAllowed) {
       throw new Error('Cannot use blind commit when log local processing is allowed');
     }
-    const corralLength = this.corral[0];
-    if (!corralLength) return true;
-    let index = this.data[0];
-    let generation = this.data[1];
+    if (!this.corral[0]) return true;
     if (pointer && !(
-      pointer.generation === generation && pointer.index === index &&
+      pointer.generation === this.data[1] && pointer.index === this.data[0] &&
       pointer.corralGeneration === this.corral[1] && pointer.corralIndex === this.corral[0]
     )) return false;
-    if (this.staging) {
-      const stagingLength = this.sortCorralIntoStaging();
-      this.copyToData(this.staging, stagingLength, index);
-      index += stagingLength;
-    } else {
-      this.copyToData(this.corral, corralLength, index);
-      index += corralLength;
-    }
-    while (index >= this.maxEntries) {
-      index -= this.maxEntries;
-      generation += 1;
-    }
-    this.data[0] = index;
-    this.data[1] = generation;
+    this.copyToData(this.staging ? this.sortCorral() : this.corral);
     this.corral[0] = 0;
     this.corral[1] += 1;
     if (pointer) {
-      pointer.index = index;
-      pointer.generation = generation;
+      pointer.index = this.data[0];
+      pointer.generation = this.data[1];
     }
     return true;
   }
 
-  private sortCorralIntoStaging(): number {
-    let offset = 0;
+  private sortCorral(): Uint32Array {
+    let offset = LOG_HEADER_LENGTH, soleTypeId = -1, soleTypeCount = 0;
     for (let typeId = 0; typeId < this.typeCounters.length; typeId++) {
       const count = this.typeCounters[typeId];
       if (!count) continue;
-      this.typeCounters[typeId] = offset + 1;
-      this.staging[offset] = count | (typeId << ENTITY_ID_BITS) | 2 ** 31;
-      offset += count + 1;
+      if (soleTypeId === -1) {
+        soleTypeId = typeId;
+        soleTypeCount = count;
+      } else if (soleTypeId >= 0) {
+        soleTypeId = -2;
+      }
+      if (count === 1) {
+        this.typeCounters[typeId] = offset;
+        offset += 1;
+      } else {
+        this.typeCounters[typeId] = offset + 1;
+        this.staging[offset] = count | (typeId << ENTITY_ID_BITS) | 2 ** 31;
+        offset += count + 1;
+      }
     }
-    const corralLength = this.corral[0] + CORRAL_HEADER_LENGTH;
-    for (let i = CORRAL_HEADER_LENGTH; i < corralLength; i++) {
+    if (soleTypeId >= 0) {
+      if (soleTypeCount > 1) {
+        this.corral[this.corral[0] + LOG_HEADER_LENGTH] = this.corral[LOG_HEADER_LENGTH];
+        this.corral[LOG_HEADER_LENGTH] = this.corral[0] | (soleTypeId << ENTITY_ID_BITS) | 2 ** 31;
+        this.corral[0] += 1;
+      }
+      this.typeCounters.fill(0);
+      return this.corral;
+    }
+    const corralAndHeaderLength = this.corral[0] + LOG_HEADER_LENGTH;
+    for (let i = LOG_HEADER_LENGTH; i < corralAndHeaderLength; i++) {
       const value = this.corral[i];
       const typeId = value >>> ENTITY_ID_BITS;
       this.staging[this.typeCounters[typeId]++] = value;
     }
+    this.staging[0] = offset - LOG_HEADER_LENGTH;
     this.typeCounters.fill(0);
-    return offset;
+    return this.staging;
   }
 
-  private copyToData(sourceArray: Uint32Array, length: number, index: number): void {
-    const sourceHeaderLength = sourceArray === this.corral ? CORRAL_HEADER_LENGTH : 0;
+  private copyToData(source: Uint32Array): void {
+    let index = this.data[0];
+    const length = source[0];
     const firstSegmentLength = Math.min(length, this.maxEntries - index);
     this.data.set(
-      sourceArray.subarray(sourceHeaderLength, firstSegmentLength + sourceHeaderLength),
+      source.subarray(LOG_HEADER_LENGTH, firstSegmentLength + LOG_HEADER_LENGTH),
       index + LOG_HEADER_LENGTH
     );
     if (firstSegmentLength < length) {
       this.data.set(
-        sourceArray.subarray(firstSegmentLength + sourceHeaderLength, length + sourceHeaderLength),
+        source.subarray(firstSegmentLength + LOG_HEADER_LENGTH, length + LOG_HEADER_LENGTH),
         LOG_HEADER_LENGTH
       );
     }
+    index += length;
+    while (index >= this.maxEntries) {
+      index -= this.maxEntries;
+      this.data[1] += 1;
+    }
+    this.data[0] = index;
   }
 
   createPointer(pointer?: LogPointer): LogPointer {
@@ -195,8 +206,8 @@ export class Log {
           startPointer.corralIndex < corralLength : corralLength;
         if (corralHasNewEntries) {
           result = [
-            this.corral, startPointer.corralIndex + CORRAL_HEADER_LENGTH,
-            corralLength + CORRAL_HEADER_LENGTH, true
+            this.corral, startPointer.corralIndex + LOG_HEADER_LENGTH,
+            corralLength + LOG_HEADER_LENGTH, true
           ];
           startPointer.corralIndex = corralLength;
           startPointer.corralGeneration = corralGeneration;

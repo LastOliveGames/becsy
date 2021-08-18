@@ -21,15 +21,21 @@ class ComponentStats {
   }
 }
 
+const internalComponentStats = new ComponentStats();
+
 export class Stats {
   frames = 0;
-  _numEntities = 0;
-  maxEntities = 0;
-  _maxLimboComponents = 0;
-  _maxRefChangesPerFrame = 0;
-  _maxShapeChangesPerFrame = 0;
-  _maxWritesPerFrame = 0;
+  private _numEntities = 0;
+  private _maxEntities = 0;
+  private _maxLimboComponents = 0;
+  private _maxRefChangesPerFrame = 0;
+  private _maxShapeChangesPerFrame = 0;
+  private _maxWritesPerFrame = 0;
   components: {[typeName: string]: ComponentStats} = Object.create(null);
+
+  get maxEntities(): number {
+    return this._maxEntities;
+  }
 
   get numEntities(): number {
     return this._numEntities;
@@ -37,7 +43,7 @@ export class Stats {
 
   set numEntities(value: number) {
     this._numEntities = value;
-    if (value > this.maxEntities) this.maxEntities = value;
+    if (value > this._maxEntities) this._maxEntities = value;
   }
 
   get maxLimboComponents(): number {
@@ -72,8 +78,8 @@ export class Stats {
     if (value > this._maxWritesPerFrame) this._maxWritesPerFrame = value;
   }
 
-  // TODO: prevent stats gathering for Alive component
   for(type: ComponentType<any>): ComponentStats {
+    if (type.id === 0) return internalComponentStats;
     return this.components[type.name] = this.components[type.name] ?? new ComponentStats();
   }
 
