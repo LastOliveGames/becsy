@@ -95,10 +95,11 @@ export class Log {
   }
 
   private sortCorral(): Uint32Array {
-    let offset = LOG_HEADER_LENGTH, soleTypeId = -1, soleTypeCount = 0;
+    let offset = LOG_HEADER_LENGTH, soleTypeId = -1, soleTypeCount = 0, numNonZeroTypes = 0;
     for (let typeId = 0; typeId < this.typeCounters.length; typeId++) {
       const count = this.typeCounters[typeId];
       if (!count) continue;
+      CHECK: numNonZeroTypes += 1;
       if (soleTypeId === -1) {
         soleTypeId = typeId;
         soleTypeCount = count;
@@ -116,6 +117,7 @@ export class Log {
     }
     if (soleTypeId >= 0) {
       if (soleTypeCount > 1) {
+        CHECK: if (this.corral[0] === this.maxEntries) this.throwCapacityExceeded();
         this.corral[this.corral[0] + LOG_HEADER_LENGTH] = this.corral[LOG_HEADER_LENGTH];
         this.corral[LOG_HEADER_LENGTH] = this.corral[0] | (soleTypeId << ENTITY_ID_BITS) | 2 ** 31;
         this.corral[0] += 1;
@@ -123,6 +125,7 @@ export class Log {
       this.typeCounters.fill(0);
       return this.corral;
     }
+    CHECK: if (this.corral[0] + numNonZeroTypes > this.maxEntries) this.throwCapacityExceeded();
     const corralAndHeaderLength = this.corral[0] + LOG_HEADER_LENGTH;
     for (let i = LOG_HEADER_LENGTH; i < corralAndHeaderLength; i++) {
       const value = this.corral[i];
