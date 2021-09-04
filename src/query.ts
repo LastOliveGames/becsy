@@ -35,7 +35,7 @@ export class QueryBox {
   private processedEntities: Bitset;
   private changedEntities: Bitset | undefined;
 
-  constructor(private readonly query: Query, private readonly system: SystemBox) {
+  constructor(query: Query, private readonly system: SystemBox) {
     query.__results = this.results;
     query.__systemName = system.name;
   }
@@ -44,6 +44,15 @@ export class QueryBox {
     const dispatcher = this.system.dispatcher;
     this.hasTransientResults = Boolean(this.flavors & transientFlavorsMask);
     this.hasChangedResults = Boolean(this.flavors & changedFlavorsMask);
+    CHECK: if (this.withMask && this.withoutMask) {
+      const minLength = Math.min(this.withMask.length, this.withoutMask.length);
+      for (let i = 0; i < minLength; i++) {
+        if ((this.withMask[i] & this.withoutMask[i]) !== 0) {
+          throw new Error(
+            'Query must not list a component type in both `with` and `without` clauses');
+        }
+      }
+    }
     CHECK: if (this.hasChangedResults && !this.trackMask) {
       throw new Error(`Query for changed entities must track at least one component`);
     }
@@ -137,7 +146,19 @@ export class QueryBox {
 }
 
 
-// TODO: document the query builder and query classes
+/**
+ * A fluent DSL for specifying a family of queries over the world's entities.
+ *
+ * Each query has a number of aspects:
+ * 1. What components an entity must (`with`) and must not (`without`) have to be selected.
+ * 2. Whether to return all `current` entities that satisfy the query, only various deltas from the
+ *    last frame (`added`, `removed`, `changed`, etc.).  It's permitted and encouraged to declare
+ *    multiple such variants on a single query if needed.  For the delta queries, each entity will
+ *    be compared against the query's value in the previous frame, so an entity that changes state
+ *    and changes back again between system executions will not be selected.
+ * 3. Which component types the query will read and write.  This doesn't affect the results of the
+ *    query but is used to order and deconflict systems.
+ */
 export class QueryBuilder {
   private __query: QueryBox;
   private __system: SystemBox;
@@ -165,80 +186,145 @@ export class QueryBuilder {
     }
   }
 
+  /**
+   * A noop connector to make a query definition read better.
+   */
   get and(): this {
     return this;
   }
 
+  /**
+   * A noop connector to make a query definition read better.
+   */
   get but(): this {
     return this;
   }
 
+  /**
+   * A noop connector to make a query definition read better.
+   */
   get also(): this {
     return this;
   }
 
+  /**
+   * Requests the maintenance of a list of all entities that currently satisfy the query.  This is
+   * the most common use of queries.
+   */
   get current(): this {
     this.__query.flavors |= QueryFlavor.current;
     return this;
   }
 
+  /**
+   * Requests that a list of all entities that newly satisfy the query be made available each frame.
+   */
   get added(): this {
     this.__query.flavors |= QueryFlavor.added;
     return this;
   }
 
+  /**
+   * Requests that a list of all entities that no longer satisfy the query be made available each
+   * frame.
+   */
   get removed(): this {
     this.__query.flavors |= QueryFlavor.removed;
     return this;
   }
 
+  /**
+   * Requests that a list of all entities that were recently written to and satisfy the query be
+   * made available each frame.  You must additionally specify which components the write detection
+   * should be sensitive to using `track`.
+   */
   get changed(): this {
     this.__query.flavors |= QueryFlavor.changed;
     return this;
   }
 
+  /**
+   * A combination of the `added` and `changed` query types, with the advantage that an entity that
+   * satisfies both will only appear once.
+   */
   get addedOrChanged(): this {
     this.__query.flavors |= QueryFlavor.addedOrChanged;
     return this;
   }
 
+  /**
+   * A combination of the `changed` and `removed` query types, with the advantage that an entity
+   * that satisfies both will only appear once.
+   */
   get changedOrRemoved(): this {
     this.__query.flavors |= QueryFlavor.changedOrRemoved;
     return this;
   }
 
+  /**
+   * A combination of the `added`, `changed`, and `removed` query types, with the advantage that an
+   * entity that satisfies multiple ones will only appear once.
+   */
   get addedChangedOrRemoved(): this {
     this.__query.flavors |= QueryFlavor.addedChangedOrRemoved;
     return this;
   }
 
+  /**
+   * Constrains the query to entities that possess components of all the given types.  All given
+   * types are also marked as `read`.
+   * @param types The types of components required to match the query.
+   */
   with(...types: ComponentType<any>[]): this {
     this.set(this.__system.rwMasks.read, types);
     this.set('withMask');
     return this;
   }
 
+  /**
+   * Constrains the query to entities that don't possess components of any of the given types.  All
+   * given types are also marked as `read`.
+   * @param types The types of components that must not be present to match the query.
+   */
   without(...types: ComponentType<any>[]): this {
     this.set(this.__system.rwMasks.read, types);
     this.set('withoutMask');
     return this;
   }
 
+  /**
+   * Marks all the given component types as `read`.
+   * @param types The types of components that the system will read, but that don't constrain the
+   * query.
+   */
   using(...types: ComponentType<any>[]): this {
     this.set(this.__system.rwMasks.read, types);
     return this;
   }
 
+  /**
+   * Marks the most recently mentioned component types as trackable for `changed` query flavors.
+   */
   get track(): this {
     this.set('trackMask');
     for (const type of this.__lastTypes) type.__binding!.trackedWrites = true;
     return this;
   }
 
+  /**
+   * Marks the most recently mentioned component types as read by the system.  Redundant, since any
+   * mention of component types automatically marks them as read, but can be included for clarity.
+   */
   get read(): this {
     return this;
   }
 
+  /**
+   * Marks the most recently mentioned component types as written by the system.  This declaration
+   * is enforced: you will only be able to write to component of types thus declared.  You should
+   * try to declare the minimum writable set that your system will need to improve ordering and
+   * concurrent performance.
+   */
   get write(): this {
     this.set(this.__system.rwMasks.write);
     return this;
@@ -282,36 +368,62 @@ export class Query {
   __results: Partial<Record<QueryFlavorName, EntityList>> & {current?: PackedArrayEntityList};
   __systemName: string;
 
+  /**
+   * Returns a list of all entities that match this query as of the beginning of the system's
+   * current (or last) execution.
+   */
   get current(): readonly Entity[] {
     CHECK: this.__checkList('current');
     return this.__results.current!.entities;
   }
 
+  /**
+   * Returns a list of all entities that newly started matching this query between the system's
+   * current (or last) and previous executions.
+   */
   get added(): readonly Entity[] {
     CHECK: this.__checkList('added');
     return this.__results.added!.entities;
   }
 
+  /**
+   * Returns a list of all entities that newly stopped matching this query between the system's
+   * current (or last) and previous executions.
+   */
   get removed(): readonly Entity[] {
     CHECK: this.__checkList('removed');
     return this.__results.removed!.entities;
   }
 
+  /**
+   * Returns a list of all entities that match this query as of the beginning of of the system's
+   * current (or last) execution, and that had tracked components written to between the system's
+   * current (or last) and previous executions.
+   */
   get changed(): readonly Entity[] {
     CHECK: this.__checkList('changed');
     return this.__results.changed!.entities;
   }
 
+  /**
+   * Returns a list that combines `added` and `changed`, but without duplicate entities.
+   */
   get addedOrChanged(): readonly Entity[] {
     CHECK: this.__checkList('addedOrChanged');
     return this.__results.addedOrChanged!.entities;
   }
 
+  /**
+   * Returns a list that combines `changed` and `removed`, but without duplicate entities.
+   */
   get changedOrRemoved(): readonly Entity[] {
     CHECK: this.__checkList('changedOrRemoved');
     return this.__results.changedOrRemoved!.entities;
   }
 
+  /**
+   * Returns a list that combines `added`, `changed`, and `removed`, but without duplicate entities.
+   */
   get addedChangedOrRemoved(): readonly Entity[] {
     CHECK: this.__checkList('addedChangedOrRemoved');
     return this.__results.addedChangedOrRemoved!.entities;

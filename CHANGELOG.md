@@ -1,4 +1,6 @@
 ### Upcoming
+- Improved query performance as the number of components grows.  This actually reduced performance on some of the synthetic benchmarks but should have a greatly positive effect in actual applications.
+- Documented query builder and query object.
 
 ### 0.8.0
 - Implemented automatic ordering of systems for execution.  Systems will *not* be executed in order of definition any more!  You'll need to read the docs for `System.schedule` and add scheduling constraints to your systems.  (You can also schedule whole groups at a time, which can come in handy! Don't forget that `@system` takes an optional group argument to easily group systems together.)
@@ -19,7 +21,7 @@
 - Exported `SystemGroup`.
 - Made `@component` decorator automatically add the class to a new world's defs.
 - Added a `@system` decorator to automatically add systems to a new world's defs, and optionally group them.
-- Chaned default component storage strategy to `packed` and elastic.  This will use less memory but decrease performance.  You can change the storage strategy back to the old `sparse` either by setting a component type's `storage` option, or by passing `defaultComponentStorage: 'sparse'` to the world options.
+- Changed default component storage strategy to `packed` and elastic.  This will use less memory but decrease performance.  You can change the storage strategy back to the old `sparse` either by setting a component type's `storage` option, or by passing `defaultComponentStorage: 'sparse'` to the world options.
 
 ### 0.5.2
 - Fixed bug in `weakObject` type.
