@@ -1,4 +1,4 @@
-### Upcoming
+### 0.8.1
 - Improved query performance as the number of components grows.  This actually reduced performance on some of the synthetic benchmarks but should have a greatly positive effect in actual applications.
 - Improved performance of component initialization, both with and without custom field values.
 - Documented query builder and query object.
