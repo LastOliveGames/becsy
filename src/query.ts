@@ -180,7 +180,7 @@ export class QueryBuilder {
         );
       }
       this.__query.complete();
-    } catch (e) {
+    } catch (e: any) {
       e.message = `Failed to build query in system ${system.name}: ${e.message}`;
       throw e;
     }
