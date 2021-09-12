@@ -27,7 +27,7 @@
   "author": "Piotr Kaminski <piotr@lastolive.games>",
   "license": "MIT",
   "devDependencies": {
-    "@types/jest": "^26.0.20",
+    "@types/jest": "^27.0.1",
     "@types/ms": "^0.7.31",
     "@types/node": "^16.9.1",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
@@ -37,10 +37,10 @@
     "eslint": "^7.22.0",
     "eslint-plugin-disable": "^2.0.1",
     "eslint-plugin-import": "^2.22.1",
-    "jest": "^26.6.3",
+    "jest": "^27.1.1",
     "rollup": "^2.41.2",
     "rollup-plugin-terser": "^7.0.2",
-    "ts-jest": "^26.5.3",
+    "ts-jest": "^27.0.5",
     "tsc-watch": "^4.2.9",
     "typescript": "^4.2.3"
   }
