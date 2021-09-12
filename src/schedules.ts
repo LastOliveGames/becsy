@@ -38,7 +38,7 @@ export class ScheduleBuilder {
       this.__systems = systems;
       this.__dispatcher = systems[0].dispatcher;
       this.__callback(this);
-    } catch (e) {
+    } catch (e: any) {
       e.message = `Failed to build schedule in ${name}: ${e.message}`;
       throw e;
     }

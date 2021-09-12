@@ -17,7 +17,7 @@ for (const name in tests) {
     try {
       const ops = await runCase(tests[name]);
       parentPort!.postMessage({name, ops});
-    } catch (e) {
+    } catch (e: any) {
       parentPort!.postMessage({name, ops: 0, error: e.toString()});
     }
     break;

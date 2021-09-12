@@ -656,7 +656,7 @@ type FinalizerHeldValue = {
 };
 
 class WeakObjectType extends Type<any> {
-  private finalizers: FinalizationRegistry | undefined;
+  private finalizers: FinalizationRegistry<any> | undefined;
 
   constructor() {super(undefined);}
 
