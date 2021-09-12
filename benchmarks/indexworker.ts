@@ -41,7 +41,7 @@ async function benchmark(fn: () => Promise<void>): Promise<number> {
     cycleTotalTime += elapsed;
   }
 
-  global.gc();
+  global.gc!();
   const targetCount = Math.ceil(TARGET_RUNNING_TIME / cycleTime);
   const totalTime = await time(fn, targetCount);
   return Math.floor(targetCount / totalTime * 1000);
