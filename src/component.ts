@@ -347,6 +347,7 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
     }
 
     case 'compact':
+      // TODO: implement compact storage type
       throw new Error('Not yet implemented');
 
     default:
