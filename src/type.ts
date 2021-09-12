@@ -520,7 +520,7 @@ class RefType extends Type<Entity | undefined> {
   }
 }
 
-const EMPTY_ARRAY: Entity[] = [];
+export const EMPTY_ARRAY: Entity[] = [];
 
 class BackrefsType extends Type<Entity[]> {
   constructor(

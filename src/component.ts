@@ -1,4 +1,4 @@
-import {Type} from './type';
+import {EMPTY_ARRAY, Type} from './type';
 import type {Entity, EntityId} from './entity';
 import {MAX_NUM_FIELDS} from './consts';
 import type {Dispatcher} from './dispatcher';
@@ -62,6 +62,8 @@ export class Binding<C> {
   internallyIndexed = false;
   entityId = 0;
   index = 0;
+  readonly initDefault: (component: any) => void;
+  readonly init: (component: any, values: any) => void;
 
   constructor(
     readonly type: ComponentType<C>, readonly fields: Field<any>[], readonly dispatcher: Dispatcher,
@@ -72,6 +74,25 @@ export class Binding<C> {
     this.shapeOffset = type.id! >> 5;
     this.shapeMask = 1 << (type.id! & 31);
     this.refFields = fields.filter(field => field.type === Type.ref);
+    // eslint-disable-next-line no-new-func
+    this.initDefault = new Function(
+      'component',
+      fields
+        .filter(field => field.default !== EMPTY_ARRAY)
+        .map(field => `component.${field.name} = ${JSON.stringify(field.default)};`)
+        .join('\n')
+    ) as (component: any) => void;
+    // eslint-disable-next-line no-new-func
+    this.init = new Function(
+      'component', 'values',
+      fields
+        .filter(field => field.default !== EMPTY_ARRAY)
+        .map(field =>
+          `component.${field.name} = values.${field.name} === undefined ?
+            ${JSON.stringify(field.default)} : values.${field.name};`
+        )
+        .join('\n')
+    ) as (component: any, values: any) => void;
   }
 }
 
@@ -189,11 +210,10 @@ export function initComponent(type: ComponentType<any>, id: EntityId, values: an
     }
   }
   const component = type.__allocate!(id);
-  // TODO: optimize component initialization
-  // 1. If no default values provided, use Object.assign with a predefined default values object.
-  // 2. Try generating custom init functions for the field to avoid a loop.
-  for (const field of type.__binding!.fields) {
-    (component as any)[field.name] = values?.[field.name] ?? field.default;
+  if (values) {
+    type.__binding!.init(component, values);
+  } else {
+    type.__binding!.initDefault(component);
   }
 }
 
