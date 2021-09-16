@@ -23,7 +23,7 @@ function checkInvalid(component: Component, binding: Binding<any>) {
 }
 
 export abstract class Type<JSType> {
-  constructor(readonly defaultValue: JSType) {}
+  constructor(readonly defaultValue: JSType, readonly shared = true) {}
 
   abstract defineElastic(binding: Binding<any>, field: Field<any>): void;
   abstract defineFixed(binding: Binding<any>, field: Field<any>): void;
@@ -594,7 +594,7 @@ class BackrefsType extends Type<Entity[]> {
 }
 
 class ObjectType extends Type<any> {
-  constructor() {super(undefined);}
+  constructor() {super(undefined, false);}
 
   defineElastic<C>(binding: Binding<C>, field: Field<any>): void {
     const data: any[] = [];
@@ -660,7 +660,7 @@ type FinalizerHeldValue = {
 class WeakObjectType extends Type<any> {
   private finalizers: FinalizationRegistry<any> | undefined;
 
-  constructor() {super(undefined);}
+  constructor() {super(undefined, false);}
 
   defineElastic<C>(binding: Binding<C>, field: Field<any>): void {
     const data: WeakRef<any>[] = [];

@@ -186,6 +186,8 @@ export class QueryBuilder {
     }
   }
 
+  // TODO: support partitioned queries in stateless systems
+
   /**
    * A noop connector to make a query definition read better.
    */
@@ -329,6 +331,9 @@ export class QueryBuilder {
     this.set(this.__system.rwMasks.write);
     return this;
   }
+
+  // TODO: add support for create mode; precedence like write, but systems can run concurrently if
+  // component has inelastic storage and atomic component allocation
 
   private set(
     mask: MaskKind | number[] | undefined, types?: ComponentType<any>[]

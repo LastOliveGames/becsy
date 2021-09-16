@@ -1,9 +1,9 @@
-import type {Component, ComponentType} from './component';
-import {Graph} from './datatypes/graph';
+import type {ComponentType} from './component';
 import type {Dispatcher} from './dispatcher';
+import type {Plan} from './planner';
 import type {System, SystemBox, SystemType} from './system';
 
-const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
+export const now = typeof window !== 'undefined' && typeof window.performance !== 'undefined' ?
   performance.now.bind(performance) : Date.now.bind(Date);
 
 
@@ -41,6 +41,48 @@ export class ScheduleBuilder {
     } catch (e: any) {
       e.message = `Failed to build schedule in ${name}: ${e.message}`;
       throw e;
+    }
+  }
+
+  /**
+   * Force this system to only execute on the main thread.  This is needed for systems that interact
+   * with APIs only available in the main thread such as the DOM.
+   * @returns The builder for chaining calls.
+   */
+  get onMainThread(): this {
+    CHECK: this.__checkNoLaneAssigned();
+    this.__dispatcher.planner.mainLane?.add(...this.__systems);
+    return this;
+  }
+
+  /**
+   * Execute this system consistently on a single thread.  This is the default behavior to
+   * accommodate systems with internal state.
+   * @returns The builder for chaining calls.
+   */
+  get onOneThread(): this {
+    CHECK: this.__checkNoLaneAssigned();
+    this.__dispatcher.planner.createLane().add(...this.__systems);
+    return this;
+  }
+
+  /**
+   * Replicate this system among multiple threads and execute it on any one of them, possibly a
+   * different one each time.  This allows Becsy to better utilize available CPUs but requires the
+   * system to be stateless (except for queries and attached systems).  Note that `prepare` and
+   * `initialize` will be called on each replicated instance of the system!
+   * @returns The builder for chaining calls.
+   */
+  get onManyThreads(): this {
+    CHECK: this.__checkNoLaneAssigned();
+    this.__dispatcher.planner.replicatedLane?.add(...this.__systems);
+    for (const system of this.__systems) system.stateless = true;
+    return this;
+  }
+
+  private __checkNoLaneAssigned(): void {
+    if (this.__systems.some(system => system.lane)) {
+      throw new Error(`Threading semantics already specified`);
     }
   }
 
@@ -301,127 +343,3 @@ export class FrameImpl {
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface Frame extends FrameImpl { }
 
-
-export abstract class Plan {
-  protected readonly graph: Graph<SystemBox>;
-
-  constructor(protected readonly planner: Planner, protected readonly group: SystemGroup) {
-    this.graph = planner.graph.induceSubgraph(group.__systems);
-    this.graph.seal();
-  }
-
-  abstract execute(time: number, delta: number): Promise<void>;
-  abstract initialize(): Promise<void>;
-}
-
-
-class SimplePlan extends Plan {
-  private readonly systems: SystemBox[];
-
-  constructor(protected readonly planner: Planner, protected readonly group: SystemGroup) {
-    super(planner, group);
-    this.systems = this.graph.topologicallySortedVertices;
-    CHECK: if (this.systems.length > 1 && (
-      typeof process === 'undefined' || process.env.NODE_ENV === 'development'
-    )) {
-      console.log('System execution order:');
-      for (const system of this.systems) console.log(' ', system.name);
-    }
-  }
-
-  execute(time: number, delta: number): Promise<void> {
-    const dispatcher = this.planner.dispatcher;
-    const registry = dispatcher.registry;
-    const systems = this.systems;
-    this.group.__executed = true;
-    for (let i = 0; i < systems.length; i++) {
-      const system = systems[i];
-      registry.executingSystem = system;
-      system.execute(time, delta);
-      dispatcher.flush();
-    }
-    registry.executingSystem = undefined;
-    return Promise.resolve();
-  }
-
-  async initialize(): Promise<void> {
-    const dispatcher = this.planner.dispatcher;
-    const registry = dispatcher.registry;
-    this.group.__executed = true;
-    return new Promise((resolve, reject) => {
-      let rejected = false;
-
-      const initSystem = async(system: SystemBox) => {
-        try {
-          await system.prepare();
-          if (rejected) return;
-          registry.executingSystem = system;
-          system.initialize();
-          dispatcher.flush();
-          registry.executingSystem = undefined;
-          const systems = this.graph.traverse(system);
-          if (!systems) return resolve();
-          for (let i = 0; i < systems.length; i++) initSystem(systems[i]);
-        } catch (e) {
-          rejected = true;
-          reject(e);
-        }
-      };
-
-      const systems = this.graph.traverse();
-      if (!systems) return resolve();
-      for (let i = 0; i < systems.length; i++) initSystem(systems[i]);
-    });
-  }
-
-}
-
-
-class ThreadedPlan extends Plan {
-  execute(time: number, delta: number): Promise<void> {
-    throw new Error('Method not implemented.');
-  }
-
-  initialize(): Promise<void> {
-    throw new Error('Method not implemented.');
-  }
-}
-
-
-export class Planner {
-  readonly graph: Graph<SystemBox>;
-  readers? = new Map<ComponentType<Component>, Set<SystemBox>>();
-  writers? = new Map<ComponentType<Component>, Set<SystemBox>>();
-
-  constructor(
-    readonly dispatcher: Dispatcher, private readonly systems: SystemBox[],
-    private readonly groups: SystemGroup[]
-  ) {
-    this.graph = new Graph(systems);
-    for (const componentType of dispatcher.registry.types) {
-      this.readers!.set(componentType, new Set());
-      this.writers!.set(componentType, new Set());
-    }
-  }
-
-  organize(): void {
-    for (const group of this.groups) group.__collectSystems(this.dispatcher);
-    for (const system of this.systems) system.buildQueries();
-    for (const system of this.systems) system.buildSchedule();
-    for (const group of this.groups) group.__buildSchedule();
-    for (const [componentType, systems] of this.readers!.entries()) {
-      for (const reader of systems) {
-        for (const writer of this.writers!.get(componentType)!) {
-          this.graph.addEdge(writer, reader, 1);
-        }
-      }
-    }
-    delete this.readers;
-    delete this.writers;
-    for (const group of this.groups) {
-      group.__plan =
-        this.dispatcher.threaded ? new ThreadedPlan(this, group) : new SimplePlan(this, group);
-    }
-  }
-
-}

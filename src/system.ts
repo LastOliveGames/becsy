@@ -6,12 +6,15 @@ import type {World} from './world';  // eslint-disable-line @typescript-eslint/n
 import {Query, QueryBox, QueryBuilder} from './query';
 import type {ComponentType} from './component';
 import {
-  GroupContentsArray, Schedule, ScheduleBuilder, SystemGroup, SystemGroupImpl
-} from './schedules';
+  GroupContentsArray, now, Schedule, ScheduleBuilder, SystemGroup, SystemGroupImpl
+} from './schedule';
+import type {Lane} from './planner';
+import type {SystemStats} from './stats';
 
 
 export interface SystemType<S extends System> {
   __system: true;
+  __staticScheduler?: (s: ScheduleBuilder) => ScheduleBuilder;
   new(): S;
 }
 
@@ -25,6 +28,9 @@ class Placeholder {
 }
 
 
+// TODO: support HMR for systems
+
+
 /**
  * An encapsulated piece of functionality for your app that executes every frame, typically by
  * iterating over some components returned by a query.
@@ -36,12 +42,14 @@ export abstract class System {
   static readonly __system = true;
 
   /**
-   * Creates a group of systems that applies scheduling constraints to all its members, and can also
-   * be used to define custom frames. The group needs to be included in the world's defs, which will
-   * also automatically include all its member systems.
-   * @param systemTypes The system types to include in the group.  A system can be a member of more
-   *   than one group.
-   * @returns The group of given systems.
+   * Create a group of systems that can be scheduled collectively, or used in
+   * {@link World.createCustomExecutor} to execute a subset of all the system in a frame. The group
+   * needs to be included in the world's defs, which will also automatically include all its member
+   * systems.
+   * @param systemTypes System classes to include in the group, each optionally followed by an
+   *  object to initialize the system's properties.  A system can be a member of more than one
+   *  group.
+   * @returns A group of the given systems.
    */
   static group(...systemTypes: GroupContentsArray): SystemGroup {
     return new SystemGroupImpl(systemTypes);
@@ -49,6 +57,7 @@ export abstract class System {
 
   __queryBuilders: QueryBuilder[] | null = [];
   __scheduleBuilder: ScheduleBuilder | undefined | null;
+  __placeholders: Placeholder[] | null = [];
   __dispatcher: Dispatcher;
 
   /**
@@ -141,7 +150,9 @@ export abstract class System {
    * @returns The unique instance of the system of the given type that exists in the world.
    */
   attach<S extends System>(systemType: SystemType<S>): S {
-    return new Placeholder(systemType) as unknown as S;
+    const placeholder = new Placeholder(systemType);
+    this.__placeholders!.push(placeholder);
+    return placeholder as unknown as S;
   }
 
   /**
@@ -201,7 +212,11 @@ export class SystemBox {
   private shapeLogPointer: LogPointer;
   private writeLogPointer?: LogPointer;
   private state: RunState = RunState.RUNNING;
+  readonly stats: SystemStats;
   private propsAssigned = false;
+  lane?: Lane;
+  stateless = false;
+  weight = 1;
 
   get id(): number {return this.system.id;}
   get name(): string {return this.system.name;}
@@ -210,6 +225,7 @@ export class SystemBox {
   constructor(private readonly system: System, readonly dispatcher: Dispatcher) {
     system.__dispatcher = dispatcher;
     this.shapeLogPointer = dispatcher.shapeLog.createPointer();
+    this.stats = dispatcher.stats.forSystem(system.constructor as SystemType<any>);
   }
 
   assignProps(props: Record<string, unknown>): void {
@@ -229,6 +245,8 @@ export class SystemBox {
   }
 
   buildSchedule(): void {
+    const staticScheduler = (this.system.constructor as SystemType<any>).__staticScheduler;
+    if (staticScheduler) this.system.schedule(staticScheduler);
     this.system.__scheduleBuilder?.__build([this], `system ${this.name}`);
     this.system.__scheduleBuilder = null;
   }
@@ -249,6 +267,12 @@ export class SystemBox {
         (this.system as any)[prop] = targetSystem.system;
       }
     }
+    this.system.__placeholders = null;
+  }
+
+  get attachedSystems(): (SystemBox | undefined)[] {
+    return this.system.__placeholders!.map(
+      placeholder => this.dispatcher.systemsByClass.get(placeholder.type));
   }
 
   prepare(): Promise<void> {
@@ -263,8 +287,16 @@ export class SystemBox {
     if (this.state !== RunState.RUNNING) return;
     this.system.time = time;
     this.system.delta = delta;
+    let time1, time2, time3;
+    STATS: time1 = now();
     this.runQueries();
+    STATS: time2 = now();
     this.system.execute();
+    STATS: time3 = now();
+    STATS: {
+      this.stats.lastQueryUpdateDuration = time2 - time1;
+      this.stats.lastExecutionDuration = time3 - time2;
+    }
   }
 
   private runQueries(): void {

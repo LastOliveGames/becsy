@@ -19,6 +19,7 @@ export interface ComponentOptions {
   storage?: ComponentStorage;
   capacity?: number;
   initialCapacity?: number;
+  restrictedToMainThread?: boolean;
 }
 
 export interface Field<JSType> {
@@ -156,7 +157,7 @@ class PackedStorage implements Storage {
 
   private growCapacity(): void {
     const capacity = this.binding.capacity;
-    STATS: this.binding.dispatcher.stats.for(this.binding.type).capacity = capacity;
+    STATS: this.binding.dispatcher.stats.forComponent(this.binding.type).capacity = capacity;
     const ArrayType = this.ArrayType;
     const elementSizeChanged = ArrayType.BYTES_PER_ELEMENT !== this.spares?.[0];
     if (!this.index || elementSizeChanged) {
@@ -264,6 +265,10 @@ export function assimilateComponentType<C>(
           `Component type ${type.name} cannot have both capacity and initialCapacity options`);
       }
     }
+    if (type.options?.restrictedToMainThread && fields.every(field => field.type.shared)) {
+      throw new Error(
+        `Component type ${type.name} is restrictedToMainThread but has no thread-exclusive fields`);
+    }
     if ((typeof process === 'undefined' || process.env.NODE_ENV !== 'test') && type.__bind) {
       throw new Error(`Component type ${type.name} is already in use in another world`);
     }
@@ -307,7 +312,7 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
   switch (binding.storage) {
     case 'sparse':
       // Inline the trivial storage manager for performance.
-      STATS: binding.dispatcher.stats.for(type).capacity = binding.capacity;  // fixed
+      STATS: binding.dispatcher.stats.forComponent(type).capacity = binding.capacity;  // fixed
       type.__bind = (id: EntityId, writable: boolean): C => {
         binding.entityId = id;
         binding.index = id;

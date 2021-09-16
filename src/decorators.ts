@@ -1,5 +1,5 @@
 import type {ComponentOptions, ComponentType} from './component';
-import type {SystemGroup} from './schedules';
+import type {ScheduleBuilder, SystemGroup} from './schedule';
 import type {SystemType} from './system';
 import type {Type} from './type';
 
@@ -50,6 +50,8 @@ export function component(arg: ComponentType<any> | ComponentOptions):
 
 export const systemTypes: (SystemType<any> | SystemGroup)[] = [];
 
+type ScheduleFn = (s: ScheduleBuilder) => ScheduleBuilder;
+
 /**
  * Declare this class as a system type that will be automatically added to any new world.  The class
  * must inherit from System.
@@ -65,14 +67,26 @@ export function system(systemClass: SystemType<any>): void;
  */
 export function system(systemGroup: SystemGroup): (constructor: SystemType<any>) => void;
 
-export function system(arg: SystemType<any> | SystemGroup):
-    ((systemClass: SystemType<any>) => void) | void {
+export function system(scheduler: ScheduleFn): (constructor: SystemType<any>) => void;
+
+export function system(systemGroup: SystemGroup, scheduler: ScheduleFn):
+  (constructor: SystemType<any>) => void;
+
+export function system(
+  arg: SystemType<any> | SystemGroup | ScheduleFn | undefined, scheduler?: ScheduleFn
+): ((systemClass: SystemType<any>) => void) | void {
+  if (typeof arg === 'function' && !(arg as SystemType<any>).__system) {
+    scheduler = arg as ScheduleFn;
+    arg = undefined;
+  }
   if (typeof arg === 'function') {
-    systemTypes.push(arg);
+    systemTypes.push(arg as SystemType<any>);
   } else {
-    if (!systemTypes.includes(arg)) systemTypes.push(arg);
+    if (arg && !systemTypes.includes(arg)) systemTypes.push(arg);
     return (systemClass: SystemType<any>) => {
-      arg.__contents.push(systemClass);
+      if (arg) (arg as SystemGroup).__contents.push(systemClass);
+      if (scheduler) systemClass.__staticScheduler = scheduler;
+      systemTypes.push(systemClass);
     };
   }
 }

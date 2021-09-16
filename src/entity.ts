@@ -38,7 +38,7 @@ export class EntityImpl {
       }
     }
     this.__registry.setShape(this.__id, type);
-    STATS: this.__registry.dispatcher.stats.for(type).numEntities += 1;
+    STATS: this.__registry.dispatcher.stats.forComponent(type).numEntities += 1;
     initComponent(type, this.__id, values);
   }
 

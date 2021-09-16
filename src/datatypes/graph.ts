@@ -13,6 +13,7 @@ interface Printable {
 export class Graph<V extends Printable> {
   private readonly numVertices: number;
   private readonly edges: number[];
+  private paths: number[];
   private readonly vertexIndexMap = new Map<V, number>();
   private sealed = false;
   private sortedVertices: V[];
@@ -71,6 +72,11 @@ export class Graph<V extends Printable> {
     return this.edges[this.getEdgeIndex(source, target)] > 0;
   }
 
+  hasPath(source: V, target: V): boolean {
+    DEBUG: if (!this.sealed) throw new Error('Graph not yet sealed');
+    return this.paths[this.getEdgeIndex(source, target)] > 0;
+  }
+
   private hasEdgeBetweenIds(sourceId: number, targetId: number): boolean {
     DEBUG: if (sourceId > this.numVertices) {
       throw new Error(`Vertex id out of range: ${sourceId} > ${this.numVertices}`);
@@ -92,6 +98,7 @@ export class Graph<V extends Printable> {
     DEBUG: if (this.sealed) throw new Error('Graph already sealed');
     this.sealed = true;
     CHECK: this.checkForCycles();
+    this.derivePaths();
     this.simplify();
     this.countDependencies();
   }
@@ -253,7 +260,7 @@ export class Graph<V extends Printable> {
     return vertices;
   }
 
-  private simplify(): void {
+  private derivePaths(): void {
     const n = this.numVertices;
 
     // Remove denial edges, no longer needed
@@ -270,6 +277,14 @@ export class Graph<V extends Printable> {
         }
       }
     }
+
+    this.paths = paths;
+
+  }
+
+  private simplify(): void {
+    const n = this.numVertices;
+    const paths = this.paths;
 
     // Perform a transitive reduction
     for (let i = 0; i < n; i++) {

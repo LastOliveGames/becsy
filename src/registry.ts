@@ -215,7 +215,7 @@ export class Registry {
     if (type !== this.Alive || this.hasNegativeQueries) {
       this.dispatcher.shapeLog.push(logEntry, type);
     }
-    STATS: this.dispatcher.stats.for(type).numEntities -= 1;
+    STATS: this.dispatcher.stats.forComponent(type).numEntities -= 1;
   }
 
   trackWrite(id: EntityId, type: ComponentType<any>): void {

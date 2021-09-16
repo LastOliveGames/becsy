@@ -1,6 +1,6 @@
 import type {ComponentType} from './component';
 import {ControlOptions, Dispatcher, WorldOptions} from './dispatcher';
-import {Frame, FrameImpl, SystemGroup} from './schedules';
+import {Frame, FrameImpl, SystemGroup} from './schedule';
 import type {Stats} from './stats';
 import type {System} from './system';
 

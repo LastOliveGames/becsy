@@ -1,7 +1,13 @@
 import type {ComponentType} from './component';
+import type {SystemType} from './system';
 
-class ComponentStats {
-  _numEntities = 0;
+const ALPHA = 0.05;
+function computeMovingAverage(average: number, value: number): number {
+  return value * ALPHA + average * (1 - ALPHA);
+}
+
+export class ComponentStats {
+  private _numEntities = 0;
   maxEntities = 0;
   capacity = 0;
 
@@ -21,7 +27,34 @@ class ComponentStats {
   }
 }
 
+export class SystemStats {
+  worker: number;  // -1 means replicated to all workers
+  private _lastQueryUpdateDuration = 0;
+  averageQueryUpdateDuration = 0;
+  private _lastExecutionDuration = 0;
+  averageExecutionDuration = 0;
+
+  get lastQueryUpdateDuration(): number {
+    return this._lastQueryUpdateDuration;
+  }
+
+  set lastQueryUpdateDuration(value: number) {
+    this._lastQueryUpdateDuration = value;
+    this.averageQueryUpdateDuration = computeMovingAverage(this.averageQueryUpdateDuration, value);
+  }
+
+  get lastExecutionDuration(): number {
+    return this._lastExecutionDuration;
+  }
+
+  set lastExecutionDuration(value: number) {
+    this._lastExecutionDuration = value;
+    this.averageExecutionDuration = computeMovingAverage(this.averageExecutionDuration, value);
+  }
+}
+
 const internalComponentStats = new ComponentStats();
+const internalSystemStats = new SystemStats();
 
 export class Stats {
   frames = 0;
@@ -32,6 +65,7 @@ export class Stats {
   private _maxShapeChangesPerFrame = 0;
   private _maxWritesPerFrame = 0;
   components: {[typeName: string]: ComponentStats} = Object.create(null);
+  systems: {[systemName: string]: SystemStats} = Object.create(null);
 
   get maxEntities(): number {
     return this._maxEntities;
@@ -78,9 +112,14 @@ export class Stats {
     if (value > this._maxWritesPerFrame) this._maxWritesPerFrame = value;
   }
 
-  for(type: ComponentType<any>): ComponentStats {
+  forComponent(type: ComponentType<any>): ComponentStats {
     if (type.id === 0) return internalComponentStats;
     return this.components[type.name] = this.components[type.name] ?? new ComponentStats();
+  }
+
+  forSystem(type: SystemType<any>): SystemStats {
+    if (type.name === 'CallbackSystem') return internalSystemStats;
+    return this.systems[type.name] = this.systems[type.name] ?? new SystemStats();
   }
 
   toString(): string {

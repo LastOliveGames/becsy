@@ -14,7 +14,7 @@ describe('using packed component storage', () => {
       const entity2 = system.createEntity(A, {value: 2});
       expect(entity1.read(A).value).toBe(1);
       expect(entity2.read(A).value).toBe(2);
-      expect(world.stats.for(A).numEntities).toBe(2);
+      expect(world.stats.forComponent(A).numEntities).toBe(2);
     });
   });
 
@@ -23,13 +23,13 @@ describe('using packed component storage', () => {
     world.build(system => {
       const entity1 = system.createEntity(A, {value: 1});
       const entity2 = system.createEntity(A, {value: 2});
-      expect(world.stats.for(A).capacity).toBe(2);
+      expect(world.stats.forComponent(A).capacity).toBe(2);
       const entity3 = system.createEntity(A, {value: 3});
-      expect(world.stats.for(A).capacity).toBeGreaterThan(2);
+      expect(world.stats.forComponent(A).capacity).toBeGreaterThan(2);
       expect(entity1.read(A).value).toBe(1);
       expect(entity2.read(A).value).toBe(2);
       expect(entity3.read(A).value).toBe(3);
-      expect(world.stats.for(A).numEntities).toBe(3);
+      expect(world.stats.forComponent(A).numEntities).toBe(3);
     });
   });
 
@@ -41,8 +41,8 @@ describe('using packed component storage', () => {
       entity1.remove(A);
       expect(entity1.has(A)).toBe(false);
       expect(entity2.read(A).value).toBe(2);
-      expect(world.stats.for(A).numEntities).toBe(1);
-      expect(world.stats.for(A).maxEntities).toBe(2);
+      expect(world.stats.forComponent(A).numEntities).toBe(1);
+      expect(world.stats.forComponent(A).maxEntities).toBe(2);
     });
     // flush out the removed component
     await world.execute();
@@ -50,9 +50,9 @@ describe('using packed component storage', () => {
     world.build(system => {
       const entity3 = system.createEntity(A, {value: 3});
       expect(entity3.read(A).value).toBe(3);
-      expect(world.stats.for(A).numEntities).toBe(2);
-      expect(world.stats.for(A).maxEntities).toBe(2);
-      expect(world.stats.for(A).capacity).toBe(2);
+      expect(world.stats.forComponent(A).numEntities).toBe(2);
+      expect(world.stats.forComponent(A).maxEntities).toBe(2);
+      expect(world.stats.forComponent(A).capacity).toBe(2);
     });
   });
 
@@ -61,15 +61,15 @@ describe('using packed component storage', () => {
     world.build(system => {
       const entities = [];
       for (let i = 0; i < 9; i++) entities[i] = system.createEntity(A);
-      expect(world.stats.for(A).numEntities).toBe(9);
-      expect(world.stats.for(A).capacity).toBe(16);
+      expect(world.stats.forComponent(A).numEntities).toBe(9);
+      expect(world.stats.forComponent(A).capacity).toBe(16);
       for (let i = 0; i < 9; i++) entities[i].remove(A);
-      expect(world.stats.for(A).numEntities).toBe(0);
+      expect(world.stats.forComponent(A).numEntities).toBe(0);
       for (let i = 0; i < 9; i++) entities[i].add(A);
-      expect(world.stats.for(A).numEntities).toBe(9);
-      expect(world.stats.for(A).capacity).toBe(16);
+      expect(world.stats.forComponent(A).numEntities).toBe(9);
+      expect(world.stats.forComponent(A).capacity).toBe(16);
       system.createEntity(A);
-      expect(world.stats.for(A).numEntities).toBe(10);
+      expect(world.stats.forComponent(A).numEntities).toBe(10);
     });
   });
 
@@ -104,7 +104,7 @@ describe('using packed component storage', () => {
     const world = await World.create();
     world.build(system => {
       for (let i = 0; i < 128; i++) system.createEntity(A);
-      expect(world.stats.for(A).capacity).toBe(128);
+      expect(world.stats.forComponent(A).capacity).toBe(128);
     });
   });
 });

@@ -10,7 +10,8 @@ import {Buffers} from './buffers';
 import {
   componentTypes as decoratedComponentTypes, systemTypes as decoratedSystemTypes
 } from './decorators';
-import {Frame, FrameImpl, Planner, SystemGroup, SystemGroupImpl} from './schedules';
+import {Frame, FrameImpl, SystemGroup, SystemGroupImpl} from './schedule';
+import {Planner} from './planner';
 
 
 // TODO: figure out a better type for interleaved arrays, here and elsewhere
