@@ -369,8 +369,11 @@ export class Query {
   __systemName: string;
 
   /**
-   * Returns a list of all entities that match this query as of the beginning of the system's
-   * current (or last) execution.
+   * A list of all entities that match this query as of the beginning of the system's current (or
+   * last) execution.
+   *
+   * You must not keep a reference to these entities beyond the local scope of a system's execution.
+   * To obtain an object for long-term use please see {@link Entity.hold}.
    */
   get current(): readonly Entity[] {
     CHECK: this.__checkList('current');
@@ -378,8 +381,11 @@ export class Query {
   }
 
   /**
-   * Returns a list of all entities that newly started matching this query between the system's
-   * current (or last) and previous executions.
+   * A list of all entities that newly started matching this query between the system's current (or
+   * last) and previous executions.
+   *
+   * You must not keep a reference to these entities beyond the local scope of a system's execution.
+   * To obtain an object for long-term use please see {@link Entity.hold}.
    */
   get added(): readonly Entity[] {
     CHECK: this.__checkList('added');
@@ -387,8 +393,11 @@ export class Query {
   }
 
   /**
-   * Returns a list of all entities that newly stopped matching this query between the system's
-   * current (or last) and previous executions.
+   * A list of all entities that newly stopped matching this query between the system's current (or
+   * last) and previous executions.
+   *
+   * You must not keep a reference to these entities beyond the local scope of a system's execution.
+   * To obtain an object for long-term use please see {@link Entity.hold}.
    */
   get removed(): readonly Entity[] {
     CHECK: this.__checkList('removed');
@@ -396,9 +405,12 @@ export class Query {
   }
 
   /**
-   * Returns a list of all entities that match this query as of the beginning of of the system's
-   * current (or last) execution, and that had tracked components written to between the system's
-   * current (or last) and previous executions.
+   * A list of all entities that match this query as of the beginning of of the system's current (or
+   * last) execution, and that had tracked components written to between the system's current (or
+   * last) and previous executions.
+   *
+   * You must not keep a reference to these entities beyond the local scope of a system's execution.
+   * To obtain an object for long-term use please see {@link Entity.hold}.
    */
   get changed(): readonly Entity[] {
     CHECK: this.__checkList('changed');
@@ -406,7 +418,10 @@ export class Query {
   }
 
   /**
-   * Returns a list that combines `added` and `changed`, but without duplicate entities.
+   * A list that combines `added` and `changed`, but without duplicate entities.
+   *
+   * You must not keep a reference to these entities beyond the local scope of a system's execution.
+   * To obtain an object for long-term use please see {@link Entity.hold}.
    */
   get addedOrChanged(): readonly Entity[] {
     CHECK: this.__checkList('addedOrChanged');
@@ -414,7 +429,10 @@ export class Query {
   }
 
   /**
-   * Returns a list that combines `changed` and `removed`, but without duplicate entities.
+   * A list that combines `changed` and `removed`, but without duplicate entities.
+   *
+   * You must not keep a reference to these entities beyond the local scope of a system's execution.
+   * To obtain an object for long-term use please see {@link Entity.hold}.
    */
   get changedOrRemoved(): readonly Entity[] {
     CHECK: this.__checkList('changedOrRemoved');
@@ -422,7 +440,10 @@ export class Query {
   }
 
   /**
-   * Returns a list that combines `added`, `changed`, and `removed`, but without duplicate entities.
+   * A list that combines `added`, `changed`, and `removed`, but without duplicate entities.
+   *
+   * You must not keep a reference to these entities beyond the local scope of a system's execution.
+   * To obtain an object for long-term use please see {@link Entity.hold}.
    */
   get addedChangedOrRemoved(): readonly Entity[] {
     CHECK: this.__checkList('addedChangedOrRemoved');

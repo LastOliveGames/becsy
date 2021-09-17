@@ -242,7 +242,7 @@ export class Dispatcher {
 
   async execute(time?: number, delta?: number): Promise<void> {
     this.default.frame.begin();
-    await this.default.frame.execute(this.default.group, time, delta);
+    await Promise.resolve(this.default.frame.execute(this.default.group, time, delta));
     this.default.frame.end();
   }
 

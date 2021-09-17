@@ -2,7 +2,7 @@ import {ComponentType, assimilateComponentType, defineAndAllocateComponentType} 
 import {Log, LogPointer} from './datatypes/log';
 import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/intpool';
 import type {Dispatcher} from './dispatcher';
-import {Entity, EntityId} from './entity';
+import {Entity, EntityId, EntityImpl} from './entity';
 import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {SystemBox} from './system';
 import {AtomicSharedShapeArray, ShapeArray, UnsharedShapeArray} from './datatypes/shapearray';
@@ -23,7 +23,7 @@ export class EntityPool {
     this.borrowCounts[id] += 1;
     let entity = this.borrowed[id];
     if (!entity) {
-      entity = this.borrowed[id] = this.spares.pop() ?? new Entity(this.registry);
+      entity = this.borrowed[id] = this.spares.pop() ?? new EntityImpl(this.registry);
       entity.__id = id;
     }
     return entity;
@@ -47,8 +47,13 @@ export class EntityPool {
       }
     }
     if (--this.borrowCounts[id] <= 0) {
-      this.spares.push(this.borrowed[id]!);
+      const entity = this.borrowed[id]!;
       this.borrowed[id] = undefined;
+      CHECK: {
+        entity.__valid = false;
+        return;
+      }
+      this.spares.push(entity);
     }
   }
 }
@@ -60,6 +65,7 @@ export class Registry {
   private readonly removedShapes: ShapeArray;
   private readonly entityIdPool: Uint32Pool;
   readonly pool: EntityPool;
+  private readonly heldEntities: Entity[];
   executingSystem?: SystemBox;
   includeRecentlyDeleted = false;
   hasNegativeQueries = false;
@@ -84,6 +90,7 @@ export class Registry {
       new UnsharedPool(maxEntities, 'maxEntities');
     this.entityIdPool.fillWithDescendingIntegers(0);
     this.pool = new EntityPool(this, maxEntities);
+    CHECK: this.heldEntities = [];
     this.removalLog = new Log(maxLimboComponents, 'maxLimboComponents', dispatcher.buffers);
     this.prevRemovalPointer = this.removalLog.createPointer();
     this.oldRemovalPointer = this.removalLog.createPointer();
@@ -120,11 +127,13 @@ export class Registry {
 
   completeCycle(): void {
     this.processRemovalLog();
+    CHECK: this.invalidateDeletedHeldEntities();
   }
 
   private processRemovalLog(): void {
     const indexer = this.dispatcher.indexer;
     this.removalLog.commit();
+    this.entityIdPool.mark();
     let numDeletedEntities = 0;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
 
@@ -157,6 +166,29 @@ export class Registry {
     STATS: this.dispatcher.stats.numEntities -= numDeletedEntities;
     this.removedShapes.clear();
     this.removalLog.createPointer(this.prevRemovalPointer);
+  }
+
+  private invalidateDeletedHeldEntities(): void {
+    let index = 0;
+    let entityId;
+    while ((entityId = this.entityIdPool.peekSinceMark(index++)) !== undefined) {
+      const entity = this.heldEntities[entityId];
+      if (entity) {
+        entity.__valid = false;
+        delete this.heldEntities[entityId];
+      }
+    }
+  }
+
+  holdEntity(id: EntityId): Entity {
+    let entity;
+    CHECK: entity = this.heldEntities[id];
+    if (!entity) {
+      entity = new EntityImpl(this);
+      entity.__id = id;
+      CHECK: this.heldEntities[id] = entity;
+    }
+    return entity;
   }
 
   hasShape(id: EntityId, type: ComponentType<any>, allowRecentlyDeleted: boolean): boolean {

@@ -210,9 +210,9 @@ describe('follow backward references', () => {
 
   test('backrefs to recently removed component', async() => {
     const world = await createWorld();
-    let d1: Entity;  // should stay bound long enough...
+    let d1: Entity;
     world.build(sys => {
-      d1 = sys.createEntity(GlobalDestWithStales);
+      d1 = sys.createEntity(GlobalDestWithStales).hold();
       sys.createEntity(Origin, {target: d1});
       const o = sys.createEntity(Origin, {target: d1});
       o.remove(Origin);
@@ -284,7 +284,7 @@ describe('refs affected by entity deletion', () => {
     let o: Entity;
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
-      o = sys.createEntity(Origin, {target: d1});
+      o = sys.createEntity(Origin, {target: d1}).hold();
       d1.delete();
       expect(o.read(Origin).target).toBe(undefined);
       sys.accessRecentlyDeletedData();
@@ -304,18 +304,18 @@ describe('refs affected by entity deletion', () => {
     let d2: Entity;
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
-      d2 = sys.createEntity(GlobalDest);
-      o = sys.createEntity(Origin, {target: d1});
+      d2 = sys.createEntity(GlobalDest).hold();
+      o = sys.createEntity(Origin, {target: d1}).hold();
       d1.delete();
       expect(o.read(Origin).target).toBe(undefined);
       sys.accessRecentlyDeletedData();
-      expect(o.read(Origin).target).toBe(d1);
+      expect(o.read(Origin).target?.isSame(d1)).toBe(true);
       sys.accessRecentlyDeletedData(false);
       o.write(Origin).target = d2;
-      expect(o.read(Origin).target).toBe(d2);
+      expect(o.read(Origin).target?.isSame(d2)).toBe(true);
     });
     await world.execute();
     await world.execute();
-    expect(o!.read(Origin).target).toBe(d2!);
+    expect(o!.read(Origin).target?.isSame(d2!)).toBe(true);
   });
 });

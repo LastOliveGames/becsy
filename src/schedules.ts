@@ -287,10 +287,10 @@ export class FrameImpl {
    * `delta` property and default to the duration since any previous frame's `begin` was called.
    * It's not used internally so you can pass in any numeric value that's expected by your systems.
    */
-  async execute(group: SystemGroup, time?: number, delta?: number): Promise<void> {
+  execute(group: SystemGroup, time?: number, delta?: number): Promise<void> {
     CHECK: if (!this.groups.includes(group)) throw new Error('Group not included in this frame');
     CHECK: if (!this.executing) throw new Error('Frame not executing');
-    await group.__plan.execute(time ?? this.time, delta ?? this.delta);
+    return group.__plan.execute(time ?? this.time, delta ?? this.delta);
   }
 }
 
@@ -326,7 +326,7 @@ class SimplePlan extends Plan {
     }
   }
 
-  async execute(time: number, delta: number): Promise<void> {
+  execute(time: number, delta: number): Promise<void> {
     const dispatcher = this.planner.dispatcher;
     const registry = dispatcher.registry;
     const systems = this.systems;
@@ -338,6 +338,7 @@ class SimplePlan extends Plan {
       dispatcher.flush();
     }
     registry.executingSystem = undefined;
+    return Promise.resolve();
   }
 
 }

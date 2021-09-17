@@ -88,9 +88,9 @@ describe('using packed component storage', () => {
 
   test('resurrect components', async() => {
     const world = await World.create();
-    let entity1: Entity;  // will be released, but there's nothing to overwrite it
+    let entity1: Entity;
     world.build(system => {
-      entity1 = system.createEntity(A, {value: 1});
+      entity1 = system.createEntity(A, {value: 1}).hold();
       entity1.remove(A);
       entity1.add(A, {value: 2});
     });
