@@ -2,6 +2,7 @@
 - Added `Entity.hold` and `Entity.isSame` methods.
 - Stopped returning `this` from `Entity.add` and `Entity.addAll`.  This is technically a breaking change and ought to be a major version bump, but it feels so trivial I didn't want to bother.
 - Started checking that `Entity` objects obtained from queries are not used for too long.  This reduced create/delete entity performance by 50% in dev mode, but didn't affect perf mode (where the check is bypassed).
+- Fixed `System.attach` to return actual system, not an internal handle.
 - Documented `Entity` class.
 
 ### 0.8.1

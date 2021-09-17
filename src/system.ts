@@ -218,7 +218,7 @@ export class SystemBox {
         CHECK: if (!targetSystem) {
           throw new Error(`Attached system ${targetSystemType.name} not defined in this world`);
         }
-        (this.system as any)[prop] = targetSystem;
+        (this.system as any)[prop] = targetSystem.system;
       }
     }
   }
