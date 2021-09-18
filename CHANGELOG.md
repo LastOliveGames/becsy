@@ -1,3 +1,6 @@
+### 0.8.3
+- Make `enum`s non-`const` so they don't break in builds with isolated modules.
+
 ### 0.8.2
 - Added `Entity.hold` and `Entity.isSame` methods.
 - Stopped returning `this` from `Entity.add` and `Entity.addAll`.  This is technically a breaking change and ought to be a major version bump, but it feels so trivial I didn't want to bother.
