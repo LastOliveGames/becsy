@@ -21,7 +21,7 @@ interface Selector {
   sourceSeq?: number;
 }
 
-const enum Action {
+enum Action {
   REFERENCE = 0, UNREFERENCE = 2 ** 30, RELEASE = 2 ** 31
 }
 

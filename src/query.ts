@@ -6,7 +6,7 @@ import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/en
 
 type MaskKind = 'withMask' | 'withoutMask' | 'trackMask';
 
-const enum QueryFlavor {
+enum QueryFlavor {
   current = 1, added = 2, removed = 4, changed = 8, addedOrChanged = 16, changedOrRemoved = 32,
   addedChangedOrRemoved = 64
 }

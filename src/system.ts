@@ -16,7 +16,7 @@ export interface SystemType<S extends System> {
 }
 
 
-export const enum RunState {
+export enum RunState {
   RUNNING, STOPPED
 }
 
