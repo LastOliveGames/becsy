@@ -311,6 +311,7 @@ export abstract class Plan {
   }
 
   abstract execute(time: number, delta: number): Promise<void>;
+  abstract initialize(): Promise<void>;
 }
 
 
@@ -319,7 +320,7 @@ class SimplePlan extends Plan {
 
   constructor(protected readonly planner: Planner, protected readonly group: SystemGroup) {
     super(planner, group);
-    this.systems = this.graph.topologicallSortedVertices;
+    this.systems = this.graph.topologicallySortedVertices;
     CHECK: if (typeof process === 'undefined' || process.env.NODE_ENV === 'development') {
       console.log('System execution order:');
       for (const system of this.systems) console.log(' ', system.name);
@@ -341,11 +342,30 @@ class SimplePlan extends Plan {
     return Promise.resolve();
   }
 
+  // TODO: run system initializations concurrently, within scheduling constraints
+  async initialize(): Promise<void> {
+    const dispatcher = this.planner.dispatcher;
+    const registry = dispatcher.registry;
+    const systems = this.systems;
+    this.group.__executed = true;
+    for (let i = 0; i < systems.length; i++) {
+      const system = systems[i];
+      registry.executingSystem = system;
+      await system.initialize();
+      dispatcher.flush();
+    }
+    registry.executingSystem = undefined;
+  }
+
 }
 
 
 class ThreadedPlan extends Plan {
   execute(time: number, delta: number): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+
+  initialize(): Promise<void> {
     throw new Error('Method not implemented.');
   }
 }

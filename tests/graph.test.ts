@@ -81,7 +81,7 @@ describe('bitset operations', () => {
     graph.addEdge('d', 'c', 1);
     graph.addEdge('e', 'c', 1);
     graph.seal();
-    expect(graph.topologicallSortedVertices).toEqual(['a', 'b', 'g', 'h', 'e', 'f', 'd', 'c']);
+    expect(graph.topologicallySortedVertices).toEqual(['a', 'b', 'g', 'h', 'e', 'f', 'd', 'c']);
   });
 
   test('subgraph', () => {
@@ -90,7 +90,7 @@ describe('bitset operations', () => {
     graph.addEdge('c', 'a', 1);
     const subgraph = graph.induceSubgraph(['a', 'b']);
     subgraph.seal();
-    expect(subgraph.topologicallSortedVertices).toEqual(['a', 'b']);
+    expect(subgraph.topologicallySortedVertices).toEqual(['a', 'b']);
   });
 
   test('ignore self loops', () => {

@@ -1,5 +1,8 @@
+### 0.8.4
+- Fixed `System.initialize` to not invalidate entities immediately upon creation.
+
 ### 0.8.3
-- Make `enum`s non-`const` so they don't break in builds with isolated modules.
+- Made `enum`s non-`const` so they don't break in builds with isolated modules.
 
 ### 0.8.2
 - Added `Entity.hold` and `Entity.isSame` methods.

@@ -24,7 +24,7 @@ export class Graph<V extends Printable> {
     this.edges = new Array(this.numVertices ** 2).fill(0);
   }
 
-  get topologicallSortedVertices(): V[] {
+  get topologicallySortedVertices(): V[] {
     DEBUG: if (!this.sealed) throw new Error('Graph not yet sealed');
     if (!this.sortedVertices) this.sortedVertices = this.sortTopologically();
     return this.sortedVertices;
