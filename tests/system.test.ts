@@ -1,4 +1,4 @@
-import {System, World} from '../src';
+import {Entity, System, World} from '../src';
 
 let message: string;
 
@@ -17,7 +17,6 @@ class SystemB extends System {
   }
 }
 
-
 describe('attaching systems', () => {
 
   test('attach a system', async() => {
@@ -26,4 +25,18 @@ describe('attaching systems', () => {
     expect(message).toBe('hello');
   });
 
+  test('creating and holding an entity during initialize', async() => {
+    class TestComponent {}
+
+    let output: Entity;
+    await World.create({
+      defs: [TestComponent, class extends System {
+        initialize() {
+          output = this.createEntity(TestComponent).hold();
+        }
+      }]
+    });
+
+    expect(output!.has(TestComponent)).toBe(true);
+  });
 });

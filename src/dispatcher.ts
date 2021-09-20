@@ -237,7 +237,12 @@ export class Dispatcher {
   }
 
   async initialize(): Promise<void> {
+    this.default.frame.begin();
     await Promise.all(this.systems.map(system => system.initialize()));
+    this.flush();
+    this.default.frame.end();
+    // This is not a frame
+    STATS: this.stats.frames -= 1;
   }
 
   async execute(time?: number, delta?: number): Promise<void> {
