@@ -19,7 +19,7 @@ export class ArrayEntityList implements EntityList {
   }
 
   clear(): void {
-    if (this.entities.length) this.entities.splice(0, Infinity);
+    if (this.entities.length) this.entities.length = 0;
   }
 }
 

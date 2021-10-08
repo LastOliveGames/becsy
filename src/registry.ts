@@ -37,7 +37,7 @@ export class EntityPool {
 
   returnTemporaryBorrows(): void {
     for (const id of this.temporarilyBorrowedIds) this.return(id);
-    this.temporarilyBorrowedIds.splice(0, Infinity);
+    this.temporarilyBorrowedIds.length = 0;
   }
 
   return(id: number): void {
