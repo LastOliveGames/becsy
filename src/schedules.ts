@@ -342,19 +342,34 @@ class SimplePlan extends Plan {
     return Promise.resolve();
   }
 
-  // TODO: run system initializations concurrently, within scheduling constraints
   async initialize(): Promise<void> {
     const dispatcher = this.planner.dispatcher;
     const registry = dispatcher.registry;
-    const systems = this.systems;
     this.group.__executed = true;
-    for (let i = 0; i < systems.length; i++) {
-      const system = systems[i];
-      registry.executingSystem = system;
-      await system.initialize();
-      dispatcher.flush();
-    }
-    registry.executingSystem = undefined;
+    return new Promise((resolve, reject) => {
+      let rejected = false;
+
+      const initSystem = async(system: SystemBox) => {
+        try {
+          await system.prepare();
+          if (rejected) return;
+          registry.executingSystem = system;
+          system.initialize();
+          dispatcher.flush();
+          registry.executingSystem = undefined;
+          const systems = this.graph.traverse(system);
+          if (!systems) return resolve();
+          for (let i = 0; i < systems.length; i++) initSystem(systems[i]);
+        } catch (e) {
+          rejected = true;
+          reject(e);
+        }
+      };
+
+      const systems = this.graph.traverse();
+      if (!systems) return resolve();
+      for (let i = 0; i < systems.length; i++) initSystem(systems[i]);
+    });
   }
 
 }

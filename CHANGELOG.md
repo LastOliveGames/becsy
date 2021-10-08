@@ -1,3 +1,7 @@
+### 0.9.0
+- Made `System.initialize` non-async, and added a new `System.prepare` method that is async and gets called first, but isn't allowed to touch entities.  This split was necessary because JS doesn't have a way to carry a context across async calls — Node has `async_hooks` but there's no browser equivalent.
+- `System.prepare` methods are run concurrently in accordance with the systems' schedules.  This can help improve performance on load.
+
 ### 0.8.4
 - Fixed `System.initialize` to not invalidate entities immediately upon creation.
 

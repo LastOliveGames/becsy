@@ -98,5 +98,24 @@ describe('bitset operations', () => {
     expect(graph.hasEdge('a', 'a')).toBe(false);
   });
 
+  test('traverse', () => {
+    graph.addEdge('a', 'b', 1);
+    graph.addEdge('b', 'c', 1);
+    graph.addEdge('b', 'd', 1);
+    graph.addEdge('c', 'e', 1);
+    graph.addEdge('d', 'e', 1);
+    graph.addEdge('f', 'g', 1);
+    graph.seal();
+    expect(graph.traverse()).toEqual(['a', 'f', 'h']);
+    expect(graph.traverse('f')).toEqual(['g']);
+    expect(graph.traverse('g')).toEqual([]);
+    expect(graph.traverse('a')).toEqual(['b']);
+    expect(graph.traverse('b')).toEqual(['c', 'd']);
+    expect(graph.traverse('c')).toEqual([]);
+    expect(graph.traverse('d')).toEqual(['e']);
+    expect(graph.traverse('e')).toEqual([]);
+    expect(graph.traverse('h')).toBe(undefined);
+  });
+
 });
 

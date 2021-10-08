@@ -2,6 +2,7 @@ interface Printable {
   toString(): string;
 }
 
+
 /**
  * A directed graph with weighted edges and a few extra constraints:
  * 1. Loop edges on a single vertex are not allowed, nor are multiple edges from A to B.
@@ -15,6 +16,10 @@ export class Graph<V extends Printable> {
   private readonly vertexIndexMap = new Map<V, number>();
   private sealed = false;
   private sortedVertices: V[];
+  private readonly dependencyCounts: number[];
+  private readonly traversalCounts: number[];
+  private readonly traversedVertices: V[] = [];
+  private numTraversedVertices: number;
 
   constructor(private readonly vertices: V[]) {
     this.numVertices = vertices.length;
@@ -22,6 +27,8 @@ export class Graph<V extends Printable> {
       this.vertexIndexMap.set(vertices[i], i);
     }
     this.edges = new Array(this.numVertices ** 2).fill(0);
+    this.dependencyCounts = new Array(this.numVertices);
+    this.traversalCounts = new Array(this.numVertices);
   }
 
   get topologicallySortedVertices(): V[] {
@@ -86,6 +93,7 @@ export class Graph<V extends Printable> {
     this.sealed = true;
     CHECK: this.checkForCycles();
     this.simplify();
+    this.countDependencies();
   }
 
   private checkForCycles(): void {
@@ -272,6 +280,52 @@ export class Graph<V extends Printable> {
         }
       }
     }
+  }
+
+  private countDependencies(): void {
+    for (let i = 0; i < this.numVertices; i++) {
+      let count = 0;
+      for (let j = 0; j < this.numVertices; j++) {
+        if (this.edges[j * this.numVertices + i]) count += 1;
+      }
+      this.dependencyCounts[i] = count;
+    }
+  }
+
+  /**
+   * Traverses vertices of the graph based on dependency order.  When called without an argument it
+   * initialized (or re-initialized) the traversal and returns vertices with no dependencies.  When
+   * called with an argument, it marks that vertex as done and returns the vertices whose
+   * dependencies are all satisfied (if any).
+   * @param completedVertex The vertex to mark done; if missing, initializes the traversal instead.
+   * @returns The list of vertices whose dependencies have all been satisfied, or `undefined` if
+   *    this was the last vertex and the traversal is done.
+   */
+  traverse(completedVertex?: V): V[] | void {
+    DEBUG: if (!this.sealed) throw new Error('Graph not yet sealed');
+    this.traversedVertices.length = 0;
+    if (completedVertex) {
+      this.numTraversedVertices += 1;
+      const sourceId = this.vertexIndexMap.get(completedVertex);
+      DEBUG: if (sourceId === undefined) throw new Error(`Unknown vertex: ${completedVertex}`);
+      for (let i = 0; i < this.numVertices; i++) {
+        if (this.edges[sourceId * this.numVertices + i]) {
+          if (--this.traversalCounts[i] === 0) {
+            this.traversedVertices.push(this.vertices[i]);
+          }
+        }
+      }
+    } else {
+      this.numTraversedVertices = 0;
+      for (let i = 0; i < this.numVertices; i++) {
+        const count = this.traversalCounts[i] = this.dependencyCounts[i];
+        if (count === 0) {
+          this.traversedVertices.push(this.vertices[i]);
+        }
+      }
+    }
+    if (this.numTraversedVertices === this.numVertices) return;
+    return this.traversedVertices;
   }
 
 }

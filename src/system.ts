@@ -156,11 +156,19 @@ export abstract class System {
   }
 
   /**
-   * Initializes the system; to be implemented in a subclass and invoked automatically precisely
-   * once when the world is created.  If the method returns a promise world creation will block
-   * until it's resolved.
+   * Prepares any data or other structures needed by the system; to be implemented in a subclass and
+   * invoked automatically precisely once when the world is created.  This method is not allowed to
+   * create entities or access components.  Instead, it should set any needed data on the system's
+   * properties to be used in `initialize`, which will be called afterwards.
    */
-  initialize(): void | Promise<void> { } // eslint-disable-line @typescript-eslint/no-empty-function
+  async prepare(): Promise<void> { }  // eslint-disable-line @typescript-eslint/no-empty-function
+
+  /**
+   * Initializes the system; to be implemented in a subclass and invoked automatically precisely
+   * once when the world is created and after the system has been prepared.  This method is allowed
+   * to access the components as declared in the system's queries.
+   */
+  initialize(): void { } // eslint-disable-line @typescript-eslint/no-empty-function
 
   /**
    * Executes the system's function; to be implemented in a subclass and invoked automatically at
@@ -223,8 +231,12 @@ export class SystemBox {
     }
   }
 
-  async initialize(): Promise<void> {
-    await Promise.resolve(this.system.initialize());
+  prepare(): Promise<void> {
+    return this.system.prepare();
+  }
+
+  initialize(): void {
+    this.system.initialize();
   }
 
   execute(time: number, delta: number): void {
