@@ -321,7 +321,9 @@ class SimplePlan extends Plan {
   constructor(protected readonly planner: Planner, protected readonly group: SystemGroup) {
     super(planner, group);
     this.systems = this.graph.topologicallySortedVertices;
-    CHECK: if (typeof process === 'undefined' || process.env.NODE_ENV === 'development') {
+    CHECK: if (this.systems.length > 1 && (
+      typeof process === 'undefined' || process.env.NODE_ENV === 'development'
+    )) {
       console.log('System execution order:');
       for (const system of this.systems) console.log(' ', system.name);
     }
