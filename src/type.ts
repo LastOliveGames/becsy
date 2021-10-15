@@ -534,6 +534,8 @@ class BackrefsType extends Type<Entity[]> {
   // arrays for direct access performs significantly better than looking them up in the indexer's
   // Map each time.
   defineElastic<C>(binding: Binding<C>, field: Field<Entity[]>): void {
+    field.updateBuffer = () => { /* no-op */ }
+    
     const refField = this.fieldName ?
       this.type?.__binding!.fields.find(aField => aField.name === this.fieldName) : undefined;
     CHECK: {
