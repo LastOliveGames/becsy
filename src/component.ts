@@ -174,7 +174,7 @@ class PackedStorage implements Storage {
     } else {
       this.spares[2] = capacity;
     }
-    if (this.binding.elastic) for (const field of this.fields) field.updateBuffer!();
+    if (this.binding.elastic) for (const field of this.fields) field.updateBuffer?.();
   }
 
   private growSpares(): void {
