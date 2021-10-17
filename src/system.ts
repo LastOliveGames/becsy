@@ -190,6 +190,7 @@ export class SystemBox {
   private shapeLogPointer: LogPointer;
   private writeLogPointer?: LogPointer;
   private state: RunState = RunState.RUNNING;
+  private propsAssigned = false;
 
   get id(): number {return this.system.id;}
   get name(): string {return this.system.name;}
@@ -198,6 +199,14 @@ export class SystemBox {
   constructor(private readonly system: System, readonly dispatcher: Dispatcher) {
     system.__dispatcher = dispatcher;
     this.shapeLogPointer = dispatcher.shapeLog.createPointer();
+  }
+
+  assignProps(props: Record<string, unknown>): void {
+    if (this.propsAssigned) {
+      throw new Error(`System ${this.name} has multiple props assigned in world defs`);
+    }
+    Object.assign(this.system, props);
+    this.propsAssigned = true;
   }
 
   buildQueries(): void {

@@ -1,3 +1,6 @@
+### Upcoming
+- Allow duplicate component and system types in world defs.  They'll be deduplicated automatically, though only one copy of a system type is allowed to have initial props specified.
+
 ### 0.9.1
 - Fix crash when using backref fields in components with an elastic storage type.
 

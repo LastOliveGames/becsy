@@ -155,20 +155,20 @@ export class Dispatcher {
     const systemClasses = [];
     for (let i = 0; i < systemTypes.length; i++) {
       const SystemClass = systemTypes[i] as SystemType<System>;
-      CHECK: if (this.systemsByClass.has(SystemClass)) {
-        throw new Error(`System ${SystemClass.name} included multiple times in world defs`);
+      let box = this.systemsByClass.get(SystemClass);
+      if (!box) {
+        systemClasses.push(SystemClass);
+        const system = new SystemClass();
+        system.id = i + 1;  // 0 is reserved for the callback system
+        box = new SystemBox(system, this);
+        systems.push(box);
+        this.systemsByClass.set(SystemClass, box);
       }
-      systemClasses.push(SystemClass);
-      const system = new SystemClass();
-      system.id = i + 1;  // 0 is reserved for the callback system
       const props = systemTypes[i + 1];
       if (props && typeof props !== 'function') {
-        Object.assign(system, props);
+        box.assignProps(props);
         i++;
       }
-      const box = new SystemBox(system, this);
-      systems.push(box);
-      this.systemsByClass.set(SystemClass, box);
     }
     this.default = this.createSingleGroupFrame(systemClasses);
     return systems;
@@ -199,6 +199,7 @@ export class Dispatcher {
     systemGroups: SystemGroupImpl[]
   } {
     const componentTypes: ComponentType<any>[] = [];
+    const componentTypesSet = new Set<ComponentType<any>>();
     const systemTypes: (SystemType<System> | Record<string, unknown>)[] = [];
     const systemGroups: SystemGroupImpl[] = [];
     let lastDefWasSystem = false;
@@ -217,8 +218,9 @@ export class Dispatcher {
         lastDefWasSystem = !!(def as any).__system;
         if (lastDefWasSystem) {
           systemTypes.push(def as SystemType<any>);
-        } else {
+        } else if (!componentTypesSet.has(def)) {
           componentTypes.push(def);
+          componentTypesSet.add(def);
         }
       } else {
         CHECK: if (!lastDefWasSystem) throw new Error('Unexpected value in world defs: ' + def);
