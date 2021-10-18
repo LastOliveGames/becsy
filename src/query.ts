@@ -368,6 +368,8 @@ export class Query {
   __results: Partial<Record<QueryFlavorName, EntityList>> & {current?: PackedArrayEntityList};
   __systemName: string;
 
+  // TODO: add an API for freezing/thawing a query
+
   /**
    * A list of all entities that match this query as of the beginning of the system's current (or
    * last) execution.

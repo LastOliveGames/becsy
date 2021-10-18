@@ -35,7 +35,14 @@ class Placeholder {
 export abstract class System {
   static readonly __system = true;
 
-  // TODO: document
+  /**
+   * Creates a group of systems that applies scheduling constraints to all its members, and can also
+   * be used to define custom frames. The group needs to be included in the world's defs, which will
+   * also automatically include all its member systems.
+   * @param systemTypes The system types to include in the group.  A system can be a member of more
+   *   than one group.
+   * @returns The group of given systems.
+   */
   static group(...systemTypes: GroupContentsArray): SystemGroup {
     return new SystemGroupImpl(systemTypes);
   }
@@ -67,6 +74,10 @@ export abstract class System {
    * This system's name, as used in error messages and stats reports.
    */
   get name(): string {return this.constructor.name;}
+
+  // TODO: add an API for making immediate queries
+  // TODO: make it easy to define and access singleton components
+  // TODO: add support for coroutines
 
   /**
    * Creates a persistent query for this system.  Can only be called from the constructor, typically
