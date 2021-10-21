@@ -4,6 +4,7 @@
   "version": "0.9.1",
   "scripts": {
     "test": "jest --config jestconfig.json --detectOpenHandles",
+    "type-tests": "tsd",
     "test:watch": "jest --watch --config jestconfig.json --detectOpenHandles",
     "perf": "rollup --config rollup.benchmarks.config.mjs && cp index.* perf.* lib && tsc && env NODE_ENV=test node --expose-gc --enable-source-maps --es-module-specifier-resolution=node lib/benchmarks/index.js",
     "deopt": "rm *.log && node --trace-ic --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js && mv *.log v8.pre.log && node striplog.cjs && deoptigate",
@@ -22,6 +23,13 @@
   "module": "index.js",
   "engines": {
     "node": ">=12"
+  },
+  "tsd": {
+    "directory": "test-d",
+    "compilerOptions": {
+      "target": "esnext",
+      "lib": ["esnext", "dom"]
+    }
   },
   "repository": "git@github.com:lastolivegames/becsy.git",
   "author": "Piotr Kaminski <piotr@lastolive.games>",
@@ -42,6 +50,7 @@
     "rollup-plugin-terser": "^7.0.2",
     "ts-jest": "^27.0.5",
     "tsc-watch": "^4.2.9",
+    "tsd": "^0.17.0",
     "typescript": "^4.2.3"
   }
 }
