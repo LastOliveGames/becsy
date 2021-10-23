@@ -1,9 +1,10 @@
 module.exports = {
   env: {
-    es2020: true, node: true
+    es2021: true, 'shared-node-browser': true
   },
   parserOptions: {
-    sourceType: 'module'
+    sourceType: 'module',
+    ecmaVersion: 'latest'
   },
   extends: [
     'eslint:recommended', 'plugin:import/recommended'

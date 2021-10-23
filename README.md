@@ -4,6 +4,8 @@ Becsy is a (soon to be) multi-threaded Entity Component System (ECS) for TypeScr
 
 ECS is an architectural pattern where computation is defined as a list of systems operating on a set of entities, each of which consists of a dynamic set of pure data components.  Systems select the entities to process via means of persistent, efficient queries over the entities' component "shapes".
 
+Jump right in to see some heavily annotated [examples](./examples)!
+
 ## Project priorities
 
 Becsy positions itself within the wider ecosystem of ECS frameworks with the following set of priorities:

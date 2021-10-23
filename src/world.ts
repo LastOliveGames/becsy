@@ -71,8 +71,7 @@ export class World {
   /**
    * Executes all the systems defined during the world's creation.  The systems will be executed as
    * ordered by their constraints, *not* in the order they were defined.  See
-   * {@link System.schedule} for details.  If your world is single-threaded then execution is
-   * synchronous and you can ignore the returned promise.
+   * {@link System.schedule} for details.
    *
    * @param time The time of this frame's execution.  This will be set on every system's `time`
    * property and defaults to the time when `execute` was called.  It's not used internally so you
