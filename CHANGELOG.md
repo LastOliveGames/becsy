@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.9.2
 - Allowed duplicate component and system types in world defs.  They'll be deduplicated automatically, though only one copy of a system type is allowed to have initial props specified.
 - Added recording of some basic stats about systems in `World.stats`.
 - Added a scheduling definition function argument to the `@system` decorator.  This is equivalent to but requires less boilerplate than invoking `this.schedule` in the system itself.
