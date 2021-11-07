@@ -1,5 +1,7 @@
 ### Upcoming
-- Hang field types directly off the `field` decorator, so you can just do `@field.int32` instead of `@field(Type.int32)`.  Less imports, less typing, more readable -- a win all around!  You still need to use the long form if you want to specify any field options, though.
+- Put field types directly off the `field` decorator, so you can just do `@field.int32` instead of `@field(Type.int32)`.  Less imports, less typing, more readable -- a win all around!  You still need to use the long form if you want to specify any field options, though.
+- Added support for coroutines in systems.  See `System.start` for some docs.
+- Fixed worlds with no component types were unable to create (empty) entities.
 
 ### 0.9.2
 - Allowed duplicate component and system types in world defs.  They'll be deduplicated automatically, though only one copy of a system type is allowed to have initial props specified.

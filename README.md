@@ -32,13 +32,13 @@ From bitecs we take:
 Then we add:
 - [x] native TypeScript implementation, for a type-friendly design and the best typings
 - [x] selectable component storage strategies, to adjust the performance/memory trade-off
-- [x] weak references to native JS objects, for better integration with other frameworks
 - [x] entity references that can be traversed in either direction, with strong referential integrity
 - [x] declarative system ordering based on data dependencies
+- [x] coroutines for more natural multi-stage workflows
+- [x] weak references to native JS objects, for better integration with other frameworks
 
 Still to come:
 - [ ] examples and docs
 - [ ] multithreaded system execution
-- [ ] coroutines for more natural multi-stage workflows
 - [ ] built-in support for representing state machines (per [Sander Mertens](https://ajmmertens.medium.com/why-storing-state-machines-in-ecs-is-a-bad-idea-742de7a18e59))
 - [ ] an optional but nicely integrated networked data replication system

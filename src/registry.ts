@@ -78,6 +78,7 @@ export class Registry {
     maxEntities: number, maxLimboComponents: number, readonly types: ComponentType<any>[],
     readonly dispatcher: Dispatcher
   ) {
+    this.types.unshift(this.Alive);
     const ShapeArrayClass = dispatcher.threaded ? AtomicSharedShapeArray : UnsharedShapeArray;
     this.shapes = new ShapeArrayClass(
       'registry.shapes', types.length, maxEntities, dispatcher.buffers);
@@ -97,7 +98,6 @@ export class Registry {
   }
 
   initializeComponentTypes(): void {
-    this.types.unshift(this.Alive);
     let componentId = 0;
     // Two-phase init, so components can have dependencies on each other's fields.
     for (const type of this.types) assimilateComponentType(componentId++, type, this.dispatcher);

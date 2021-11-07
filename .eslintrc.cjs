@@ -1,3 +1,4 @@
+/* eslint-env node */
 module.exports = {
   env: {
     es2021: true, 'shared-node-browser': true
@@ -68,7 +69,7 @@ module.exports = {
     'eol-last': 'warn',
     'eqeqeq': 'error',
     'func-call-spacing': 'warn',
-    'generator-star-spacing': 'warn',
+    'generator-star-spacing': ['warn', {named: 'before', anonymous: 'neither', method: 'before'}],
     'getter-return': ['error', {allowImplicit: true}],
     'import/no-cycle': 'error',
     'indent': ['warn', 2, {
@@ -167,7 +168,8 @@ module.exports = {
     'semi-spacing': 'warn',
     'semi-style': 'warn',
     'space-before-blocks': 'warn',
-    'space-before-function-paren': ['warn', 'never'],
+    'space-before-function-paren':
+      ['warn', {named: 'never', anonymous: 'never', asyncArrow: 'always'}],
     'space-in-parens': 'warn',
     'space-infix-ops': 'warn',
     'space-unary-ops': ['warn', {words: true, nonwords: false}],

@@ -21,6 +21,15 @@ export class EntityImpl {
   constructor(private readonly __registry: Registry) {}
 
   /**
+   * Returns whether the entity is alive, i.e. has not been deleted.  Turning on
+   * `accessRecentlyDeletedData` doesn't affect the return value.
+   */
+  get alive(): boolean {
+    CHECK: this.__checkValid();
+    return this.__registry.hasShape(this.__id, this.__registry.Alive, false);
+  }
+
+  /**
    * Adds a component to the entity.  If the entity already possesses a component of this type the
    * call will fail.
    * @param type The type of component to add.

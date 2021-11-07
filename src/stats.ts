@@ -33,6 +33,8 @@ export class SystemStats {
   averageQueryUpdateDuration = 0;
   private _lastExecutionDuration = 0;
   averageExecutionDuration = 0;
+  private _lastCoroutinesDuration = 0;
+  averageCoroutinesDuration = 0;
 
   get lastQueryUpdateDuration(): number {
     return this._lastQueryUpdateDuration;
@@ -50,6 +52,15 @@ export class SystemStats {
   set lastExecutionDuration(value: number) {
     this._lastExecutionDuration = value;
     this.averageExecutionDuration = computeMovingAverage(this.averageExecutionDuration, value);
+  }
+
+  get lastCoroutinesDuration(): number {
+    return this._lastCoroutinesDuration;
+  }
+
+  set lastCoroutinesDuration(value: number) {
+    this._lastCoroutinesDuration = value;
+    this.averageCoroutinesDuration = computeMovingAverage(this.averageCoroutinesDuration, value);
   }
 }
 

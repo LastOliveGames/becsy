@@ -10,6 +10,8 @@ import {
 } from './schedule';
 import type {Lane} from './planner';
 import type {SystemStats} from './stats';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import {co, Coroutine, CoroutineGenerator, Supervisor} from './coroutines';
 
 
 export interface SystemType<S extends System> {
@@ -58,6 +60,7 @@ export abstract class System {
   __queryBuilders: QueryBuilder[] | null = [];
   __scheduleBuilder: ScheduleBuilder | undefined | null;
   __placeholders: Placeholder[] | null = [];
+  __supervisor = new Supervisor(this);
   __dispatcher: Dispatcher;
 
   /**
@@ -178,6 +181,26 @@ export abstract class System {
   }
 
   /**
+   * Starts running a coroutine.  The coroutine will execute after each time this system does and
+   * run until its next `yield` expression.  You can start coroutines anytime: from within
+   * `initialize` or `execute`, from within a coroutine, or even from an event handler between
+   * frames.  Coroutines started from within `execute` will begin running in the same frame.
+   *
+   * If you're using the {@link co} decorator you don't need call this method manually, it'll be
+   * handled for you.
+   *
+   * Inside the coroutine, you can call methods on {@link co} to control the execution of the
+   * coroutine.  You can `yield` on the result of the various `co.wait` methods, and also `yield`
+   * directly on the result of starting another coroutine to wait for its returned value.
+   * @param generator The generator returned by a coroutine method.
+   * @returns A coroutine handle that you can use to control it.
+   */
+  start(generator: CoroutineGenerator): Coroutine {
+    // TODO: disable coroutines if system is stateless
+    return this.__supervisor.start(generator);
+  }
+
+  /**
    * Prepares any data or other structures needed by the system; to be implemented in a subclass and
    * invoked automatically precisely once when the world is created.  This method is not allowed to
    * create entities or access components.  Instead, it should set any needed data on the system's
@@ -287,15 +310,18 @@ export class SystemBox {
     if (this.state !== RunState.RUNNING) return;
     this.system.time = time;
     this.system.delta = delta;
-    let time1, time2, time3;
+    let time1, time2, time3, time4;
     STATS: time1 = now();
     this.runQueries();
     STATS: time2 = now();
     this.system.execute();
     STATS: time3 = now();
+    this.system.__supervisor.execute();
+    STATS: time4 = now();
     STATS: {
       this.stats.lastQueryUpdateDuration = time2 - time1;
       this.stats.lastExecutionDuration = time3 - time2;
+      this.stats.lastCoroutinesDuration = time4 - time3;
     }
   }
 
