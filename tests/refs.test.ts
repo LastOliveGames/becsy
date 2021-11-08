@@ -1,37 +1,35 @@
-import {
-  component, ComponentType, Entity, field, Query, System, SystemType, Type, World
-} from '../src';
+import {component, ComponentType, Entity, field, Query, System, SystemType, World} from '../src';
 
 
 @component class Origin {
-  @field(Type.uint8) declare value: number;
-  @field(Type.ref) declare target?: Entity;
+  @field.uint8 declare value: number;
+  @field.ref declare target?: Entity;
 }
 
 @component class MultiOrigin {
-  @field(Type.uint8) declare value: number;
-  @field(Type.ref) declare target1?: Entity;
-  @field(Type.ref) declare target2?: Entity;
+  @field.uint8 declare value: number;
+  @field.ref declare target1?: Entity;
+  @field.ref declare target2?: Entity;
 }
 
 @component class PreciseDest {
-  @field(Type.uint8) declare value: number;
-  @field(Type.backrefs(MultiOrigin, 'target1')) declare targeters: Entity[];
+  @field.uint8 declare value: number;
+  @field.backrefs(MultiOrigin, 'target1') declare targeters: Entity[];
 }
 
 @component class TypeDest {
-  @field(Type.uint8) declare value: number;
-  @field(Type.backrefs(MultiOrigin)) declare targeters: Entity[];
+  @field.uint8 declare value: number;
+  @field.backrefs(MultiOrigin) declare targeters: Entity[];
 }
 
 @component class GlobalDest {
-  @field(Type.uint8) declare value: number;
-  @field(Type.backrefs) declare targeters: Entity[];
+  @field.uint8 declare value: number;
+  @field.backrefs declare targeters: Entity[];
 }
 
 @component class GlobalDestWithStales {
-  @field(Type.uint8) declare value: number;
-  @field(Type.backrefs(undefined, undefined, true)) declare targeters: Entity[];
+  @field.uint8 declare value: number;
+  @field.backrefs(undefined, undefined, true) declare targeters: Entity[];
 }
 
 const componentTypes =

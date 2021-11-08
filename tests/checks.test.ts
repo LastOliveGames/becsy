@@ -1,7 +1,7 @@
-import {field, component, System, Type, World} from '../src';
+import {field, component, System, World} from '../src';
 
 @component class A {
-  @field(Type.int32) declare value: number;
+  @field.int32 declare value: number;
 }
 
 class SystemA extends System {

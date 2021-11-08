@@ -721,6 +721,7 @@ class WeakObjectType extends Type<any> {
   }
 }
 
+// The fields below are replicated in the @field decorator, keep them in sync.
 Type.boolean = new BooleanType();
 Type.uint8 = new NumberType(Uint8Array);
 Type.int8 = new NumberType(Int8Array);

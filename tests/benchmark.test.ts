@@ -4,23 +4,23 @@ import {System} from '../src/system';
 import {World} from '../src/world';
 
 class A {
-  @field(Type.int32) declare value: number;
+  @field.int32 declare value: number;
 }
 
 class B {
-  @field(Type.int32) declare value: number;
+  @field.int32 declare value: number;
 }
 
 class C {
-  @field(Type.int32) declare value: number;
+  @field.int32 declare value: number;
 }
 
 class D {
-  @field(Type.int32) declare value: number;
+  @field.int32 declare value: number;
 }
 
 class E {
-  @field(Type.int32) declare value: number;
+  @field.int32 declare value: number;
 }
 
 const COMPS = Array.from(
@@ -34,7 +34,7 @@ const COMPS = Array.from(
 );
 
 class Data {
-  @field(Type.int32) declare value: number;
+  @field.int32 declare value: number;
 }
 
 

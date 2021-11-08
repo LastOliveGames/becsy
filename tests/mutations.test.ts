@@ -1,12 +1,12 @@
-import {component, field, System, SystemType, Type, World} from '../src';
+import {component, field, System, SystemType, World} from '../src';
 
 
 @component class A {
-  @field(Type.uint8) declare value: number;
+  @field.uint8 declare value: number;
 }
 
 @component class B {
-  @field(Type.uint8) declare value: number;
+  @field.uint8 declare value: number;
 }
 
 

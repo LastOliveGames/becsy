@@ -1,8 +1,8 @@
-import {field, component, Type, World, Entity} from '../src';
+import {field, component, World, Entity} from '../src';
 
 @component({storage: 'packed', initialCapacity: 2})
 class A {
-  @field(Type.int32) declare value: number;
+  @field.int32 declare value: number;
 }
 
 describe('using packed component storage', () => {

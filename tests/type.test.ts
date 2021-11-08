@@ -1,24 +1,24 @@
-import {field, component, Type, World, Entity} from '../src';
+import {field, component, World, Entity} from '../src';
 
 class Stuff {
   value: number;
 }
 
 @component class Big {
-  @field(Type.boolean) boolean: boolean;
-  @field(Type.uint8) uint8: number;
-  @field(Type.int8) int8: number;
-  @field(Type.uint16) uint16: number;
-  @field(Type.int16) int16: number;
-  @field(Type.uint32) uint32: number;
-  @field(Type.int32) int32: number;
-  @field(Type.float32) float32: number;
-  @field(Type.float64) float64: number;
-  @field(Type.staticString(['foo', 'bar', 'baz'])) staticString: string;
-  @field(Type.dynamicString(14)) dynamicString: string;
-  @field(Type.ref) ref?: Entity;
-  @field(Type.object) object: Stuff;
-  @field(Type.weakObject) weakObject: Stuff;
+  @field.boolean boolean: boolean;
+  @field.uint8 uint8: number;
+  @field.int8 int8: number;
+  @field.uint16 uint16: number;
+  @field.int16 int16: number;
+  @field.uint32 uint32: number;
+  @field.int32 int32: number;
+  @field.float32 float32: number;
+  @field.float64 float64: number;
+  @field.staticString(['foo', 'bar', 'baz']) staticString: string;
+  @field.dynamicString(14) dynamicString: string;
+  @field.ref ref?: Entity;
+  @field.object object: Stuff;
+  @field.weakObject weakObject: Stuff;
 }
 
 async function testReadWrite(prop: string, values: any[]): Promise<void> {

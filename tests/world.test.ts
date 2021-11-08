@@ -1,7 +1,7 @@
-import {field, System, Type, World} from '../src';
+import {field, System, World} from '../src';
 
 class A {
-  @field(Type.int32) declare value: number;
+  @field.int32 declare value: number;
 }
 
 class SysA extends System {
