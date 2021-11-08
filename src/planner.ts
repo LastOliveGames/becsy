@@ -155,7 +155,7 @@ export class Planner {
     this.addComponentReaderWriterDependencies();
     this.graph.seal();
     if (this.dispatcher.threaded) this.assignSystemsToLanes();
-    for (const system of this.systems) system.stats.worker = system.lane?.id ?? 0;
+    STATS: for (const system of this.systems) system.stats.worker = system.lane?.id ?? 0;
     delete this.readers;
     delete this.writers;
     for (const group of this.groups) {

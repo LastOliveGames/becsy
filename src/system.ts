@@ -248,7 +248,7 @@ export class SystemBox {
   constructor(private readonly system: System, readonly dispatcher: Dispatcher) {
     system.__dispatcher = dispatcher;
     this.shapeLogPointer = dispatcher.shapeLog.createPointer();
-    this.stats = dispatcher.stats.forSystem(system.constructor as SystemType<any>);
+    STATS: this.stats = dispatcher.stats.forSystem(system.constructor as SystemType<any>);
   }
 
   assignProps(props: Record<string, unknown>): void {
