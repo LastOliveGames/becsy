@@ -1,4 +1,4 @@
-import {component, field, system, System, Type, World} from '@lastolivegames/becsy';
+import {component, field, system, System, World} from '@lastolivegames/becsy';
 
 // Component types are declared as classes and don't need to inherit from anything in particular.
 // We use the `@component` decorator to automatically register the component type with the world
@@ -8,8 +8,8 @@ import {component, field, system, System, Type, World} from '@lastolivegames/bec
   // data between workers (threads) rather than using objects to represent components.  To keep
   // TypeScript happy, we also use `declare` to expose the high level JavaScript type of each
   // property, whose implementation will be provided by Becsy.
-  @field(Type.float64) declare x: number;
-  @field(Type.float64) declare y: number;
+  @field.float64 declare x: number;
+  @field.float64 declare y: number;
 }
 
 @component class Velocity {
@@ -17,14 +17,14 @@ import {component, field, system, System, Type, World} from '@lastolivegames/bec
   // separate component type.  Since an entity can have at most one instance of any given component
   // type this will allow an entity to have both a Velocity and a Position.  We could reuse property
   // names but prefer not to, as it will make code clearer later on.
-  @field(Type.float64) declare vx: number;
-  @field(Type.float64) declare vy: number;
+  @field.float64 declare vx: number;
+  @field.float64 declare vy: number;
 }
 
 @component class DOMRenderable {
   // We'll need a reference to the DOM node we set up in the HTML file in order to manipulate it
   // later on.
-  @field(Type.object) declare node: HTMLElement;
+  @field.object declare node: HTMLElement;
 }
 
 // Systems are declared as classes that extend `System`.  We use the `@system` decorator to
