@@ -184,7 +184,8 @@ export abstract class System {
    * Starts running a coroutine.  The coroutine will execute after each time this system does and
    * run until its next `yield` expression.  You can start coroutines anytime: from within
    * `initialize` or `execute`, from within a coroutine, or even from an event handler between
-   * frames.  Coroutines started from within `execute` will begin running in the same frame.
+   * frames.  Coroutines started from within `execute` will begin running in the same frame.  The
+   * execution order of coroutines within a system is unspecified and you should not depend on it.
    *
    * If you're using the {@link co} decorator you don't need call this method manually, it'll be
    * handled for you.
@@ -192,6 +193,7 @@ export abstract class System {
    * Inside the coroutine, you can call methods on {@link co} to control the execution of the
    * coroutine.  You can `yield` on the result of the various `co.wait` methods, and also `yield`
    * directly on the result of starting another coroutine to wait for its returned value.
+   *
    * @param generator The generator returned by a coroutine method.
    * @returns A coroutine handle that you can use to control it.
    */

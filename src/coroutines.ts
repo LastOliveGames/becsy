@@ -349,10 +349,12 @@ export class Supervisor {
     while (processedLength < this.coroutines.length) {
       const endIndex = processedLength;
       processedLength = this.coroutines.length;
-      for (let i = this.coroutines.length - 1; i >= endIndex; i--) {
+      for (let i = processedLength - 1; i >= endIndex; i--) {
+        this.system.accessRecentlyDeletedData(false);
         this.coroutines[i].__checkCancelation();
       }
-      for (let i = this.coroutines.length - 1; i >= endIndex; i--) {
+      for (let i = processedLength - 1; i >= endIndex; i--) {
+        this.system.accessRecentlyDeletedData(false);
         const coroutine = this.coroutines[i];
         coroutine.__step();
         if (coroutine.isReady()) {
