@@ -1,4 +1,5 @@
 ### Upcoming
+- Implemented `compact` storage strategy.  This is very parsimonious in memory usage but also very slow as the number of allocated components grows so you shoud only consider using it if you have just a handful of components of a given type.
 - Changed the signature of `System.start`.  `@co` usage is unaffected.
 - Added `cancelIfCoroutineStarted` to implement mutually exclusive coroutines.
 - Made sure to reset `accessRecentlyDeletedData` between coroutines.

@@ -136,6 +136,9 @@ class PackedStorage implements Storage {
               `Storage exhausted for component ${this.binding.type.name}; ` +
               `raise its capacity above ${this.binding.capacity}`);
           }
+          DEBUG: if (this.binding.capacity === this.maxEntities) {
+            throw new Error('Trying to grow storage index beyond maxEntities');
+          }
           this.binding.capacity = Math.min(this.maxEntities, this.binding.capacity * 2);
           this.growCapacity();
         }
@@ -195,6 +198,73 @@ class PackedStorage implements Storage {
   private get ArrayType() {
     const capacity = Math.max(this.spares?.[2] ?? 0, this.binding.capacity);
     return capacity < (1 << 7) ? Int8Array : capacity < (1 << 15) ? Int16Array : Int32Array;
+  }
+}
+
+
+class CompactStorage implements Storage {
+  private index: Int32Array;
+
+  constructor(
+    private readonly maxEntities: number, private readonly binding: Binding<any>,
+    private readonly fields: Field<any>[]
+  ) {
+    this.growCapacity();
+  }
+
+  findIndex(id: number): number {
+    for (let i = 0; i < this.index.length; i++) {
+      if (this.index[i] === id) return i;
+    }
+    return -1;
+  }
+
+  acquireIndex(id: number): number {
+    let firstEmpty;
+    for (let i = 0; i < this.index.length; i++) {
+      if (this.index[i] === id) return i;
+      if (firstEmpty === undefined && this.index[i] === -1) firstEmpty = i;
+    }
+    if (firstEmpty === undefined) {
+      CHECK: if (!this.binding.elastic) {
+        throw new Error(
+          `Storage exhausted for component ${this.binding.type.name}; ` +
+          `raise its capacity above ${this.binding.capacity}`);
+      }
+      DEBUG: if (this.binding.capacity === this.maxEntities) {
+        throw new Error('Trying to grow storage index beyond maxEntities');
+      }
+      firstEmpty = this.index.length;
+      this.binding.capacity = Math.min(this.maxEntities, this.binding.capacity * 2);
+      this.growCapacity();
+    }
+    this.index[firstEmpty] = id;
+    return firstEmpty;
+  }
+
+  releaseIndex(id: number): void {
+    for (let i = 0; i < this.index.length; i++) {
+      if (this.index[i] === id) {
+        this.index[i] = -1;
+        return;
+      }
+    }
+    DEBUG: throw new Error(`Internal error, index for entity ${id} not allocated`);
+  }
+
+  private growCapacity(): void {
+    const capacity = this.binding.capacity;
+    STATS: this.binding.dispatcher.stats.forComponent(this.binding.type).capacity = capacity;
+    this.binding.dispatcher.buffers.register(
+      `component.${this.binding.type.id!}.storage.index`, capacity, Int32Array,
+      this.updateIndex.bind(this), -1
+    );
+    if (this.binding.elastic) for (const field of this.fields) field.updateBuffer!();
+  }
+
+  private updateIndex(index: Int32Array): void {
+    this.index = index;
+    this.binding.capacity = this.index.length;
   }
 }
 
@@ -351,9 +421,30 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
       break;
     }
 
-    case 'compact':
-      // TODO: implement compact storage type
-      throw new Error('Not yet implemented');
+    case 'compact': {
+      const storageManager = new CompactStorage(
+        binding.dispatcher.maxEntities, binding, binding.fields);
+      type.__bind = (id: EntityId, writable: boolean): C => {
+        binding.entityId = id;
+        binding.index = storageManager.findIndex(id);
+        DEBUG: if (binding.index === -1) {
+          throw new Error(`Attempt to bind unacquired entity ${id} to ${type.name}`);
+        }
+        CHECK: resetComponent(writable);
+        return writable ? binding.writableInstance : binding.readonlyInstance;
+      };
+      type.__allocate = (id: EntityId): C => {
+        binding.entityId = id;
+        binding.index = storageManager.acquireIndex(id);
+        CHECK: resetComponent(true);
+        return binding.writableInstance;
+      };
+      type.__free = (id: EntityId): void => {
+        storageManager.releaseIndex(id);
+      };
+
+      break;
+    }
 
     default:
       CHECK: throw new Error(`Invalid storage type "${binding.storage}`);
