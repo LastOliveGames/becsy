@@ -27,4 +27,14 @@ interface Generator<T, TReturn, TNext> extends Coroutine {
    * @param type The type of component to check for.
    */
   cancelIfComponentMissing(type: ComponentType<any>): this;
+
+  /**
+   * Cancels this coroutine if another coroutine is started within this system.  By default, any
+   * coroutine will trigger cancelation.  If this coroutine has a scope, then the newly started
+   * coroutine must have the same scope.  If a `coroutineFn` is given, then the newly started
+   * coroutine must be that one.
+   * @param coroutineFn A specific mutually exclusive coroutine.  You can use `co.self` as a
+   *  shortcut for the currently running coroutine.
+   */
+  cancelIfCoroutineStarted(coroutineFn?: CoroutineFunction): this;
 }

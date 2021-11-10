@@ -11,7 +11,7 @@ import {
 import type {Lane} from './planner';
 import type {SystemStats} from './stats';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import {co, Coroutine, CoroutineGenerator, Supervisor} from './coroutines';
+import {co, Coroutine, CoroutineFunction, Supervisor} from './coroutines';
 
 
 export interface SystemType<S extends System> {
@@ -195,11 +195,13 @@ export abstract class System {
    * directly on the result of starting another coroutine to wait for its returned value.
    *
    * @param generator The generator returned by a coroutine method.
+   * @param coroutineFn The coroutine being started, to be used with
+   *    {@link Coroutine.cancelIfCoroutineStarted}.
    * @returns A coroutine handle that you can use to control it.
    */
-  start(generator: CoroutineGenerator): Coroutine {
+  start<CoFn extends CoroutineFunction>(coroutineFn: CoFn, ...args: Parameters<CoFn>): Coroutine {
     // TODO: disable coroutines if system is stateless
-    return this.__supervisor.start(generator);
+    return this.__supervisor.start(coroutineFn, ...args);
   }
 
   /**

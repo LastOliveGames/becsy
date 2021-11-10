@@ -65,6 +65,16 @@ export interface Coroutine {
    * @param type The type of component to check for.
    */
   cancelIfComponentMissing(type: ComponentType<any>): this;
+
+  /**
+   * Cancels this coroutine if another coroutine is started within this system.  By default, any
+   * coroutine will trigger cancelation.  If this coroutine has a scope, then the newly started
+   * coroutine must have the same scope.  If a `coroutineFn` is given, then the newly started
+   * coroutine must be that one.
+   * @param coroutineFn A specific mutually exclusive coroutine.  You can use `co.self` as a
+   *  shortcut for the currently running coroutine.
+   */
+  cancelIfCoroutineStarted(coroutineFn?: CoroutineFunction): this;
 }
 
 /**
@@ -101,12 +111,10 @@ export interface CurrentCoroutine extends Coroutine {
    * @param condition The condition to check every frame until it returns `true`.
    */
   waitUntil(condition: () => boolean): Waitable<void>;
-
-  // TODO: add wait methods for combining coroutines (all, race, allSettled).
 }
 
 
-let currentCoroutine: CurrentCoroutine | void;
+let currentCoroutine: CoroutineImpl<any> | void;
 
 
 class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
@@ -117,12 +125,19 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
   private __awaited = false;
   private __error?: Error;
   private __value: T;
+  private __firstRun = true;
+
   constructor(
-    private readonly __system: System,
-    private readonly __generator: Generator<Waitable<any> | void, T, any>
+    private readonly __generator: Generator<Waitable<any> | void, T, any>,
+    readonly __fn: CoroutineFunction,
+    private readonly __supervisor: Supervisor
   ) {}
 
   __checkCancelation(): void {
+    if (this.__firstRun) {
+      this.__firstRun = false;
+      this.__supervisor.cancelMatching(this, this.__scope, this.__fn);
+    }
     if (!this.__done) {
       for (const canceller of this.__cancellers) {
         if (canceller()) {
@@ -194,7 +209,7 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
   }
 
   waitForSeconds(seconds: number): Waitable<void> {
-    const system = this.__system;
+    const system = this.__supervisor.system;
     const targetTime = system.time + seconds;
     return {
       isReady() {return system.time >= targetTime;}
@@ -238,6 +253,12 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
     return this;
   }
 
+  cancelIfCoroutineStarted(coroutineFn?: CoroutineFunction): this {
+    this.__supervisor.registerCancelIfStarted(
+      this, this.__scope, coroutineFn === coDecorator.self ? this.__fn : coroutineFn);
+    return this;
+  }
+
   // We need to stub out all the Generator methods because we're overloading the type.  They must
   // not be called by the user, however.
 
@@ -260,20 +281,16 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
 
 
 export type CoroutineGenerator = Generator<any, any, any>;
-
-
-type CoDecorator = (
-  target: System, name: string, descriptor: TypedPropertyDescriptor<() => CoroutineGenerator>
-) => TypedPropertyDescriptor<() => CoroutineGenerator>;
-
+export type CoroutineFunction = (...args: any[]) => CoroutineGenerator;
+type Self = {get self(): CoroutineFunction};
 
 function coDecorator(
-  target: System, name: string, descriptor: TypedPropertyDescriptor<() => CoroutineGenerator>
-): TypedPropertyDescriptor<() => CoroutineGenerator> {
+  target: System, name: string, descriptor: TypedPropertyDescriptor<CoroutineFunction>
+): TypedPropertyDescriptor<CoroutineFunction> {
   const coroutine = descriptor.value!;
   return {
     value(this: System, ...args: []): CoroutineImpl<unknown> {
-      return this.start(coroutine.apply(this, args)) as CoroutineImpl<unknown>;
+      return this.start(coroutine, ...args) as CoroutineImpl<unknown>;
     },
   };
 }
@@ -313,6 +330,14 @@ coDecorator.cancelIfComponentMissing = function(type: ComponentType<any>): Curre
   return currentCoroutine!.cancelIfComponentMissing(type);
 };
 
+coDecorator.cancelIfCoroutineStarted = function(coroutineFn?: CoroutineFunction): CurrentCoroutine {
+  CHECK: checkCurrentCoroutine();
+  return currentCoroutine!.cancelIfCoroutineStarted(coroutineFn);
+};
+
+coDecorator.self = function*() {yield;};
+
+
 function checkCurrentCoroutine(): void {
   if (!currentCoroutine) throw new Error('Cannot call co methods outside coroutine context');
 }
@@ -325,16 +350,18 @@ function checkCurrentCoroutine(): void {
  * 2. As a handle to the currently executing coroutine, so you can invoke coroutine control methods
  * from within the coroutine's code.
  */
-export const co: CoDecorator & CurrentCoroutine = coDecorator;
+export const co: typeof coDecorator & CurrentCoroutine & Self = coDecorator;
 
 
 export class Supervisor {
-  private coroutines: CoroutineImpl<any>[] = [];
+  private readonly coroutines: CoroutineImpl<any>[] = [];
+  private readonly mutuallyExclusiveCoroutines = new Map<string, Coroutine[]>();
 
-  constructor(private readonly system: System) {}
+  constructor(readonly system: System) {}
 
-  start(generator: CoroutineGenerator): Coroutine {
-    const coroutine = new CoroutineImpl(this.system, generator);
+  start<CoFn extends CoroutineFunction>(coroutineFn: CoFn, ...args: Parameters<CoFn>): Coroutine {
+    const coroutine =
+      new CoroutineImpl(coroutineFn.apply(this.system, args), coroutineFn, this);
     this.coroutines.push(coroutine);
     return coroutine;
   }
@@ -362,6 +389,42 @@ export class Supervisor {
           processedLength -= 1;
         }
       }
+    }
+  }
+
+  registerCancelIfStarted(
+    targetCoroutine: Coroutine, scope: Entity | undefined,
+    coroutineFn: CoroutineFunction | undefined
+  ): void {
+    const key = (scope?.__id ?? '') + (coroutineFn?.name ?? '');
+    if (!this.mutuallyExclusiveCoroutines.has(key)) this.mutuallyExclusiveCoroutines.set(key, []);
+    this.mutuallyExclusiveCoroutines.get(key)?.push(targetCoroutine);
+  }
+
+  cancelMatching(
+    startingCoroutine: Coroutine, scope: Entity | undefined, coroutineFn: CoroutineFunction
+  ): void {
+    this.cancelMatchingKey(startingCoroutine, '');
+    this.cancelMatchingKey(startingCoroutine, coroutineFn.name);
+    if (scope) {
+      this.cancelMatchingKey(startingCoroutine, '' + scope.__id);
+      this.cancelMatchingKey(startingCoroutine, '' + scope.__id + coroutineFn.name);
+    }
+  }
+
+  private cancelMatchingKey(requestingCoroutine: Coroutine, key: string): void {
+    const coroutines = this.mutuallyExclusiveCoroutines.get(key);
+    if (coroutines) {
+      let hasRequesting = false;
+      for (const coroutine of coroutines) {
+        if (coroutine === requestingCoroutine) {
+          hasRequesting = true;
+        } else {
+          coroutine.cancel();
+        }
+      }
+      coroutines.length = 0;
+      if (hasRequesting) coroutines.push(requestingCoroutine);
     }
   }
 }
