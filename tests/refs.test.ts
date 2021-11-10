@@ -117,7 +117,7 @@ async function createWorld(...systems: SystemType<System>[]): Promise<World> {
 
 describe('follow forward references', () => {
 
-  test('refs', async() => {
+  test('refs', async () => {
     const world = await createWorld(IncrementTargetedDests);
     world.build(sys => {
       sys.createEntity(PreciseDest);
@@ -131,7 +131,7 @@ describe('follow forward references', () => {
     expect(total.preciseDest).toBe(3);
   });
 
-  test('refs in recently removed component', async() => {
+  test('refs in recently removed component', async () => {
     const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(PreciseDest);
@@ -147,7 +147,7 @@ describe('follow forward references', () => {
 
 describe('follow backward references', () => {
 
-  test('precise backref', async() => {
+  test('precise backref', async () => {
     const world = await createWorld(IncrementTargeters);
     world.build(sys => {
       sys.createEntity(PreciseDest);
@@ -163,7 +163,7 @@ describe('follow backward references', () => {
     expect(total.origin).toBe(0);
   });
 
-  test('type backref', async() => {
+  test('type backref', async () => {
     const world = await createWorld(IncrementTargeters);
     world.build(sys => {
       sys.createEntity(TypeDest);
@@ -179,7 +179,7 @@ describe('follow backward references', () => {
     expect(total.origin).toBe(0);
   });
 
-  test('global backref', async() => {
+  test('global backref', async () => {
     const world = await createWorld(IncrementTargeters);
     world.build(sys => {
       sys.createEntity(GlobalDest);
@@ -195,7 +195,7 @@ describe('follow backward references', () => {
     expect(total.origin).toBe(2);
   });
 
-  test('fail to access backrefs to recently removed component when not enabled', async() => {
+  test('fail to access backrefs to recently removed component when not enabled', async () => {
     const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
@@ -206,7 +206,7 @@ describe('follow backward references', () => {
     });
   });
 
-  test('backrefs to recently removed component', async() => {
+  test('backrefs to recently removed component', async () => {
     const world = await createWorld();
     let d1: Entity;
     world.build(sys => {
@@ -230,7 +230,7 @@ describe('follow backward references', () => {
 
 describe('backrefs storage variants', () => {
 
-  test('smcurrent entities list', async() => {
+  test('smcurrent entities list', async () => {
     const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
@@ -239,7 +239,7 @@ describe('backrefs storage variants', () => {
     });
   });
 
-  test('large entities list, with index', async() => {
+  test('large entities list, with index', async () => {
     const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
@@ -251,7 +251,7 @@ describe('backrefs storage variants', () => {
     });
   });
 
-  test('single tag', async() => {
+  test('single tag', async () => {
     const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
@@ -260,7 +260,7 @@ describe('backrefs storage variants', () => {
     });
   });
 
-  test('tag array', async() => {
+  test('tag array', async () => {
     const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);
@@ -277,7 +277,7 @@ describe('backrefs storage variants', () => {
 
 describe('refs affected by entity deletion', () => {
 
-  test('clear refs to deleted entity', async() => {
+  test('clear refs to deleted entity', async () => {
     const world = await createWorld();
     let o: Entity;
     world.build(sys => {
@@ -296,7 +296,7 @@ describe('refs affected by entity deletion', () => {
     });
   });
 
-  test('overwrite cleared refs before deletion finalized', async() => {
+  test('overwrite cleared refs before deletion finalized', async () => {
     const world = await createWorld();
     let o: Entity;
     let d2: Entity;

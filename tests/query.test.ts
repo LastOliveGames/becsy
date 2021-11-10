@@ -137,7 +137,7 @@ async function createWorld(...systems: SystemType<System>[]): Promise<World> {
 
 describe('basic queries, current iteration, reads and writes', () => {
 
-  test('iterate one type', async() => {
+  test('iterate one type', async () => {
     const world = await createWorld(IncrementA);
     world.createEntity(A);
     world.createEntity(A);
@@ -148,7 +148,7 @@ describe('basic queries, current iteration, reads and writes', () => {
     expect(total.c).toBe(0);
   });
 
-  test('iterate overlapping types', async() => {
+  test('iterate overlapping types', async () => {
     const world = await createWorld(IncrementA, IncrementC);
     world.createEntity(A);
     world.createEntity(A);
@@ -159,7 +159,7 @@ describe('basic queries, current iteration, reads and writes', () => {
     expect(total.c).toBe(2);
   });
 
-  test('iterate type intersection', async() => {
+  test('iterate type intersection', async () => {
     const world = await createWorld(IncrementAC);
     world.createEntity(A);
     world.createEntity(A);
@@ -170,7 +170,7 @@ describe('basic queries, current iteration, reads and writes', () => {
     expect(total.c).toBe(1);
   });
 
-  test('iterate type intersection with tag type', async() => {
+  test('iterate type intersection with tag type', async () => {
     const world = await createWorld(IncrementAWithD);
     world.createEntity(A);
     world.createEntity(A);
@@ -180,7 +180,7 @@ describe('basic queries, current iteration, reads and writes', () => {
     expect(total.a).toBe(1);
   });
 
-  test('iterate type exclusion', async() => {
+  test('iterate type exclusion', async () => {
     const world = await createWorld(IncrementANotC);
     world.createEntity(A);
     world.createEntity(A);
@@ -194,7 +194,7 @@ describe('basic queries, current iteration, reads and writes', () => {
 
 describe('component shape changes', () => {
 
-  test('add a component for a subsequent system', async() => {
+  test('add a component for a subsequent system', async () => {
     const world = await createWorld(AddCToA, IncrementC);
     world.createEntity(A);
     world.createEntity(A);
@@ -203,7 +203,7 @@ describe('component shape changes', () => {
     expect(total.c).toBe(3);
   });
 
-  test('remove a component for a subsequent system', async() => {
+  test('remove a component for a subsequent system', async () => {
     const world = await createWorld(RemoveCFromAC, IncrementC);
     world.createEntity(C);
     world.createEntity(C);
@@ -216,7 +216,7 @@ describe('component shape changes', () => {
 
 describe('creating and deleting entities', () => {
 
-  test('create entity for subsequent system', async() => {
+  test('create entity for subsequent system', async () => {
     const world = await createWorld(CreateA, IncrementA);
     world.createEntity(A, C);
     await world.execute();
@@ -224,7 +224,7 @@ describe('creating and deleting entities', () => {
     expect(total.c).toBe(0);
   });
 
-  test('delete entity for subsequent system', async() => {
+  test('delete entity for subsequent system', async () => {
     const world = await createWorld(DeleteA, IncrementA, IncrementC);
     world.createEntity(A);
     world.createEntity(A);
@@ -235,7 +235,7 @@ describe('creating and deleting entities', () => {
     expect(total.c).toBe(1);
   });
 
-  test('recycle entity IDs', async() => {
+  test('recycle entity IDs', async () => {
     const world = await World.create({
       maxEntities: 9, maxLimboComponents: 12, defaultComponentStorage: 'sparse',
       defs: [CreateAForEachC, DeleteA]

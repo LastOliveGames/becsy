@@ -187,7 +187,7 @@ class DataSystem extends System {
 
 describe('benchmarks', () => {
 
-  test('packed1', async() => {
+  test('packed1', async () => {
     const count = 5000;
     const world = await World.create({
       maxEntities: count, maxShapeChangesPerFrame: count * 5 + 5, defaultComponentStorage: 'sparse',
@@ -199,7 +199,7 @@ describe('benchmarks', () => {
     await world.execute();
   });
 
-  test('packed5', async() => {
+  test('packed5', async () => {
     const count = 1000;
     const world = await World.create({
       maxEntities: count, maxShapeChangesPerFrame: count * 5 + 5, defaultComponentStorage: 'sparse',
@@ -211,7 +211,7 @@ describe('benchmarks', () => {
     await world.execute();
   });
 
-  test('simpleIter', async() => {
+  test('simpleIter', async () => {
     const count = 1000;
     const world = await World.create({
       maxEntities: count * 4, maxShapeChangesPerFrame: count * 13 + 5,
@@ -228,7 +228,7 @@ describe('benchmarks', () => {
     await world.execute();
   });
 
-  test('fragIter', async() => {
+  test('fragIter', async () => {
     const count = 100;
     const world = await World.create({
       maxEntities: count * COMPS.length, maxShapeChangesPerFrame: count * 53,
@@ -242,7 +242,7 @@ describe('benchmarks', () => {
     await world.execute();
   });
 
-  test('entityCycle', async() => {
+  test('entityCycle', async () => {
     const count = 1000;
     const world = await World.create({
       maxEntities: count * 8, maxLimboComponents: count * 8,
@@ -254,7 +254,7 @@ describe('benchmarks', () => {
     await world.execute();
   });
 
-  test('addRemove', async() => {
+  test('addRemove', async () => {
     const count = 1000;
     const world = await World.create({
       maxEntities: count, maxShapeChangesPerFrame: count * 2 + 2, maxLimboComponents: count * 2,

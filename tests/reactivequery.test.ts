@@ -85,7 +85,7 @@ async function createWorld(...systems: SystemType<System>[]): Promise<World> {
 
 describe('added queries', () => {
 
-  test('finds entities added before world executes', async() => {
+  test('finds entities added before world executes', async () => {
     const world = await createWorld(IncrementAddedAEarly);
     world.createEntity(A);
     world.createEntity(A, B);
@@ -97,7 +97,7 @@ describe('added queries', () => {
     expect(total.b).toBe(0);
   });
 
-  test('finds entities added during frame', async() => {
+  test('finds entities added during frame', async () => {
     const world = await createWorld(CreateA, IncrementAddedALate);
     await world.execute();
     await world.execute();
@@ -106,7 +106,7 @@ describe('added queries', () => {
     expect(total.b).toBe(0);
   });
 
-  test('finds entities added during previous frame', async() => {
+  test('finds entities added during previous frame', async () => {
     const world = await createWorld(IncrementAddedAEarly, CreateA);
     await world.execute();
     await world.execute();
@@ -119,7 +119,7 @@ describe('added queries', () => {
 
 
 describe('removed queries', () => {
-  test('finds removed entities', async() => {
+  test('finds removed entities', async () => {
     const world = await createWorld(IncrementBWithRemovedA, RemoveA);
     world.createEntity(A);
     world.createEntity(A, B);
@@ -136,7 +136,7 @@ describe('removed queries', () => {
 
 describe('changed queries', () => {
 
-  test('finds changed entities', async() => {
+  test('finds changed entities', async () => {
     const world = await createWorld(IncrementBWithChangedA, IncrementAddedALate);
     world.createEntity(A);
     world.createEntity(A, B);

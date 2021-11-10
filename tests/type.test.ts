@@ -35,51 +35,51 @@ async function testReadWrite(prop: string, values: any[]): Promise<void> {
 
 describe('getting and setting fields of various types', () => {
 
-  test('boolean', async() => {
+  test('boolean', async () => {
     await testReadWrite('boolean', [false, true]);
   });
 
-  test('uint8', async() => {
+  test('uint8', async () => {
     await testReadWrite('uint8', [0, 127, 255]);
   });
 
-  test('int8', async() => {
+  test('int8', async () => {
     await testReadWrite('int8', [0, 127, -128]);
   });
 
-  test('uint16', async() => {
+  test('uint16', async () => {
     await testReadWrite('uint16', [0, 2 ** 15 - 1, 2 ** 16 - 1]);
   });
 
-  test('int16', async() => {
+  test('int16', async () => {
     await testReadWrite('int16', [0, 2 ** 15 - 1, -(2 ** 15)]);
   });
 
-  test('uint32', async() => {
+  test('uint32', async () => {
     await testReadWrite('uint32', [0, 2 ** 31 - 1, 2 ** 32 - 1]);
   });
 
-  test('int32', async() => {
+  test('int32', async () => {
     await testReadWrite('int32', [0, 2 ** 31 - 1, -(2 ** 31)]);
   });
 
-  test('float32', async() => {
+  test('float32', async () => {
     await testReadWrite('float32', [0, 2 ** 24, -(2 ** 24), 0.5, -0.5]);
   });
 
-  test('float64', async() => {
+  test('float64', async () => {
     await testReadWrite('float64', [0, 2 ** 53, -(2 ** 53), 0.5, -0.5]);
   });
 
-  test('staticString', async() => {
+  test('staticString', async () => {
     await testReadWrite('staticString', ['foo', 'bar', 'baz']);
   });
 
-  test('dynamicString', async() => {
+  test('dynamicString', async () => {
     await testReadWrite('dynamicString', ['', 'foo', 'foobarbazqux12', '🤷‍♂️']);
   });
 
-  test('ref', async() => {
+  test('ref', async () => {
     const world = await World.create();
     world.build(system => {
       const a = system.createEntity(Big);
@@ -91,19 +91,19 @@ describe('getting and setting fields of various types', () => {
     });
   });
 
-  test('object', async() => {
+  test('object', async () => {
     const stuff = new Stuff();
     await testReadWrite('object', [undefined, null, stuff]);
   });
 
-  test('weakObject', async() => {
+  test('weakObject', async () => {
     const stuff = new Stuff();
     await testReadWrite('weakObject', [undefined, null, stuff]);
   });
 
   // Can't figure out how to force garbage collection to test this, even after following
   // https://stackoverflow.com/questions/65175380.
-  test.skip('weakObject garbage collection', async() => {
+  test.skip('weakObject garbage collection', async () => {
     const a: any[] = [new Stuff()];
     const world = await World.create();
     let entity: Entity;  // this will get released, but nothing will overwrite it

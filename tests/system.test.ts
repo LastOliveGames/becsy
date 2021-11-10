@@ -20,13 +20,13 @@ class SystemB extends System {
 
 describe('system setup', () => {
 
-  test('attach a system', async() => {
+  test('attach a system', async () => {
     const world = await World.create({defs: [SystemB, SystemA]});
     await world.execute();
     expect(message).toBe('hello');
   });
 
-  test('create and hold an entity during initialize', async() => {
+  test('create and hold an entity during initialize', async () => {
     class TestComponent { }
 
     let output: Entity;

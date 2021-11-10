@@ -52,7 +52,7 @@ class SimplePlan extends Plan {
     return new Promise((resolve, reject) => {
       let rejected = false;
 
-      const initSystem = async(system: SystemBox) => {
+      const initSystem = async (system: SystemBox) => {
         try {
           await system.prepare();
           if (rejected) return;
@@ -115,8 +115,8 @@ export class Lane {
 
 export class Planner {
   readonly graph: Graph<SystemBox>;
-  readers?= new Map<ComponentType<Component>, Set<SystemBox>>();
-  writers?= new Map<ComponentType<Component>, Set<SystemBox>>();
+  readers? = new Map<ComponentType<Component>, Set<SystemBox>>();
+  writers? = new Map<ComponentType<Component>, Set<SystemBox>>();
   lanes: Lane[] = [];
   replicatedLane?: Lane;
   laneCount = 0;

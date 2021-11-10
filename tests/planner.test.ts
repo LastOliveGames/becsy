@@ -43,20 +43,20 @@ class J extends System {
 // TODO: un-skip when multithreading implemented
 describe.skip('planner lane assignment', () => {
 
-  test('merges readers of unshared component types into one lane', async() => {
+  test('merges readers of unshared component types into one lane', async () => {
     const world = await World.create({threads: 2, defs: [B, C]});
     expect(world.stats.systems.A.worker).toBe(-1);
     expect(world.stats.systems.B.worker).toBe(1);
     expect(world.stats.systems.C.worker).toBe(1);
   });
 
-  test('merges attached systems into one lane', async() => {
+  test('merges attached systems into one lane', async () => {
     const world = await World.create({threads: 2, defs: [D]});
     expect(world.stats.systems.A.worker).toBe(1);
     expect(world.stats.systems.D.worker).toBe(1);
   });
 
-  test('merges most dependent systems together into lanes', async() => {
+  test('merges most dependent systems together into lanes', async () => {
     const world = await World.create({threads: 2, defs: [E, F, G, H]});
     expect(world.stats.systems.E.worker).toBe(1);
     expect(world.stats.systems.F.worker).toBe(1);
@@ -64,17 +64,17 @@ describe.skip('planner lane assignment', () => {
     expect(world.stats.systems.H.worker).toBe(2);
   });
 
-  test('puts main thread system in lane zero', async() => {
+  test('puts main thread system in lane zero', async () => {
     const world = await World.create({threads: 2, defs: [I]});
     expect(world.stats.systems.I.worker).toBe(0);
   });
 
-  test('puts reader of main thread component in lane zero', async() => {
+  test('puts reader of main thread component in lane zero', async () => {
     const world = await World.create({threads: 2, defs: [J]});
     expect(world.stats.systems.J.worker).toBe(0);
   });
 
-  test('avoids merging into lane zero', async() => {
+  test('avoids merging into lane zero', async () => {
     const world = await World.create({threads: 2, defs: [B, C, D, E, F, G, H]});
     expect(world.stats.systems.A.worker).toBeGreaterThan(0);
     expect(world.stats.systems.B.worker).toBeGreaterThan(0);

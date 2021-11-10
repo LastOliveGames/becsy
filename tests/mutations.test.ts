@@ -41,7 +41,7 @@ async function createWorld(...systems: SystemType<System>[]): Promise<World> {
 
 describe('removing components', () => {
 
-  test('resurrect component', async() => {
+  test('resurrect component', async () => {
     const world = await createWorld(AddRemoveBToA);
     world.createEntity(A);
     await world.execute();
@@ -50,7 +50,7 @@ describe('removing components', () => {
     expect(lastValue).toBe(2);
   });
 
-  test('finalize component removal', async() => {
+  test('finalize component removal', async () => {
     const world = await createWorld(AddRemoveBToA);
     world.createEntity(A);
     await world.execute();
