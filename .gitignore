@@ -8,6 +8,7 @@ node_modules/
 /.gitconfig
 /.vscode/
 /.clinic/
+/coverage/
 /yarn-error.log
 /tsconfig.tsbuildinfo
 /traceopt.txt
