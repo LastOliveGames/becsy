@@ -125,15 +125,15 @@ export class Dispatcher {
     this.defaultComponentStorage = defaultComponentStorage;
     this.registry = new Registry(maxEntities, maxLimboComponents, componentTypes, this);
     this.indexer = new RefIndexer(this, maxRefChangesPerFrame);
-    this.registry.initializeComponentTypes();
     this.shapeLog = new Log(
       maxShapeChangesPerFrame, 'maxShapeChangesPerFrame', this.buffers,
       {sortedByComponentType: true, numComponentTypes: this.registry.types.length}
     );
     this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.systemGroups = systemGroups;
-    this.systems = this.normalizeAndInitSystems(systemTypes);
-    this.initCallbackSystem();
+    this.systems = this.createSystems(systemTypes);
+    this.createCallbackSystem();
+    this.registry.initializeComponentTypes();
     this.registry.hasNegativeQueries = this.systems.some(system => system.hasNegativeQueries);
     this.planner = new Planner(this, this.systems, this.systemGroups);
     this.planner.organize();
@@ -149,7 +149,7 @@ export class Dispatcher {
 
   get threaded(): boolean {return this.threads > 1;}
 
-  private normalizeAndInitSystems(
+  private createSystems(
     systemTypes: (SystemType<System> | Record<string, unknown>)[]
   ): SystemBox[] {
     const systems = [];
@@ -175,7 +175,7 @@ export class Dispatcher {
     return systems;
   }
 
-  private initCallbackSystem(): void {
+  private createCallbackSystem(): void {
     this.userCallbackSystem = new CallbackSystem();
     this.userCallbackSystem.id = 0;
     const box = new SystemBox(this.userCallbackSystem, this);
