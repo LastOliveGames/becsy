@@ -4,7 +4,7 @@ import type {Entity, ReadWriteMasks} from './entity';
 import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {World} from './world';  // eslint-disable-line @typescript-eslint/no-unused-vars
 import {Query, QueryBox, QueryBuilder} from './query';
-import type {ComponentType} from './component';
+import {ComponentType, declareSingleton} from './component';
 import {
   GroupContentsArray, now, Schedule, ScheduleBuilder, SystemGroup, SystemGroupImpl
 } from './schedule';
@@ -26,7 +26,11 @@ export enum RunState {
 }
 
 class SingletonPlaceholder {
-  constructor(readonly type: ComponentType<any>) {}
+  constructor(
+    readonly access: 'read' | 'write',
+    readonly type: ComponentType<any>,
+    readonly initialValues?: Record<string, unknown>
+  ) {}
 }
 
 class AttachPlaceholder {
@@ -145,44 +149,75 @@ export abstract class System {
     return schedule;
   }
 
-  singleton<T>(type: ComponentType<T>): T {
-    if (!type.options) type.options = {};
-    CHECK: {
-      if (type.options.storage && type.options.storage !== 'compact') {
+  singleton = {
+    /**
+     * Declares that the given component type is a singleton and gets a read-only handle to it. This
+     * will automatically set the component's storage type to `compact` with a capacity of 1 and
+     * create a new entity to hold all singleton components.  It's fine for many systems to request
+     * access to the same singleton component, of course.  Can only be called from the constructor,
+     * typically by initializing an instance property.
+     * @example
+     * foo = this.singleton.read(ComponentFoo);
+     * @param type The component type to declare as a singleton.
+     * @returns A read-only view of the only instance of the component.  This instance will remain
+     *  valid for as long as the world exists.
+     */
+    read: <T>(type: ComponentType<T>): T => {
+      CHECK: if (!this.__singletonPlaceholders) {
         throw new Error(
-          `Component ${type.name} ${type.options.storage} storage is incompatible with singletons`);
+          `Attempt to declare a singleton after world initialized in system ${this.name}`);
       }
-      if (type.options.capacity && type.options.capacity !== 1) {
+      declareSingleton(type);
+      this.query(q => q.using(type));
+      const placeholder = new SingletonPlaceholder('read', type);
+      this.__singletonPlaceholders.push(placeholder);
+      return placeholder as unknown as T;
+    },
+
+    /**
+     * Declarse that the given component type is a singleton and gets a read-write handle to it.
+     * This will automatically set the component's storage type to `compact` with a capacity of 1
+     * and create a new entity to hold all singleton components.  It's fine for many systems to
+     * request access to the same singleton component, but at most one can provide initial values
+     * for it.  Can only be called from the constructor, typically by initializing an instance
+     * property.
+     * @example
+     * foo = this.singleton.write(ComponentFoo, {value: 42});
+     * @param type The component type to declare as a singleton.
+     * @param initialValues Optional field values to initialize the component with.
+     * @returns A read-write view of the only instance of the component.  This instance will remain
+     *  valid for as long as the world exists.
+     */
+    write: <T>(type: ComponentType<T>, initialValues?: Record<string, unknown>): T => {
+      CHECK: if (!this.__singletonPlaceholders) {
         throw new Error(
-          `Component ${type.name} capacity of ${type.options.capacity} ` +
-          `is incompatible with singletons`);
+          `Attempt to declare a singleton after world initialized in system ${this.name}`);
       }
-      if (type.options.initialCapacity) {
-        throw new Error(
-          `Component ${type.name} initial capacity of ${type.options.initialCapacity} ` +
-          `is incompatible with singletons`);
-      }
+      declareSingleton(type);
+      this.query(q => q.using(type).write);
+      const placeholder = new SingletonPlaceholder('write', type, initialValues);
+      this.__singletonPlaceholders.push(placeholder);
+      return placeholder as unknown as T;
     }
-    type.options.storage = 'compact';
-    type.options.capacity = 1;
-    const placeholder = new SingletonPlaceholder(type);
-    this.__singletonPlaceholders!.push(placeholder);
-    return placeholder as unknown as T;
-  }
+  };
 
   /**
    * Creates a reference to another system in the world, that you can then use in your `initialize`
    * or `execute` methods.  Be careful not to abuse this feature as it will force all systems that
    * reference each other to be located in the same thread when using multithreading, possibly
-   * limiting performance.
+   * limiting performance.  Can only be called from the constructor, typically by initializing an
+   * instance property.
    * @example
    * foo = this.attach(SystemFoo);
    * @param systemType The type of the system to reference.
    * @returns The unique instance of the system of the given type that exists in the world.
    */
   attach<S extends System>(systemType: SystemType<S>): S {
+    CHECK: if (!this.__attachPlaceholders) {
+      throw new Error(`Attempt to attach a system after world initialized in system ${this.name}`);
+    }
     const placeholder = new AttachPlaceholder(systemType);
-    this.__attachPlaceholders!.push(placeholder);
+    this.__attachPlaceholders.push(placeholder);
     return placeholder as unknown as S;
   }
 
@@ -268,6 +303,8 @@ export class SystemBox {
   private writeLogPointer?: LogPointer;
   private state: RunState = RunState.RUNNING;
   readonly stats: SystemStats;
+  readonly attachedSystems: (SystemBox | undefined)[];
+  readonly singletonComponentDefs: (ComponentType<any> | Record<string, unknown>)[];
   private propsAssigned = false;
   lane?: Lane;
   stateless = false;
@@ -281,6 +318,12 @@ export class SystemBox {
     system.__dispatcher = dispatcher;
     this.shapeLogPointer = dispatcher.shapeLog.createPointer();
     STATS: this.stats = dispatcher.stats.forSystem(system.constructor as SystemType<any>);
+    this.attachedSystems = this.system.__attachPlaceholders!.map(
+      placeholder => this.dispatcher.systemsByClass.get(placeholder.type));
+    this.singletonComponentDefs = this.system.__singletonPlaceholders!.flatMap(placeholder => {
+      return placeholder.initialValues ?
+        [placeholder.type, placeholder.initialValues] : [placeholder.type];
+    });
   }
 
   assignProps(props: Record<string, unknown>): void {
@@ -308,10 +351,9 @@ export class SystemBox {
 
   finishConstructing(): void {
     this.writeLogPointer = this.dispatcher.writeLog?.createPointer();
-    this.replacePlaceholders();
   }
 
-  private replacePlaceholders(): void {
+  replacePlaceholders(): void {
     const openSystem = this.system as any;
     for (const prop in this.system) {
       const value = openSystem[prop];
@@ -323,16 +365,11 @@ export class SystemBox {
         }
         openSystem[prop] = targetSystem.system;
       } else if (value instanceof SingletonPlaceholder) {
-        const componentType = value.type;
-        openSystem[prop] = null;
+        openSystem[prop] = this.dispatcher.singleton![value.access](value.type);
       }
     }
     this.system.__attachPlaceholders = null;
-  }
-
-  get attachedSystems(): (SystemBox | undefined)[] {
-    return this.system.__attachPlaceholders!.map(
-      placeholder => this.dispatcher.systemsByClass.get(placeholder.type));
+    this.system.__singletonPlaceholders = null;
   }
 
   prepare(): Promise<void> {

@@ -1,6 +1,15 @@
-import {Entity, System, World} from '../src';
+import {Entity, field, System, World} from '../src';
 
 let message: string;
+
+class Foo {
+  @field.int16 declare speed: number;
+}
+
+class Bar {
+  @field.int16 declare direction: number;
+}
+
 
 class SystemA extends System {
   message: string;
@@ -15,6 +24,20 @@ class SystemB extends System {
   execute() {
     this.systemA.message = 'hello';
   }
+}
+
+class SystemC extends System {
+  foo = this.singleton.read(Foo);
+  bar = this.singleton.write(Bar);
+
+  initialize() {
+    this.bar.direction = 45;
+    message = `foo ${this.foo.speed} bar ${this.bar.direction}`;
+  }
+}
+
+class SystemD extends System {
+  foo = this.singleton.write(Foo, {speed: 100});
 }
 
 
@@ -40,5 +63,10 @@ describe('system setup', () => {
     });
 
     expect(output!.has(TestComponent)).toBe(true);
+  });
+
+  test('declare a singleton', async () => {
+    await World.create({defs: [Foo, Bar, SystemC, SystemD]});
+    expect(message).toBe('foo 100 bar 45');
   });
 });

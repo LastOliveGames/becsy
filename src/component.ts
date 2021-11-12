@@ -364,12 +364,13 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
     readonlyMaster = binding.readonlyInstance;
     writableMaster = binding.writableInstance;
     binding.readonlyInstance = Object.create(readonlyMaster);
-    binding.readonlyInstance.__invalid = true;
+    binding.readonlyInstance.__invalid = binding.capacity > 1;
     binding.writableInstance = Object.create(writableMaster);
-    binding.writableInstance.__invalid = true;
+    binding.writableInstance.__invalid = binding.capacity > 1;
   }
 
   function resetComponent(writable: boolean): void {
+    if (binding.capacity === 1) return;
     if (writable) {
       binding.writableInstance.__invalid = true;
       binding.writableInstance = Object.create(writableMaster);
@@ -451,3 +452,25 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
   }
 }
 
+
+export function declareSingleton(type: ComponentType<any>): void {
+  if (!type.options) type.options = {};
+  CHECK: {
+    if (type.options.storage && type.options.storage !== 'compact') {
+      throw new Error(
+        `Component ${type.name} ${type.options.storage} storage is incompatible with singletons`);
+    }
+    if (type.options.capacity && type.options.capacity !== 1) {
+      throw new Error(
+        `Component ${type.name} capacity of ${type.options.capacity} ` +
+        `is incompatible with singletons`);
+    }
+    if (type.options.initialCapacity) {
+      throw new Error(
+        `Component ${type.name} initial capacity of ${type.options.initialCapacity} ` +
+        `is incompatible with singletons`);
+    }
+  }
+  type.options.storage = 'compact';
+  type.options.capacity = 1;
+}

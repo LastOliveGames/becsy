@@ -94,6 +94,7 @@ export class Dispatcher {
   readonly planner: Planner;
   readonly threads: number;
   readonly buffers: Buffers;
+  readonly singleton?: Entity;
   private userCallbackSystem: CallbackSystem;
   private callback: {group: SystemGroup, frame: Frame};
   private readonly deferredControls = new Map<SystemBox, RunState>();
@@ -125,16 +126,18 @@ export class Dispatcher {
     this.defaultComponentStorage = defaultComponentStorage;
     this.registry = new Registry(maxEntities, maxLimboComponents, componentTypes, this);
     this.indexer = new RefIndexer(this, maxRefChangesPerFrame);
-    this.registry.initializeComponentTypes();
     this.shapeLog = new Log(
       maxShapeChangesPerFrame, 'maxShapeChangesPerFrame', this.buffers,
       {sortedByComponentType: true, numComponentTypes: this.registry.types.length}
     );
     this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.systemGroups = systemGroups;
-    this.systems = this.normalizeAndInitSystems(systemTypes);
-    this.initCallbackSystem();
+    this.systems = this.createSystems(systemTypes);
+    this.createCallbackSystem();
+    this.registry.initializeComponentTypes();
     this.registry.hasNegativeQueries = this.systems.some(system => system.hasNegativeQueries);
+    this.singleton = this.createSingletons();
+    for (const box of this.systems) box.replacePlaceholders();
     this.planner = new Planner(this, this.systems, this.systemGroups);
     this.planner.organize();
     if (this.systems.some(system => system.hasWriteQueries)) {
@@ -149,7 +152,7 @@ export class Dispatcher {
 
   get threaded(): boolean {return this.threads > 1;}
 
-  private normalizeAndInitSystems(
+  private createSystems(
     systemTypes: (SystemType<System> | Record<string, unknown>)[]
   ): SystemBox[] {
     const systems = [];
@@ -175,7 +178,7 @@ export class Dispatcher {
     return systems;
   }
 
-  private initCallbackSystem(): void {
+  private createCallbackSystem(): void {
     this.userCallbackSystem = new CallbackSystem();
     this.userCallbackSystem.id = 0;
     const box = new SystemBox(this.userCallbackSystem, this);
@@ -192,6 +195,36 @@ export class Dispatcher {
     this.systemGroups.push(group);
     const frame = new FrameImpl(this, [group]);
     return {group, frame};
+  }
+
+  private createSingletons(): Entity | undefined {
+    const types = new Set<ComponentType<any>>();
+    const singletonComponentDefs =
+      this.systems.flatMap(box => {
+        return box.singletonComponentDefs.filter((item, i) => {
+          let accepted = true;
+          if (typeof item === 'function') {
+            accepted = i < box.singletonComponentDefs.length - 1 &&
+              typeof box.singletonComponentDefs[i + 1] !== 'function';
+            if (accepted) types.add(item);
+          }
+          return accepted;
+        });
+      }).concat(this.systems.flatMap(box => {
+        return box.singletonComponentDefs.filter(item => {
+          if (typeof item === 'function' && !types.has(item)) {
+            types.add(item);
+            return true;
+          }
+          return false;
+        });
+      }));
+    if (!singletonComponentDefs.length) return;
+    this.executing = true;
+    const singleton = this.createEntity(singletonComponentDefs).hold();
+    this.executing = false;
+    this.flush();
+    return singleton;
   }
 
   private splitDefs(defs: DefsArray): {
