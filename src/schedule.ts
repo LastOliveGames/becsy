@@ -7,6 +7,9 @@ export const now = typeof window !== 'undefined' && typeof window.performance !=
   performance.now.bind(performance) : Date.now.bind(Date);
 
 
+// TODO: support replicated systems
+// TODO: support continuously executed systems
+
 /**
  * A fluent DSL for specifying a system's scheduling constraints.
  *

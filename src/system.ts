@@ -89,7 +89,6 @@ export abstract class System {
 
   // TODO: add an API for making immediate queries
   // TODO: make it easy to define and access singleton components
-  // TODO: add support for coroutines
 
   /**
    * Creates a persistent query for this system.  Can only be called from the constructor, typically
