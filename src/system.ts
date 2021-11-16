@@ -25,7 +25,11 @@ export enum RunState {
   RUNNING, STOPPED
 }
 
-class Placeholder {
+class SingletonPlaceholder {
+  constructor(readonly type: ComponentType<any>) {}
+}
+
+class AttachPlaceholder {
   constructor(readonly type: SystemType<System>) {}
 }
 
@@ -59,7 +63,8 @@ export abstract class System {
 
   __queryBuilders: QueryBuilder[] | null = [];
   __scheduleBuilder: ScheduleBuilder | undefined | null;
-  __placeholders: Placeholder[] | null = [];
+  __attachPlaceholders: AttachPlaceholder[] | null = [];
+  __singletonPlaceholders: SingletonPlaceholder[] | null = [];
   __supervisor = new Supervisor(this);
   __dispatcher: Dispatcher;
 
@@ -88,7 +93,6 @@ export abstract class System {
   get name(): string {return this.constructor.name;}
 
   // TODO: add an API for making immediate queries
-  // TODO: make it easy to define and access singleton components
 
   /**
    * Creates a persistent query for this system.  Can only be called from the constructor, typically
@@ -141,6 +145,31 @@ export abstract class System {
     return schedule;
   }
 
+  singleton<T>(type: ComponentType<T>): T {
+    if (!type.options) type.options = {};
+    CHECK: {
+      if (type.options.storage && type.options.storage !== 'compact') {
+        throw new Error(
+          `Component ${type.name} ${type.options.storage} storage is incompatible with singletons`);
+      }
+      if (type.options.capacity && type.options.capacity !== 1) {
+        throw new Error(
+          `Component ${type.name} capacity of ${type.options.capacity} ` +
+          `is incompatible with singletons`);
+      }
+      if (type.options.initialCapacity) {
+        throw new Error(
+          `Component ${type.name} initial capacity of ${type.options.initialCapacity} ` +
+          `is incompatible with singletons`);
+      }
+    }
+    type.options.storage = 'compact';
+    type.options.capacity = 1;
+    const placeholder = new SingletonPlaceholder(type);
+    this.__singletonPlaceholders!.push(placeholder);
+    return placeholder as unknown as T;
+  }
+
   /**
    * Creates a reference to another system in the world, that you can then use in your `initialize`
    * or `execute` methods.  Be careful not to abuse this feature as it will force all systems that
@@ -152,8 +181,8 @@ export abstract class System {
    * @returns The unique instance of the system of the given type that exists in the world.
    */
   attach<S extends System>(systemType: SystemType<S>): S {
-    const placeholder = new Placeholder(systemType);
-    this.__placeholders!.push(placeholder);
+    const placeholder = new AttachPlaceholder(systemType);
+    this.__attachPlaceholders!.push(placeholder);
     return placeholder as unknown as S;
   }
 
@@ -279,25 +308,30 @@ export class SystemBox {
 
   finishConstructing(): void {
     this.writeLogPointer = this.dispatcher.writeLog?.createPointer();
-    this.replaceAttachmentPlaceholders();
+    this.replacePlaceholders();
   }
 
-  private replaceAttachmentPlaceholders(): void {
+  private replacePlaceholders(): void {
+    const openSystem = this.system as any;
     for (const prop in this.system) {
-      if ((this.system as any)[prop] instanceof Placeholder) {
-        const targetSystemType = (this.system as any)[prop].type;
+      const value = openSystem[prop];
+      if (value instanceof AttachPlaceholder) {
+        const targetSystemType = value.type;
         const targetSystem = this.dispatcher.systemsByClass.get(targetSystemType);
         CHECK: if (!targetSystem) {
           throw new Error(`Attached system ${targetSystemType.name} not defined in this world`);
         }
-        (this.system as any)[prop] = targetSystem.system;
+        openSystem[prop] = targetSystem.system;
+      } else if (value instanceof SingletonPlaceholder) {
+        const componentType = value.type;
+        openSystem[prop] = null;
       }
     }
-    this.system.__placeholders = null;
+    this.system.__attachPlaceholders = null;
   }
 
   get attachedSystems(): (SystemBox | undefined)[] {
-    return this.system.__placeholders!.map(
+    return this.system.__attachPlaceholders!.map(
       placeholder => this.dispatcher.systemsByClass.get(placeholder.type));
   }
 
