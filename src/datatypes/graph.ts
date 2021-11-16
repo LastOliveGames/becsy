@@ -158,7 +158,6 @@ export class Graph<V extends Printable> {
 
     for (s = 0; s < this.numVertices; s++) {
       const componentVertices = this.findLeastStronglyConnectedComponent(s);
-      if (componentVertices.every(v => !this.hasEdgesFromId(v))) break;
       s = componentVertices[0];
       for (const v of componentVertices) {
         blocked[v] = false;

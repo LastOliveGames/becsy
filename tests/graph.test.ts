@@ -60,6 +60,13 @@ describe('bitset operations', () => {
     expect(graph.findCycles()).toEqual([['a', 'b', 'c', 'd']]);
   });
 
+  test('find another cycle', () => {
+    graph.addEdge('d', 'b', 4);
+    graph.addEdge('b', 'c', 4);
+    graph.addEdge('c', 'd', 4);
+    expect(graph.findCycles()).toEqual([['b', 'c', 'd']]);
+  });
+
   test('find multiple cycles', () => {
     graph.addEdge('a', 'b', 1);
     graph.addEdge('b', 'a', 1);

@@ -3,6 +3,7 @@
 - Changed the signature of `System.start`.  `@co` usage is unaffected.
 - Added `cancelIfCoroutineStarted` to implement mutually exclusive coroutines.
 - Made sure to reset `accessRecentlyDeletedData` between coroutines.
+- Fixed system dependency cycle detection to detect cycles that it missed before.
 
 ### 0.9.4
 - Fixed the perf build, which got broken in 0.9.2.
