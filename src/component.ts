@@ -364,13 +364,13 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
     readonlyMaster = binding.readonlyInstance;
     writableMaster = binding.writableInstance;
     binding.readonlyInstance = Object.create(readonlyMaster);
-    binding.readonlyInstance.__invalid = binding.capacity > 1;
+    binding.readonlyInstance.__invalid = !binding.elastic && binding.capacity > 1;
     binding.writableInstance = Object.create(writableMaster);
-    binding.writableInstance.__invalid = binding.capacity > 1;
+    binding.writableInstance.__invalid = !binding.elastic && binding.capacity > 1;
   }
 
   function resetComponent(writable: boolean): void {
-    if (binding.capacity === 1) return;
+    if (!binding.elastic && binding.capacity === 1) return;
     if (writable) {
       binding.writableInstance.__invalid = true;
       binding.writableInstance = Object.create(writableMaster);

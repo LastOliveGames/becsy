@@ -149,7 +149,10 @@ export abstract class System {
     return schedule;
   }
 
-  singleton = {
+  /**
+   * Contains helper methods for declaring read-only and read-write singleton components.
+   */
+  declare readonly singleton: {
     /**
      * Declares that the given component type is a singleton and gets a read-only handle to it. This
      * will automatically set the component's storage type to `compact` with a capacity of 1 and
@@ -162,17 +165,7 @@ export abstract class System {
      * @returns A read-only view of the only instance of the component.  This instance will remain
      *  valid for as long as the world exists.
      */
-    read: <T>(type: ComponentType<T>): T => {
-      CHECK: if (!this.__singletonPlaceholders) {
-        throw new Error(
-          `Attempt to declare a singleton after world initialized in system ${this.name}`);
-      }
-      declareSingleton(type);
-      this.query(q => q.using(type));
-      const placeholder = new SingletonPlaceholder('read', type);
-      this.__singletonPlaceholders.push(placeholder);
-      return placeholder as unknown as T;
-    },
+    readonly read: <T>(type: ComponentType<T>) => T,
 
     /**
      * Declarse that the given component type is a singleton and gets a read-write handle to it.
@@ -188,17 +181,7 @@ export abstract class System {
      * @returns A read-write view of the only instance of the component.  This instance will remain
      *  valid for as long as the world exists.
      */
-    write: <T>(type: ComponentType<T>, initialValues?: Record<string, unknown>): T => {
-      CHECK: if (!this.__singletonPlaceholders) {
-        throw new Error(
-          `Attempt to declare a singleton after world initialized in system ${this.name}`);
-      }
-      declareSingleton(type);
-      this.query(q => q.using(type).write);
-      const placeholder = new SingletonPlaceholder('write', type, initialValues);
-      this.__singletonPlaceholders.push(placeholder);
-      return placeholder as unknown as T;
-    }
+    readonly write: <T>(type: ComponentType<T>, initialValues?: Record<string, unknown>) => T
   };
 
   /**
@@ -288,6 +271,39 @@ export abstract class System {
    */
   execute(): void { } // eslint-disable-line @typescript-eslint/no-empty-function
 }
+
+Object.defineProperty(System.prototype, 'singleton', {
+  get(this: System) {
+    const self = this;  // eslint-disable-line @typescript-eslint/no-this-alias
+    const singleton = {
+      read<T>(type: ComponentType<T>): T {
+        CHECK: if (!self.__singletonPlaceholders) {
+          throw new Error(
+            `Attempt to declare a singleton after world initialized in system ${self.name}`);
+        }
+        declareSingleton(type);
+        self.query(q => q.using(type));
+        const placeholder = new SingletonPlaceholder('read', type);
+        self.__singletonPlaceholders.push(placeholder);
+        return placeholder as unknown as T;
+      },
+      write<T>(type: ComponentType<T>, initialValues?: Record<string, unknown>): T {
+        CHECK: if (!self.__singletonPlaceholders) {
+          throw new Error(
+            `Attempt to declare a singleton after world initialized in system ${self.name}`);
+        }
+        declareSingleton(type);
+        self.query(q => q.using(type).write);
+        const placeholder = new SingletonPlaceholder('write', type, initialValues);
+        self.__singletonPlaceholders.push(placeholder);
+        return placeholder as unknown as T;
+      }
+    };
+    Object.defineProperty(this, 'singleton', {value: singleton});
+    return singleton;
+  }
+});
+
 
 export class SystemBox {
   readonly rwMasks: ReadWriteMasks = {read: [], write: []};
