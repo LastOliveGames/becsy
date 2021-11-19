@@ -274,14 +274,15 @@ export class RefIndexer {
   trackRefChange(
     sourceId: EntityId, sourceType: ComponentType<any>, sourceSeq: number,
     sourceInternalIndex: number | undefined, oldTargetId: EntityId, newTargetId: EntityId,
-    final: boolean
+    unreference: boolean, release: boolean
   ): void {
     DEBUG: if (!this.refLog) throw new Error(`Trying to trackRefChange without a refLog`);
     DEBUG: if (oldTargetId === newTargetId) throw new Error('No-op call to trackRefChange');
     if (oldTargetId !== -1) {
-      const action = final ? Action.RELEASE : (
-        newTargetId === -1 ? Action.UNREFERENCE : Action.UNREFERENCE | Action.RELEASE
-      );
+      const action = (unreference ? Action.UNREFERENCE : 0) | (release ? Action.RELEASE : 0);
+      DEBUG: if (!action) {
+        throw new Error('Called trackRefChange with neither unreference nor release');
+      }
       this.pushRefLogEntry(
         sourceId, sourceType, sourceSeq, sourceInternalIndex, oldTargetId, action
       );

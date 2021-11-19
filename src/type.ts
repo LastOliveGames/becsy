@@ -420,7 +420,7 @@ class RefType extends Type<Entity | undefined> {
       if (!final) data[binding.index] |= STALE_REF_BIT;
       else if (targetIdGiven) data[binding.index] = -1;
       indexer.trackRefChange(
-        binding.entityId, binding.type, field.seq, undefined, id, -1, final);
+        binding.entityId, binding.type, field.seq, undefined, id, -1, !final, final);
     };
 
     Object.defineProperty(binding.writableInstance, field.name, {
@@ -443,7 +443,7 @@ class RefType extends Type<Entity | undefined> {
         if (oldId === newId && (!stale || newId === -1)) return;
         data[binding.index] = newId;
         indexer.trackRefChange(
-          binding.entityId, binding.type, field.seq, undefined, oldId, newId, stale);
+          binding.entityId, binding.type, field.seq, undefined, oldId, newId, !stale, true);
       }
     });
 
@@ -482,7 +482,7 @@ class RefType extends Type<Entity | undefined> {
       if (!final) data[binding.index] |= STALE_REF_BIT;
       else if (targetIdGiven) data[binding.index] = -1;
       indexer.trackRefChange(
-        binding.entityId, binding.type, field.seq, undefined, id, -1, final);
+        binding.entityId, binding.type, field.seq, undefined, id, -1, !final, final);
     };
 
     Object.defineProperty(binding.writableInstance, field.name, {
@@ -505,7 +505,7 @@ class RefType extends Type<Entity | undefined> {
         if (oldId === newId && (!stale || newId === -1)) return;
         data[binding.index] = newId;
         indexer.trackRefChange(
-          binding.entityId, binding.type, field.seq, undefined, oldId, newId, stale);
+          binding.entityId, binding.type, field.seq, undefined, oldId, newId, !stale, true);
       }
     });
 

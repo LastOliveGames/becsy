@@ -328,4 +328,21 @@ describe('refs affected by entity deletion', () => {
     await world.execute();
     expect(o!.read(Origin).target?.isSame(d2!)).toBe(true);
   });
+
+  test('overwrite cleared ref with same ref before deletion finalized', async () => {
+    const world = await createWorld();
+    let o: Entity;
+    let d1: Entity;
+    world.build(sys => {
+      d1 = sys.createEntity(GlobalDest);
+      o = sys.createEntity(Origin, {target: d1}).hold();
+      o.write(Origin).target = undefined;
+      expect(o.read(Origin).target).toBe(undefined);
+      o.write(Origin).target = d1;
+      expect(o.read(Origin).target?.isSame(d1)).toBe(true);
+    });
+    await world.execute();
+    await world.execute();
+    expect(o!.read(Origin).target?.isSame(d1!)).toBe(true);
+  });
 });

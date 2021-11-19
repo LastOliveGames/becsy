@@ -1,5 +1,8 @@
 ### Upcoming
 
+### 0.10.2
+- Fixed entity reference ovewriting some more.
+
 ### 0.10.1
 - Fixed entity reference overwriting.
 
