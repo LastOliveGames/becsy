@@ -418,8 +418,7 @@ class RefType extends Type<Entity | undefined> {
       const id = data[binding.index] & ENTITY_ID_MASK;
       const targetIdGiven = targetId !== undefined;
       if (targetIdGiven && id !== targetId) return;
-      if (!final) data[binding.index] |= STALE_REF_BIT;
-      else if (targetIdGiven) data[binding.index] = -1;
+      if (final) data[binding.index] = -1; else data[binding.index] |= STALE_REF_BIT;
       indexer.trackRefChange(
         binding.entityId, binding.type, field.seq, undefined, id, -1, !final, final);
     };
@@ -481,8 +480,7 @@ class RefType extends Type<Entity | undefined> {
       const id = data[binding.index] & ENTITY_ID_MASK;
       const targetIdGiven = targetId !== undefined;
       if (targetIdGiven && id !== targetId) return;
-      if (!final) data[binding.index] |= STALE_REF_BIT;
-      else if (targetIdGiven) data[binding.index] = -1;
+      if (final) data[binding.index] = -1; else data[binding.index] |= STALE_REF_BIT;
       indexer.trackRefChange(
         binding.entityId, binding.type, field.seq, undefined, id, -1, !final, final);
     };

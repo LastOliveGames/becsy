@@ -1,7 +1,7 @@
 ### Upcoming
 
-### 0.10.1, 0.10.2, 0.10.3
-- Fixed entity reference overwriting, over and over again.
+### 0.10.1, 0.10.2, 0.10.3, 0.10.4
+- Fixed entity reference overwriting and resetting, over and over again.
 
 ### 0.10.0
 - Implemented `compact` storage strategy.  This is very parsimonious in memory usage but also very slow as the number of allocated components grows so you shoud only consider using it if you have just a handful of components of a given type.
