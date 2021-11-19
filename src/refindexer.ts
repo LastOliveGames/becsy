@@ -277,7 +277,9 @@ export class RefIndexer {
     unreference: boolean, release: boolean
   ): void {
     DEBUG: if (!this.refLog) throw new Error(`Trying to trackRefChange without a refLog`);
-    DEBUG: if (oldTargetId === newTargetId) throw new Error('No-op call to trackRefChange');
+    DEBUG: if (oldTargetId === newTargetId && unreference) {
+      throw new Error('No-op call to trackRefChange');
+    }
     if (oldTargetId !== -1) {
       const action = (unreference ? Action.UNREFERENCE : 0) | (release ? Action.RELEASE : 0);
       DEBUG: if (!action) {

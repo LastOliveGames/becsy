@@ -387,7 +387,7 @@ class DynamicStringType extends Type<string> {
   }
 }
 
-const STALE_REF_BIT = 2 ** 30;
+const STALE_REF_BIT = 2 ** 31;
 
 class RefType extends Type<Entity | undefined> {
   constructor() {
@@ -411,6 +411,7 @@ class RefType extends Type<Entity | undefined> {
 
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
       DEBUG: if (internalIndex) throw new Error('Ref fields have no internal index');
+      DEBUG: if (data[binding.index] === -1) throw new Error('Clearing empty ref');
       DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
         throw new Error('Wrong ref stale state');
       }
@@ -438,9 +439,9 @@ class RefType extends Type<Entity | undefined> {
         }
         let oldId = data[binding.index];
         if (oldId !== -1) oldId &= ENTITY_ID_MASK;
-        const stale = !!(data[binding.index] & STALE_REF_BIT);
+        const stale = oldId !== -1 && !!(data[binding.index] & STALE_REF_BIT);
         const newId = value?.__id ?? -1;
-        if (oldId === newId && (!stale || newId === -1)) return;
+        if (oldId === newId && !stale) return;
         data[binding.index] = newId;
         indexer.trackRefChange(
           binding.entityId, binding.type, field.seq, undefined, oldId, newId, !stale, true);
@@ -473,6 +474,7 @@ class RefType extends Type<Entity | undefined> {
 
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
       DEBUG: if (internalIndex) throw new Error('Ref fields have no internal index');
+      DEBUG: if (data[binding.index] === -1) throw new Error('Clearing empty ref');
       DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
         throw new Error('Wrong ref stale state');
       }
@@ -500,9 +502,9 @@ class RefType extends Type<Entity | undefined> {
         }
         let oldId = data[binding.index];
         if (oldId !== -1) oldId &= ENTITY_ID_MASK;
-        const stale = !!(data[binding.index] & STALE_REF_BIT);
+        const stale = oldId !== -1 && !!(data[binding.index] & STALE_REF_BIT);
         const newId = value?.__id ?? -1;
-        if (oldId === newId && (!stale || newId === -1)) return;
+        if (oldId === newId && !stale) return;
         data[binding.index] = newId;
         indexer.trackRefChange(
           binding.entityId, binding.type, field.seq, undefined, oldId, newId, !stale, true);
