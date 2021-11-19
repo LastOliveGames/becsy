@@ -143,6 +143,18 @@ describe('follow forward references', () => {
     });
   });
 
+  test('reassigned refs', async () => {
+    const world = await createWorld();
+    let d1: Entity, d2: Entity, o: Entity;
+    world.build(sys => {
+      d1 = sys.createEntity(PreciseDest).hold();
+      d2 = sys.createEntity(PreciseDest).hold();
+      o = sys.createEntity(Origin, {target: d1}).hold();
+      o!.write(Origin).target = d2;
+      o!.write(Origin).target = d1;
+    });
+  });
+
 });
 
 describe('follow backward references', () => {

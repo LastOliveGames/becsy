@@ -1,5 +1,8 @@
 ### Upcoming
 
+### 0.10.1
+- Fixed entity reference overwriting.
+
 ### 0.10.0
 - Implemented `compact` storage strategy.  This is very parsimonious in memory usage but also very slow as the number of allocated components grows so you shoud only consider using it if you have just a handful of components of a given type.
 - Implemented easy declaration of and access to singleton components.  See `System.singleton.read` and `System.singleton.write` for docs.

@@ -387,7 +387,7 @@ class DynamicStringType extends Type<string> {
   }
 }
 
-const STALE_REF_BIT = 2 ** 31;
+const STALE_REF_BIT = 2 ** 30;
 
 class RefType extends Type<Entity | undefined> {
   constructor() {
@@ -436,12 +436,14 @@ class RefType extends Type<Entity | undefined> {
         CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
           throw new Error('Referencing a deleted entity is not allowed');
         }
-        const oldId = data[binding.index];
+        let oldId = data[binding.index];
+        if (oldId !== -1) oldId &= ENTITY_ID_MASK;
+        const stale = !!(data[binding.index] & STALE_REF_BIT);
         const newId = value?.__id ?? -1;
-        if (oldId === newId) return;
+        if (oldId === newId && (!stale || newId === -1)) return;
         data[binding.index] = newId;
         indexer.trackRefChange(
-          binding.entityId, binding.type, field.seq, undefined, oldId, newId, true);
+          binding.entityId, binding.type, field.seq, undefined, oldId, newId, stale);
       }
     });
 
@@ -496,12 +498,14 @@ class RefType extends Type<Entity | undefined> {
         CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
           throw new Error('Referencing a deleted entity is not allowed');
         }
-        const oldId = data[binding.index];
+        let oldId = data[binding.index];
+        if (oldId !== -1) oldId &= ENTITY_ID_MASK;
+        const stale = !!(data[binding.index] & STALE_REF_BIT);
         const newId = value?.__id ?? -1;
-        if (oldId === newId) return;
+        if (oldId === newId && (!stale || newId === -1)) return;
         data[binding.index] = newId;
         indexer.trackRefChange(
-          binding.entityId, binding.type, field.seq, undefined, oldId, newId, true);
+          binding.entityId, binding.type, field.seq, undefined, oldId, newId, stale);
       }
     });
 

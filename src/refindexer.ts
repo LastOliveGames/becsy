@@ -22,10 +22,11 @@ interface Selector {
 }
 
 enum Action {
-  REFERENCE = 0, UNREFERENCE = 2 ** 30, RELEASE = 2 ** 31
+  REFERENCE = 0, UNREFERENCE = 2 ** 30, RELEASE = 2 ** 31,
+  UNREFERENCE_AND_RELEASE = 2 ** 30 | 2 ** 31
 }
 
-const ACTION_MASK = Action.REFERENCE | Action.UNREFERENCE | Action.RELEASE;
+const ACTION_MASK = Action.UNREFERENCE_AND_RELEASE;
 
 
 class Tracker {
@@ -278,9 +279,11 @@ export class RefIndexer {
     DEBUG: if (!this.refLog) throw new Error(`Trying to trackRefChange without a refLog`);
     DEBUG: if (oldTargetId === newTargetId) throw new Error('No-op call to trackRefChange');
     if (oldTargetId !== -1) {
+      const action = final ? Action.RELEASE : (
+        newTargetId === -1 ? Action.UNREFERENCE : Action.UNREFERENCE | Action.RELEASE
+      );
       this.pushRefLogEntry(
-        sourceId, sourceType, sourceSeq, sourceInternalIndex, oldTargetId,
-        final ? Action.RELEASE : Action.UNREFERENCE
+        sourceId, sourceType, sourceSeq, sourceInternalIndex, oldTargetId, action
       );
     }
     if (newTargetId !== -1) {
@@ -345,7 +348,7 @@ export class RefIndexer {
         const sourceTypeId = entryPart1 >>> ENTITY_ID_BITS;
         const targetId = entryPart2 & ENTITY_ID_MASK;
         const sourceSeq = (entryPart2 >>> ENTITY_ID_BITS) & (MAX_NUM_FIELDS - 1);
-        const action: Action = (entryPart2 & ACTION_MASK) >>> 30;
+        const action: Action = entryPart2 & ACTION_MASK;
         const internallyIndexed = (entryPart2 & 2 ** 29) !== 0;
         const internalIndex = internallyIndexed ? log[i + 2] : undefined;
         if (internallyIndexed) i += 1;
@@ -363,8 +366,8 @@ export class RefIndexer {
     for (let j = 0; j < this.selectors.length; j++) {
       const selector = this.selectors[j];
       if ((!selector.matchType || selector.sourceTypeId === sourceTypeId) &&
-        (!selector.matchSeq || selector.sourceSeq === sourceSeq)) {
-        if (action === Action.REFERENCE || action === Action.UNREFERENCE) {
+          (!selector.matchSeq || selector.sourceSeq === sourceSeq)) {
+        if (action === Action.REFERENCE || action & Action.UNREFERENCE) {
           const tracker = this.getOrCreateTracker(selector, targetId, false);
           if (action === Action.REFERENCE) {
             tracker.trackReference(sourceId, sourceTypeId, sourceSeq, sourceInternalIndex, local);
@@ -372,7 +375,7 @@ export class RefIndexer {
             tracker.trackUnreference(sourceId, sourceTypeId, sourceSeq, sourceInternalIndex, local);
           }
         }
-        if (selector.trackStale && (action === Action.REFERENCE || action === Action.RELEASE)) {
+        if (selector.trackStale && (action === Action.REFERENCE || action & Action.RELEASE)) {
           const tracker = this.getOrCreateTracker(selector, targetId, true);
           if (action === Action.REFERENCE) {
             tracker.trackReference(sourceId, sourceTypeId, sourceSeq, sourceInternalIndex, local);
