@@ -1,4 +1,4 @@
-import {component, field, System, SystemType, World} from '../src';
+import {component, Entity, field, System, SystemType, World} from '../src';
 
 
 @component class A {
@@ -7,6 +7,10 @@ import {component, field, System, SystemType, World} from '../src';
 
 @component class B {
   @field.uint8 declare value: number;
+}
+
+@component class C {
+  @field.ref declare ref: Entity;
 }
 
 
@@ -57,6 +61,14 @@ describe('removing components', () => {
     await world.execute();
     await world.execute();
     expect(world.execute()).rejects.toThrowError();
+  });
+
+  test('remove component with empty ref', async () => {
+    const world = await createWorld();
+    world.build(sys => {
+      const c = sys.createEntity(C);
+      c.remove(C);
+    });
   });
 
 });

@@ -412,7 +412,7 @@ class RefType extends Type<Entity | undefined> {
 
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
       DEBUG: if (internalIndex) throw new InternalError('Ref fields have no internal index');
-      DEBUG: if (data[binding.index] === -1) throw new InternalError('Clearing empty ref');
+      if (data[binding.index] === -1) return;
       DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
         throw new InternalError('Wrong ref stale state');
       }
@@ -474,7 +474,7 @@ class RefType extends Type<Entity | undefined> {
 
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
       DEBUG: if (internalIndex) throw new InternalError('Ref fields have no internal index');
-      DEBUG: if (data[binding.index] === -1) throw new InternalError('Clearing empty ref');
+      if (data[binding.index] === -1) return;
       DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
         throw new InternalError('Wrong ref stale state');
       }
