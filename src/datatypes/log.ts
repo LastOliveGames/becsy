@@ -1,6 +1,7 @@
 import type {ComponentType} from '../component';
 import type {Buffers} from '../buffers';
 import {ENTITY_ID_BITS} from '../consts';
+import {InternalError} from '../errors';
 
 
 export interface LogPointer {
@@ -50,7 +51,7 @@ export class Log {
     );
     if (options.sortedByComponentType) {
       DEBUG: if (options.numComponentTypes === undefined) {
-        throw new Error(
+        throw new InternalError(
           `numComponentTypes required when ${this.configParamName} is sortedByComponentType`);
       }
       buffers.register(
@@ -68,7 +69,7 @@ export class Log {
     this.corral[corralLength + HEADER_LENGTH] = value;
     this.corral[0] += 1;
     DEBUG: if (!!type !== !!this.options.sortedByComponentType) {
-      throw new Error(
+      throw new InternalError(
         `Pushing value ${type ? 'with' : 'without'} type to log ${this.configParamName} ` +
         `${this.options.sortedByComponentType ? '' : 'not '}sorted by component type`);
     }
@@ -77,7 +78,7 @@ export class Log {
 
   commit(pointer?: LogPointer): boolean {
     DEBUG: if (!pointer && this.options.localProcessingAllowed) {
-      throw new Error('Cannot use blind commit when log local processing is allowed');
+      throw new InternalError('Cannot use blind commit when log local processing is allowed');
     }
     if (!this.corral[0]) return true;
     if (pointer && !(
@@ -233,7 +234,9 @@ export class Log {
 
   countSince(startPointer: LogPointer, endPointer?: LogPointer): number {
     CHECK: this.checkPointers(startPointer, endPointer);
-    DEBUG: if (this.corral[0]) throw new Error(`Internal error, should commit log before counting`);
+    DEBUG: if (this.corral[0]) {
+      throw new InternalError(`Should commit log before counting`);
+    }
     const startIndex = startPointer.index;
     const startGeneration = startPointer.generation;
     const endIndex = endPointer?.index ?? this.data[0];
@@ -252,7 +255,7 @@ export class Log {
       DEBUG: {
         if (startPointer.index > endPointer.index &&
             startPointer.generation >= endPointer.generation) {
-          throw new RangeError(`Internal error, start pointer exceeds end pointer`);
+          throw new InternalError(`Start pointer exceeds end pointer`);
         }
       }
     }
@@ -269,10 +272,10 @@ export class Log {
     }
     DEBUG: {
       if (pointer.corralGeneration > this.corral[1]) {
-        throw new Error('Internal error, pointer corral generation older than corral');
+        throw new InternalError('Pointer corral generation older than corral');
       }
       if (pointer.corralGeneration === this.corral[1] && pointer.corralIndex > this.corral[0]) {
-        throw new Error('Internal error, pointer past end of log corral area');
+        throw new InternalError('Pointer past end of log corral area');
       }
     }
   }

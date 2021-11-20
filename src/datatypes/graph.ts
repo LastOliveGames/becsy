@@ -1,3 +1,5 @@
+import {InternalError} from '../errors';
+
 interface Printable {
   toString(): string;
 }
@@ -33,7 +35,7 @@ export class Graph<V extends Printable> {
   }
 
   get topologicallySortedVertices(): V[] {
-    DEBUG: if (!this.sealed) throw new Error('Graph not yet sealed');
+    DEBUG: if (!this.sealed) throw new InternalError('Graph not yet sealed');
     if (!this.sortedVertices) this.sortedVertices = this.sortTopologically();
     return this.sortedVertices;
   }
@@ -41,13 +43,13 @@ export class Graph<V extends Printable> {
   private getEdgeIndex(source: V, target: V): number {
     const sourceId = this.vertexIndexMap.get(source);
     const targetId = this.vertexIndexMap.get(target);
-    DEBUG: if (sourceId === undefined) throw new Error(`Unknown vertex: ${source}`);
-    DEBUG: if (targetId === undefined) throw new Error(`Unknown vertex: ${target}`);
+    DEBUG: if (sourceId === undefined) throw new InternalError(`Unknown vertex: ${source}`);
+    DEBUG: if (targetId === undefined) throw new InternalError(`Unknown vertex: ${target}`);
     return sourceId * this.numVertices + targetId;
   }
 
   private setEdge(source: V, target: V, weight: number): void {
-    DEBUG: if (this.sealed) throw new Error('Graph already sealed');
+    DEBUG: if (this.sealed) throw new InternalError('Graph already sealed');
     if (source === target) return;
     const sourceToTarget = this.getEdgeIndex(source, target);
     const targetToSource = this.getEdgeIndex(target, source);
@@ -59,12 +61,12 @@ export class Graph<V extends Printable> {
   }
 
   addEdge(source: V, target: V, weight: number): void {
-    DEBUG: if (weight <= 0) throw new Error(`Edge has non-positive weight: ${weight}`);
+    DEBUG: if (weight <= 0) throw new InternalError(`Edge has non-positive weight: ${weight}`);
     this.setEdge(source, target, weight);
   }
 
   denyEdge(source: V, target: V, weight: number): void {
-    DEBUG: if (weight <= 0) throw new Error(`Edge has non-positive weight: ${weight}`);
+    DEBUG: if (weight <= 0) throw new InternalError(`Edge has non-positive weight: ${weight}`);
     this.setEdge(source, target, -weight);
   }
 
@@ -73,29 +75,22 @@ export class Graph<V extends Printable> {
   }
 
   hasPath(source: V, target: V): boolean {
-    DEBUG: if (!this.sealed) throw new Error('Graph not yet sealed');
+    DEBUG: if (!this.sealed) throw new InternalError('Graph not yet sealed');
     return this.paths[this.getEdgeIndex(source, target)] > 0;
   }
 
   private hasEdgeBetweenIds(sourceId: number, targetId: number): boolean {
     DEBUG: if (sourceId > this.numVertices) {
-      throw new Error(`Vertex id out of range: ${sourceId} > ${this.numVertices}`);
+      throw new InternalError(`Vertex id out of range: ${sourceId} > ${this.numVertices}`);
     }
     DEBUG: if (targetId > this.numVertices) {
-      throw new Error(`Vertex id out of range: ${targetId} > ${this.numVertices}`);
+      throw new InternalError(`Vertex id out of range: ${targetId} > ${this.numVertices}`);
     }
     return this.edges[sourceId * this.numVertices + targetId] > 0;
   }
 
-  private hasEdgesFromId(sourceId: number): boolean {
-    for (let i = 0; i < this.numVertices; i++) {
-      if (this.hasEdgeBetweenIds(sourceId, i)) return true;
-    }
-    return false;
-  }
-
   seal(): void {
-    DEBUG: if (this.sealed) throw new Error('Graph already sealed');
+    DEBUG: if (this.sealed) throw new InternalError('Graph already sealed');
     this.sealed = true;
     CHECK: this.checkForCycles();
     this.derivePaths();
@@ -217,7 +212,7 @@ export class Graph<V extends Printable> {
     const subgraph = new Graph<V>(subvertices);
     for (const vertex of subvertices) {
       DEBUG: if (!this.vertexIndexMap.has(vertex)) {
-        throw new Error(`Vertex not in graph: ${vertex}`);
+        throw new InternalError(`Vertex not in graph: ${vertex}`);
       }
       for (const target of subvertices) {
         const edgeIndex = this.getEdgeIndex(vertex, target);
@@ -254,7 +249,9 @@ export class Graph<V extends Printable> {
           }
         }
       }
-      DEBUG: if (!changed) throw new Error('Graph has a cycle, topological sort not possible');
+      DEBUG: if (!changed) {
+        throw new InternalError('Graph has a cycle, topological sort not possible');
+      }
     }
     return vertices;
   }
@@ -316,12 +313,14 @@ export class Graph<V extends Printable> {
    *    this was the last vertex and the traversal is done.
    */
   traverse(completedVertex?: V): V[] | void {
-    DEBUG: if (!this.sealed) throw new Error('Graph not yet sealed');
+    DEBUG: if (!this.sealed) throw new InternalError('Graph not yet sealed');
     this.traversedVertices.length = 0;
     if (completedVertex) {
       this.numTraversedVertices += 1;
       const sourceId = this.vertexIndexMap.get(completedVertex);
-      DEBUG: if (sourceId === undefined) throw new Error(`Unknown vertex: ${completedVertex}`);
+      DEBUG: if (sourceId === undefined) {
+        throw new InternalError(`Unknown vertex: ${completedVertex}`);
+      }
       for (let i = 0; i < this.numVertices; i++) {
         if (this.edges[sourceId * this.numVertices + i]) {
           if (--this.traversalCounts[i] === 0) {

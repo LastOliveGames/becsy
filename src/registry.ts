@@ -6,6 +6,7 @@ import {Entity, EntityId, EntityImpl} from './entity';
 import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {SystemBox} from './system';
 import {AtomicSharedShapeArray, ShapeArray, UnsharedShapeArray} from './datatypes/shapearray';
+import {InternalError} from './errors';
 
 
 export class EntityPool {
@@ -43,7 +44,7 @@ export class EntityPool {
   return(id: number): void {
     DEBUG: {
       if (!this.borrowCounts[id]) {
-        throw new Error('Internal error, returning entity with no borrows');
+        throw new InternalError('Returning entity with no borrows');
       }
     }
     if (--this.borrowCounts[id] <= 0) {
@@ -105,7 +106,7 @@ export class Registry {
     DEBUG: {
       const aliveBinding = this.types[0].__binding!;
       if (!(aliveBinding.shapeOffset === 0 && aliveBinding.shapeMask === 1)) {
-        throw new Error('Alive component was not assigned first available shape mask');
+        throw new InternalError('Alive component was not assigned first available shape mask');
       }
     }
   }

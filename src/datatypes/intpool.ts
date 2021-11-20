@@ -1,3 +1,4 @@
+import {InternalError} from '../errors';
 import type {Buffers} from '../buffers';
 
 
@@ -37,7 +38,7 @@ export class UnsharedPool implements Uint32Pool {
 
   return(id: number): void {
     DEBUG: if (this.length >= this.maxItems) {
-      throw new Error('Internal error, returned entity ID exceeded pool capacity');
+      throw new InternalError('Internal error, returned entity ID exceeded pool capacity');
     }
     this.data[this.length + HEADER_LENGTH] = id;
     this.data[0] += 1;
@@ -57,7 +58,7 @@ export class UnsharedPool implements Uint32Pool {
     const length = this.length;
     const newLength = length + source.length;
     DEBUG: if (newLength > this.maxItems) {
-      throw new Error('Internal error, returned entity ID exceeded pool capacity');
+      throw new InternalError('Internal error, returned entity ID exceeded pool capacity');
     }
     this.data.set(source, length + HEADER_LENGTH);
     this.data[0] = newLength;
@@ -105,7 +106,7 @@ export class SharedAtomicPool {
 
   return(id: number): void {
     DEBUG: if (this.length >= this.maxItems) {
-      throw new Error('Internal error, returned entity ID exceeded pool capacity');
+      throw new InternalError('Internal error, returned entity ID exceeded pool capacity');
     }
     this.data[this.length + HEADER_LENGTH] = id;
     this.data[0] += 1;
@@ -125,7 +126,7 @@ export class SharedAtomicPool {
     const length = this.length;
     const newLength = length + source.length;
     DEBUG: if (newLength > this.maxItems) {
-      throw new Error('Internal error, returned entity ID exceeded pool capacity');
+      throw new InternalError('Internal error, returned entity ID exceeded pool capacity');
     }
     this.data.set(source, length + HEADER_LENGTH);
     this.data[0] = newLength;

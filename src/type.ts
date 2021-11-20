@@ -2,6 +2,7 @@ import type {TypedArray, TypedArrayConstructor} from './buffers';
 import type {Binding, Component, ComponentType, Field} from './component';
 import {ENTITY_ID_MASK} from './consts';
 import type {Entity, EntityId} from './entity';
+import {InternalError} from './errors';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -410,10 +411,10 @@ class RefType extends Type<Entity | undefined> {
     field.updateBuffer();
 
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
-      DEBUG: if (internalIndex) throw new Error('Ref fields have no internal index');
-      DEBUG: if (data[binding.index] === -1) throw new Error('Clearing empty ref');
+      DEBUG: if (internalIndex) throw new InternalError('Ref fields have no internal index');
+      DEBUG: if (data[binding.index] === -1) throw new InternalError('Clearing empty ref');
       DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
-        throw new Error('Wrong ref stale state');
+        throw new InternalError('Wrong ref stale state');
       }
       const id = data[binding.index] & ENTITY_ID_MASK;
       const targetIdGiven = targetId !== undefined;
@@ -472,10 +473,10 @@ class RefType extends Type<Entity | undefined> {
     indexer.registerSelector();
 
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
-      DEBUG: if (internalIndex) throw new Error('Ref fields have no internal index');
-      DEBUG: if (data[binding.index] === -1) throw new Error('Clearing empty ref');
+      DEBUG: if (internalIndex) throw new InternalError('Ref fields have no internal index');
+      DEBUG: if (data[binding.index] === -1) throw new InternalError('Clearing empty ref');
       DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
-        throw new Error('Wrong ref stale state');
+        throw new InternalError('Wrong ref stale state');
       }
       const id = data[binding.index] & ENTITY_ID_MASK;
       const targetIdGiven = targetId !== undefined;

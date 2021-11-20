@@ -2,6 +2,7 @@ import {EMPTY_ARRAY, Type} from './type';
 import type {Entity, EntityId} from './entity';
 import {MAX_NUM_FIELDS} from './consts';
 import type {Dispatcher} from './dispatcher';
+import {InternalError} from './errors';
 
 
 interface SchemaDef<JSType> {
@@ -137,7 +138,7 @@ class PackedStorage implements Storage {
               `raise its capacity above ${this.binding.capacity}`);
           }
           DEBUG: if (this.binding.capacity === this.maxEntities) {
-            throw new Error('Trying to grow storage index beyond maxEntities');
+            throw new InternalError('Trying to grow storage index beyond maxEntities');
           }
           this.binding.capacity = Math.min(this.maxEntities, this.binding.capacity * 2);
           this.growCapacity();
@@ -151,7 +152,7 @@ class PackedStorage implements Storage {
 
   releaseIndex(id: number): void {
     DEBUG: if (this.index[id] === -1) {
-      throw new Error(`Internal error, index for entity ${id} not allocated`);
+      throw new InternalError(`Index for entity ${id} not allocated`);
     }
     if (this.spares[3] === this.spares.length - 4) this.growSpares();
     this.spares[this.spares[3]++ + 4] = this.index[id];
@@ -232,7 +233,7 @@ class CompactStorage implements Storage {
           `raise its capacity above ${this.binding.capacity}`);
       }
       DEBUG: if (this.binding.capacity === this.maxEntities) {
-        throw new Error('Trying to grow storage index beyond maxEntities');
+        throw new InternalError('Trying to grow storage index beyond maxEntities');
       }
       firstEmpty = this.index.length;
       this.binding.capacity = Math.min(this.maxEntities, this.binding.capacity * 2);
@@ -249,7 +250,7 @@ class CompactStorage implements Storage {
         return;
       }
     }
-    DEBUG: throw new Error(`Internal error, index for entity ${id} not allocated`);
+    DEBUG: throw new InternalError(`Index for entity ${id} not allocated`);
   }
 
   private growCapacity(): void {
@@ -405,7 +406,7 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
         binding.entityId = id;
         binding.index = storageManager.index[id];
         DEBUG: if (binding.index === -1) {
-          throw new Error(`Attempt to bind unacquired entity ${id} to ${type.name}`);
+          throw new InternalError(`Attempt to bind unacquired entity ${id} to ${type.name}`);
         }
         CHECK: resetComponent(writable);
         return writable ? binding.writableInstance : binding.readonlyInstance;
@@ -429,7 +430,7 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
         binding.entityId = id;
         binding.index = storageManager.findIndex(id);
         DEBUG: if (binding.index === -1) {
-          throw new Error(`Attempt to bind unacquired entity ${id} to ${type.name}`);
+          throw new InternalError(`Attempt to bind unacquired entity ${id} to ${type.name}`);
         }
         CHECK: resetComponent(writable);
         return writable ? binding.writableInstance : binding.readonlyInstance;

@@ -12,6 +12,7 @@ import type {Lane} from './planner';
 import type {SystemStats} from './stats';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import {co, Coroutine, CoroutineFunction, Supervisor} from './coroutines';
+import {InternalError} from './errors';
 
 
 export interface SystemType<S extends System> {
@@ -467,7 +468,7 @@ export class SystemBox {
           runLength = 1;
         }
         DEBUG: if (entry & 2 ** 31) {
-          throw new Error('Trying to process run header as entry in shape log');
+          throw new InternalError('Trying to process run header as entry in shape log');
         }
         for (let j = 0; j < queries.length; j++) queries[j].handleShapeUpdate(entityId);
         if (--runLength === 0) queries = undefined;
@@ -510,7 +511,7 @@ export class SystemBox {
           runLength = 1;
         }
         DEBUG: if (entry & 2 ** 31) {
-          throw new Error('Trying to process run header as entry in write log');
+          throw new InternalError('Trying to process run header as entry in write log');
         }
         for (let j = 0; j < queries.length; j++) {
           queries[j].handleWrite(entityId, componentFlagOffset!, componentFlagMask!);

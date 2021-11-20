@@ -8,6 +8,7 @@ import {
 } from './consts';
 import type {Dispatcher} from './dispatcher';
 import type {Registry} from './registry';
+import {InternalError} from './errors';
 
 
 interface Selector {
@@ -50,7 +51,7 @@ class Tracker {
   }
 
   clearAllRefs(final: boolean): void {
-    DEBUG: if (!this.tags) throw new Error('Unreferencing an untagged tracker');
+    DEBUG: if (!this.tags) throw new InternalError('Unreferencing an untagged tracker');
     this.clearing = true;
     for (let i = 0; i < this.entities.length; i++) {
       const entityId = this.entities[i].__id;
@@ -82,7 +83,7 @@ class Tracker {
     trackChanges: boolean
   ): void {
     DEBUG: if (this.clearing) {
-      throw new Error('Cannot track a new reference while clearing tracker');
+      throw new InternalError('Cannot track a new reference while clearing tracker');
     }
     CHECK: if (trackChanges) this.checkWriteMask();
     let index = this.getEntityIndex(entityId);
@@ -97,7 +98,7 @@ class Tracker {
     if (this.clearing) return;
     CHECK: if (trackChanges) this.checkWriteMask();
     const index = this.getEntityIndex(entityId);
-    DEBUG: if (index === undefined) throw new Error('Entity backref not tracked');
+    DEBUG: if (index === undefined) throw new InternalError('Entity backref not tracked');
     const empty = this.removeTag(index, this.makeTag(typeId, fieldSeq, internalIndex));
     if (empty) this.removeEntity(index, entityId, trackChanges);
   }
@@ -109,7 +110,7 @@ class Tracker {
   }
 
   private indexEntities(): void {
-    DEBUG: if (this.entityIndex) throw new Error('Entities already indexed');
+    DEBUG: if (this.entityIndex) throw new InternalError('Entities already indexed');
     this.entityIndex = new Array(this.dispatcher.maxEntities);
     for (let i = 0; i < this.entities.length; i++) {
       this.entityIndex[this.entities[i].__id] = i;
@@ -122,10 +123,10 @@ class Tracker {
     if (set === undefined) {
       this.tags[index] = tag;
     } else if (typeof set === 'number') {
-      DEBUG: if (set === tag) throw new Error('Ref already tracked');
+      DEBUG: if (set === tag) throw new InternalError(`Ref ${tag} already tracked (single)`);
       this.tags[index] = [set, tag];
     } else if (Array.isArray(set)) {
-      DEBUG: if (set.includes(tag)) throw new Error('Ref already tracked');
+      DEBUG: if (set.includes(tag)) throw new InternalError(`Ref ${tag} already tracked (array)`);
       if (set.length >= 1000) {
         const actualSet = this.tags[index] = new Set(set);
         actualSet.add(tag);
@@ -133,7 +134,7 @@ class Tracker {
         set.push(tag);
       }
     } else {
-      DEBUG: if (set.has(tag)) throw new Error('Ref already tracked');
+      DEBUG: if (set.has(tag)) throw new InternalError(`Ref ${tag} already tracked (set)`);
       set.add(tag);
     }
   }
@@ -141,17 +142,20 @@ class Tracker {
   private removeTag(index: number, tag: number): boolean {
     if (!this.tags) return true;  // precise mode
     const set = this.tags[index];
-    DEBUG: if (set === undefined) throw new Error('Ref not tracked');
+    DEBUG: if (set === undefined) throw new InternalError(`Ref ${tag} not tracked (none)`);
     if (typeof set === 'number') {
-      DEBUG: if (set !== tag) throw new Error('Ref not tracked');
+      DEBUG: if (set !== tag) throw new InternalError(`Ref ${tag} not tracked (single ${set})`);
       delete this.tags[index];
       return true;
     }
     if (Array.isArray(set)) {
       const k = set.indexOf(tag);
-      DEBUG: if (k === -1) throw new Error('Ref not tracked');
+      DEBUG: if (k === -1) throw new InternalError(`Ref ${tag} not tracked (array ${set})`);
       set.splice(k, 1);
       return !this.tags.length;
+    }
+    DEBUG: if (!set.has(tag)) {
+      throw new InternalError(`Ref ${tag} not tracked (set ${new Array(...set)})`);
     }
     set.delete(tag);
     return !set.size;
@@ -276,14 +280,14 @@ export class RefIndexer {
     sourceInternalIndex: number | undefined, oldTargetId: EntityId, newTargetId: EntityId,
     unreference: boolean, release: boolean
   ): void {
-    DEBUG: if (!this.refLog) throw new Error(`Trying to trackRefChange without a refLog`);
+    DEBUG: if (!this.refLog) throw new InternalError(`Trying to trackRefChange without a refLog`);
     DEBUG: if (oldTargetId === newTargetId && unreference) {
-      throw new Error('No-op call to trackRefChange');
+      throw new InternalError('No-op call to trackRefChange');
     }
     if (oldTargetId !== -1) {
       const action = (unreference ? Action.UNREFERENCE : 0) | (release ? Action.RELEASE : 0);
       DEBUG: if (!action) {
-        throw new Error('Called trackRefChange with neither unreference nor release');
+        throw new InternalError('Called trackRefChange with neither unreference nor release');
       }
       this.pushRefLogEntry(
         sourceId, sourceType, sourceSeq, sourceInternalIndex, oldTargetId, action
@@ -307,7 +311,7 @@ export class RefIndexer {
   ): void {
     const internallyIndexed = typeof sourceInternalIndex !== 'undefined';
     DEBUG: if (internallyIndexed !== sourceType.__binding!.internallyIndexed) {
-      throw new Error('Inconsistent internally indexed flag');
+      throw new InternalError('Inconsistent internally indexed flag');
     }
     this.refLog!.push(sourceId | (sourceType.id! << ENTITY_ID_BITS));
     this.refLog!.push(
@@ -322,7 +326,7 @@ export class RefIndexer {
     let tracker = this.getTracker(selector, targetId, stale);
     if (tracker) return tracker;
     DEBUG: if (stale && !selector.trackStale) {
-      throw new Error('Selector not configured for stale tracking');
+      throw new InternalError('Selector not configured for stale tracking');
     }
     let staleTracker: Tracker;
     tracker = new Tracker(targetId, selector, this.dispatcher);

@@ -1,5 +1,6 @@
 import type {ComponentType} from './component';
 import type {Dispatcher} from './dispatcher';
+import {InternalError} from './errors';
 import type {Plan} from './planner';
 import type {System, SystemBox, SystemType} from './system';
 
@@ -305,7 +306,7 @@ export class FrameImpl {
    */
   end(): void {
     CHECK: if (!this.executing) throw new Error('Frame not executing');
-    DEBUG: if (!this.dispatcher.executing) throw new Error('No frame executing');
+    DEBUG: if (!this.dispatcher.executing) throw new InternalError('No frame executing');
     this.executing = this.dispatcher.executing = false;
     allExecuted: {
       for (const group of this.groups) if (!group.__executed) break allExecuted;

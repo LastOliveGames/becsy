@@ -1,3 +1,5 @@
+import {InternalError} from '../errors';
+
 /**
  * A fixed but arbitrary size bitset.
  */
@@ -11,7 +13,7 @@ export class Bitset {
   get(index: number): boolean {
     DEBUG: {
       if (index < 0 || index >= this.size) {
-        throw new Error(`Bit index out of bounds: ${index}`);
+        throw new InternalError(`Bit index out of bounds: ${index}`);
       }
     }
     return (this.bytes[index >>> 5] & (1 << (index & 31))) !== 0;
@@ -20,7 +22,7 @@ export class Bitset {
   set(index: number): void {
     DEBUG: {
       if (index < 0 || index >= this.size) {
-        throw new Error(`Bit index out of bounds: ${index}`);
+        throw new InternalError(`Bit index out of bounds: ${index}`);
       }
     }
     this.bytes[index >>> 5] |= (1 << (index & 31));
@@ -29,7 +31,7 @@ export class Bitset {
   unset(index: number): void {
     DEBUG: {
       if (index < 0 || index >= this.size) {
-        throw new Error(`Bit index out of bounds: ${index}`);
+        throw new InternalError(`Bit index out of bounds: ${index}`);
       }
     }
     this.bytes[index >>> 5] &= ~(1 << (index & 31));
