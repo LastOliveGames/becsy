@@ -371,4 +371,27 @@ describe('other entity deletion scenarios', () => {
     await world.execute();
   });
 
+  test('delete ref origin that reorders tracker tags', async () => {
+    const world = await createWorld();
+    let d1: Entity;
+    let o: Entity;
+    world.build(sys => {
+      d1 = sys.createEntity(GlobalDest).hold();
+    });
+    await world.execute();
+    world.build(sys => {
+      o = sys.createEntity(Origin, {target: d1}).hold();
+      sys.createEntity(Origin, {target: d1});
+    });
+    await world.execute();
+    world.build(sys => {
+      o.delete();
+    });
+    await world.execute();
+    world.build(sys => {
+      sys.createEntity(Origin, {target: d1});
+    });
+    await world.execute();
+  });
+
 });

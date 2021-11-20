@@ -63,7 +63,7 @@ class Tracker {
       }
     }
     this.entities = [];
-    this.tags = [];
+    if (this.tags) this.tags = [];
     this.entityIndex = undefined;
     this.clearing = false;
   }
@@ -185,6 +185,10 @@ class Tracker {
     if (this.entities.length > index) {
       this.entities[index] = lastEntity!;
       if (this.entityIndex) this.entityIndex[lastEntity!.__id] = index;
+    }
+    if (this.tags) {
+      const lastTag = this.tags.pop();
+      if (this.tags.length > index) this.tags[index] = lastTag!;
     }
     if (trackChanges) this.trackBackrefsChange();
   }
