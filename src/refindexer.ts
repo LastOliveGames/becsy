@@ -181,7 +181,7 @@ class Tracker {
   private removeEntity(index: number, entityId: EntityId, trackChanges: boolean): void {
     this.registry.pool.return(entityId);
     const lastEntity = this.entities.pop();
-    if (this.entityIndex) delete this.entityIndex[index];
+    if (this.entityIndex) delete this.entityIndex[entityId];
     if (this.entities.length > index) {
       this.entities[index] = lastEntity!;
       if (this.entityIndex) this.entityIndex[lastEntity!.__id] = index;
