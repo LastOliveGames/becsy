@@ -2,7 +2,7 @@ import type {ComponentStorage, ComponentType} from './component';
 import type {Entity} from './entity';
 import {MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './consts';
 import {Log, LogPointer} from './datatypes/log';
-import {RunState, System, SystemBox, SystemType} from './system';
+import {RunState, System, SystemBox, SystemId, SystemType} from './system';
 import {Registry} from './registry';
 import {Stats} from './stats';
 import {RefIndexer} from './refindexer';
@@ -163,7 +163,7 @@ export class Dispatcher {
       if (!box) {
         systemClasses.push(SystemClass);
         const system = new SystemClass();
-        system.id = i + 1;  // 0 is reserved for the callback system
+        system.id = (i + 1) as SystemId;  // 0 is reserved for the callback system
         box = new SystemBox(system, this);
         systems.push(box);
         this.systemsByClass.set(SystemClass, box);
@@ -180,7 +180,7 @@ export class Dispatcher {
 
   private createCallbackSystem(): void {
     this.userCallbackSystem = new CallbackSystem();
-    this.userCallbackSystem.id = 0;
+    this.userCallbackSystem.id = 0 as SystemId;
     const box = new SystemBox(this.userCallbackSystem, this);
     box.rwMasks.read = undefined;
     box.rwMasks.write = undefined;

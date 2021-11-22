@@ -1,4 +1,4 @@
-import {ComponentType, assimilateComponentType, defineAndAllocateComponentType} from './component';
+import {ComponentType, assimilateComponentType, defineAndAllocateComponentType, ComponentId} from './component';
 import {Log, LogPointer} from './datatypes/log';
 import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/intpool';
 import type {Dispatcher} from './dispatcher';
@@ -13,14 +13,14 @@ export class EntityPool {
   private readonly borrowed: (Entity | undefined)[];  // indexed by id
   private readonly borrowCounts: Int32Array;  // indexed by id
   private readonly spares: Entity[] = [];
-  private readonly temporarilyBorrowedIds: number[] = [];
+  private readonly temporarilyBorrowedIds: EntityId[] = [];
 
   constructor(private readonly registry: Registry, maxEntities: number) {
     this.borrowed = Array.from({length: maxEntities});
     this.borrowCounts = new Int32Array(maxEntities);
   }
 
-  borrow(id: number): Entity {
+  borrow(id: EntityId): Entity {
     this.borrowCounts[id] += 1;
     let entity = this.borrowed[id];
     if (!entity) {
@@ -30,7 +30,7 @@ export class EntityPool {
     return entity;
   }
 
-  borrowTemporarily(id: number): Entity {
+  borrowTemporarily(id: EntityId): Entity {
     const entity = this.borrow(id);
     this.temporarilyBorrowedIds.push(id);
     return entity;
@@ -41,7 +41,7 @@ export class EntityPool {
     this.temporarilyBorrowedIds.length = 0;
   }
 
-  return(id: number): void {
+  return(id: EntityId): void {
     DEBUG: {
       if (!this.borrowCounts[id]) {
         throw new InternalError('Returning entity with no borrows');
@@ -101,7 +101,9 @@ export class Registry {
   initializeComponentTypes(): void {
     let componentId = 0;
     // Two-phase init, so components can have dependencies on each other's fields.
-    for (const type of this.types) assimilateComponentType(componentId++, type, this.dispatcher);
+    for (const type of this.types) {
+      assimilateComponentType(componentId++ as ComponentId, type, this.dispatcher);
+    }
     for (const type of this.types) defineAndAllocateComponentType(type);
     DEBUG: {
       const aliveBinding = this.types[0].__binding!;
@@ -112,7 +114,7 @@ export class Registry {
   }
 
   createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
-    const id = this.entityIdPool.take();
+    const id = this.entityIdPool.take() as EntityId;
     this.setShape(id, this.Alive);
     const entity = this.pool.borrowTemporarily(id);
     entity.addAll(...initialComponents);
@@ -148,7 +150,7 @@ export class Registry {
       if (!log) break;
       for (let i = startIndex!; i < endIndex!; i++) {
         const entry = log[i];
-        const entityId = entry & ENTITY_ID_MASK;
+        const entityId = (entry & ENTITY_ID_MASK) as EntityId;
         const componentId = (entry >>> ENTITY_ID_BITS) & COMPONENT_ID_MASK;
         const type = this.types[componentId];
         if (!this.shapes.isSet(entityId, type) && !this.removedShapes.isSet(entityId, type)) {

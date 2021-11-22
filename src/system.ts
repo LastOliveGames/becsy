@@ -1,6 +1,6 @@
 import type {LogPointer} from './datatypes/log';
 import type {Dispatcher} from './dispatcher';
-import type {Entity, ReadWriteMasks} from './entity';
+import type {Entity, EntityId, ReadWriteMasks} from './entity';
 import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {World} from './world';  // eslint-disable-line @typescript-eslint/no-unused-vars
 import {Query, QueryBox, QueryBuilder} from './query';
@@ -20,6 +20,8 @@ export interface SystemType<S extends System> {
   __staticScheduler?: (s: ScheduleBuilder) => ScheduleBuilder;
   new(): S;
 }
+
+export type SystemId = number & {__systemIdBrand: symbol};
 
 
 export enum RunState {
@@ -77,7 +79,7 @@ export abstract class System {
    * A numeric ID, unique for systems within a world, that you can use for your own purposes.  Don't
    * change it!
    */
-  id: number;
+  id: SystemId;
 
   /**
    * The time that execution of the current frame was started. See {@link World.execute} for
@@ -450,7 +452,7 @@ export class SystemBox {
       }
       for (let i = startIndex!; i < endIndex!; i++) {
         const entry = log[i];
-        const entityId = entry & ENTITY_ID_MASK;
+        const entityId = (entry & ENTITY_ID_MASK) as EntityId;
         if (!queries) {
           const typeId = (entry >>> ENTITY_ID_BITS) & COMPONENT_ID_MASK;
           const runHeader = entry & 2 ** 31;
@@ -490,7 +492,7 @@ export class SystemBox {
       }
       for (let i = startIndex!; i < endIndex!; i++) {
         const entry = log[i];
-        const entityId = entry & ENTITY_ID_MASK;
+        const entityId = (entry & ENTITY_ID_MASK) as EntityId;
         if (!queries) {
           const typeId = (entry >>> ENTITY_ID_BITS) & COMPONENT_ID_MASK;
           const runHeader = entry & 2 ** 31;
@@ -532,7 +534,7 @@ export class SystemBox {
       const registry = this.dispatcher.registry;
       const Alive = registry.Alive;
       for (const query of this.shapeQueries) query.clearProcessedEntities();
-      for (let id = 0; id < this.dispatcher.maxEntities; id++) {
+      for (let id = 0 as EntityId; id < this.dispatcher.maxEntities; id++) {
         if (registry.hasShape(id, Alive, false)) {
           for (const query of this.shapeQueries) query.handleShapeUpdate(id);
         }

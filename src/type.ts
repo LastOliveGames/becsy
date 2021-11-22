@@ -416,12 +416,12 @@ class RefType extends Type<Entity | undefined> {
       DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
         throw new InternalError('Wrong ref stale state');
       }
-      const id = data[binding.index] & ENTITY_ID_MASK;
+      const id = (data[binding.index] & ENTITY_ID_MASK) as EntityId;
       const targetIdGiven = targetId !== undefined;
       if (targetIdGiven && id !== targetId) return;
       if (final) data[binding.index] = -1; else data[binding.index] |= STALE_REF_BIT;
       indexer.trackRefChange(
-        binding.entityId, binding.type, field.seq, undefined, id, -1, !final, final);
+        binding.entityId, binding.type, field.seq, undefined, id, -1 as EntityId, !final, final);
     };
 
     Object.defineProperty(binding.writableInstance, field.name, {
@@ -430,17 +430,17 @@ class RefType extends Type<Entity | undefined> {
         CHECK: checkInvalid(this, binding);
         const id = data[binding.index];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
-        return pool.borrowTemporarily(id & ENTITY_ID_MASK);
+        return pool.borrowTemporarily((id & ENTITY_ID_MASK) as EntityId);
       },
       set(this: C, value: Entity | undefined | null): void {
         CHECK: checkInvalid(this, binding);
         CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
           throw new Error('Referencing a deleted entity is not allowed');
         }
-        let oldId = data[binding.index];
-        if (oldId !== -1) oldId &= ENTITY_ID_MASK;
+        let oldId = data[binding.index] as EntityId;
+        if (oldId !== -1) oldId = (oldId & ENTITY_ID_MASK) as EntityId;
         const stale = oldId !== -1 && !!(data[binding.index] & STALE_REF_BIT);
-        const newId = value?.__id ?? -1;
+        const newId = (value?.__id ?? -1) as EntityId;
         if (oldId === newId && !stale) return;
         data[binding.index] = newId;
         indexer.trackRefChange(
@@ -454,7 +454,7 @@ class RefType extends Type<Entity | undefined> {
         CHECK: checkInvalid(this, binding);
         const id = data[binding.index];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
-        return pool.borrowTemporarily(id & ENTITY_ID_MASK);
+        return pool.borrowTemporarily((id & ENTITY_ID_MASK) as EntityId);
       },
       set(this: C, value: Entity | undefined | null): void {
         throwNotWritable(binding);
@@ -478,12 +478,12 @@ class RefType extends Type<Entity | undefined> {
       DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
         throw new InternalError('Wrong ref stale state');
       }
-      const id = data[binding.index] & ENTITY_ID_MASK;
+      const id = (data[binding.index] & ENTITY_ID_MASK) as EntityId;
       const targetIdGiven = targetId !== undefined;
       if (targetIdGiven && id !== targetId) return;
       if (final) data[binding.index] = -1; else data[binding.index] |= STALE_REF_BIT;
       indexer.trackRefChange(
-        binding.entityId, binding.type, field.seq, undefined, id, -1, !final, final);
+        binding.entityId, binding.type, field.seq, undefined, id, -1 as EntityId, !final, final);
     };
 
     Object.defineProperty(binding.writableInstance, field.name, {
@@ -492,17 +492,17 @@ class RefType extends Type<Entity | undefined> {
         CHECK: checkInvalid(this, binding);
         const id = data[binding.index];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
-        return pool.borrowTemporarily(id & ENTITY_ID_MASK);
+        return pool.borrowTemporarily((id & ENTITY_ID_MASK) as EntityId);
       },
       set(this: C, value: Entity | undefined | null): void {
         CHECK: checkInvalid(this, binding);
         CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
           throw new Error('Referencing a deleted entity is not allowed');
         }
-        let oldId = data[binding.index];
-        if (oldId !== -1) oldId &= ENTITY_ID_MASK;
+        let oldId = data[binding.index] as EntityId;
+        if (oldId !== -1) oldId = (oldId & ENTITY_ID_MASK) as EntityId;
         const stale = oldId !== -1 && !!(data[binding.index] & STALE_REF_BIT);
-        const newId = value?.__id ?? -1;
+        const newId = (value?.__id ?? -1) as EntityId;
         if (oldId === newId && !stale) return;
         data[binding.index] = newId;
         indexer.trackRefChange(
@@ -516,7 +516,7 @@ class RefType extends Type<Entity | undefined> {
         CHECK: checkInvalid(this, binding);
         const id = data[binding.index];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
-        return pool.borrowTemporarily(id & ENTITY_ID_MASK);
+        return pool.borrowTemporarily((id & ENTITY_ID_MASK) as EntityId);
       },
       set(this: C, value: Entity | undefined | null): void {
         throwNotWritable(binding);

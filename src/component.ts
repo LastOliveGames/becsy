@@ -14,6 +14,8 @@ interface Schema {
   [prop: string]: Type<any> | (() => Type<any>) | SchemaDef<any>;
 }
 
+export type ComponentId = number & {__componentIdBrand: symbol};
+
 export type ComponentStorage = 'sparse' | 'packed' | 'compact';
 
 export interface ComponentOptions {
@@ -46,7 +48,7 @@ export interface ComponentType<C extends Component> {
    * will stay the same across runs as long as the list of defs used to create the world doesn't
    * change.  Feel free to use this for your own purposes but don't change it.
    */
-  id?: number;
+  id?: ComponentId;
 
   __binding?: Binding<C>;
   __bind?(id: EntityId, writable: boolean): C;
@@ -62,7 +64,7 @@ export class Binding<C> {
   readonly refFields: Field<Entity | null>[];
   trackedWrites = false;
   internallyIndexed = false;
-  entityId = 0;
+  entityId = 0 as EntityId;
   index = 0;
   readonly initDefault: (component: any) => void;
   readonly init: (component: any, values: any) => void;
@@ -311,7 +313,7 @@ function gatherFields(type: ComponentType<any>): Field<any>[] {
 
 
 export function assimilateComponentType<C>(
-  typeId: number, type: ComponentType<C>, dispatcher: Dispatcher
+  typeId: ComponentId, type: ComponentType<C>, dispatcher: Dispatcher
 ): void {
   const fields = gatherFields(type);
   // For tag components, force sparse storage since we don't actually need to allocate anything.

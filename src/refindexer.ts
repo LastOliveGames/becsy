@@ -38,7 +38,7 @@ class Tracker {
   private readonly registry: Registry;
 
   constructor(
-    private readonly targetEntityId: number, private readonly selector: Selector,
+    private readonly targetEntityId: EntityId, private readonly selector: Selector,
     private readonly dispatcher: Dispatcher
   ) {
     const binding = selector.sourceType?.__binding;
@@ -355,9 +355,9 @@ export class RefIndexer {
       if (local) continue;
       for (let i = startIndex!; i < endIndex!; i += 2) {
         const entryPart1 = log[i], entryPart2 = log[i + 1];
-        const sourceId = entryPart1 & ENTITY_ID_MASK;
+        const sourceId = (entryPart1 & ENTITY_ID_MASK) as EntityId;
         const sourceTypeId = entryPart1 >>> ENTITY_ID_BITS;
-        const targetId = entryPart2 & ENTITY_ID_MASK;
+        const targetId = (entryPart2 & ENTITY_ID_MASK) as EntityId;
         const sourceSeq = (entryPart2 >>> ENTITY_ID_BITS) & (MAX_NUM_FIELDS - 1);
         const action: Action = entryPart2 & ACTION_MASK;
         const internallyIndexed = (entryPart2 & 2 ** 29) !== 0;

@@ -3,7 +3,7 @@ import type {Registry} from './registry';
 import type {SystemBox} from './system';
 
 
-export type EntityId = number;
+export type EntityId = number & {__entityIdBrand: symbol};
 export type ReadWriteMasks = {read?: number[], write?: number[]};
 
 
