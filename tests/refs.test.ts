@@ -394,4 +394,14 @@ describe('other entity deletion scenarios', () => {
     await world.execute();
   });
 
+  test('remove a component with a ref to a deleted entity', async () => {
+    const world = await createWorld();
+    world.build(sys => {
+      const d1 = sys.createEntity(GlobalDest);
+      const o = sys.createEntity(Origin, {target: d1});
+      d1.delete();
+      o.remove(Origin);
+    });
+  });
+
 });

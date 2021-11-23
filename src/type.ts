@@ -413,9 +413,9 @@ class RefType extends Type<Entity | undefined> {
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
       DEBUG: if (internalIndex) throw new InternalError('Ref fields have no internal index');
       if (data[binding.index] === -1) return;
-      DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
-        throw new InternalError('Wrong ref stale state');
-      }
+      const stale = (data[binding.index] & STALE_REF_BIT) !== 0;
+      if (stale && !final) return;
+      DEBUG: if (!stale && final) throw new InternalError('Wrong ref stale state');
       const id = (data[binding.index] & ENTITY_ID_MASK) as EntityId;
       const targetIdGiven = targetId !== undefined;
       if (targetIdGiven && id !== targetId) return;
@@ -475,9 +475,9 @@ class RefType extends Type<Entity | undefined> {
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
       DEBUG: if (internalIndex) throw new InternalError('Ref fields have no internal index');
       if (data[binding.index] === -1) return;
-      DEBUG: if ((data[binding.index] & STALE_REF_BIT) !== 0 !== final) {
-        throw new InternalError('Wrong ref stale state');
-      }
+      const stale = (data[binding.index] & STALE_REF_BIT) !== 0;
+      if (stale && !final) return;
+      DEBUG: if (!stale && final) throw new InternalError('Wrong ref stale state');
       const id = (data[binding.index] & ENTITY_ID_MASK) as EntityId;
       const targetIdGiven = targetId !== undefined;
       if (targetIdGiven && id !== targetId) return;
