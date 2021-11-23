@@ -246,11 +246,18 @@ describe('follow backward references', () => {
       expect(() => sys.createEntity(GlobalDest, {targeters: [o]})).toThrow();
     });
   });
+
+  test('initialize a component with backrefs', async () => {
+    const world = await createWorld();
+    world.build(sys => {
+      sys.createEntity(GlobalDest, {value: 42});
+    });
+  });
 });
 
 describe('backrefs storage variants', () => {
 
-  test('smcurrent entities list', async () => {
+  test('small current entities list', async () => {
     const world = await createWorld();
     world.build(sys => {
       const d1 = sys.createEntity(GlobalDest);

@@ -86,14 +86,26 @@ export class Binding<C> {
         .map(field => `component.${field.name} = ${JSON.stringify(field.default)};`)
         .join('\n')
     ) as (component: any) => void;
+    let backrefFieldInits: string[] = [];
+    CHECK: {
+      backrefFieldInits = fields
+        .filter(field => field.default === EMPTY_ARRAY)
+        .map(field => `
+          if (${JSON.stringify(field.name)} in values) {
+            component.${field.name} = values.${field.name};
+          }
+        `);
+    }
     // eslint-disable-next-line no-new-func
     this.init = new Function(
       'component', 'values',
       fields
+        .filter(field => field.default !== EMPTY_ARRAY)
         .map(field => `
           component.${field.name} = values.${field.name} === undefined ?
             ${JSON.stringify(field.default)} : values.${field.name};
         `)
+        .concat(backrefFieldInits)
         .join('\n')
     ) as (component: any, values: any) => void;
   }

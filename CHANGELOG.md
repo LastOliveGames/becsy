@@ -1,5 +1,8 @@
 ### Upcoming
 
+### 0.10.10
+- Fix bug with initializing components with backrefs introduced in 0.10.8.
+
 ### 0.10.9
 - Use stronger transitive precedence paths between systems to override weak cycles.
 
