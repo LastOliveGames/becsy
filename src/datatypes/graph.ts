@@ -92,8 +92,8 @@ export class Graph<V extends Printable> {
   seal(): void {
     DEBUG: if (this.sealed) throw new InternalError('Graph already sealed');
     this.sealed = true;
-    CHECK: this.checkForCycles();
     this.derivePaths();
+    CHECK: this.checkForCycles();
     this.simplify();
     this.countDependencies();
   }
@@ -256,26 +256,43 @@ export class Graph<V extends Printable> {
     return vertices;
   }
 
-  private derivePaths(): void {
+  derivePaths(): void {
     const n = this.numVertices;
 
     // Remove denial edges, no longer needed
     for (let i = 0; i < this.edges.length; i++) {
       if (this.edges[i] < 0) this.edges[i] = 0;
     }
+    // console.log(this.printMatrix(this.edges));
 
-    // Derive path matrix using a variant of the Floyd-Warshal algorithm
+    // Derive path matrix using a variant of the Floyd-Warshall algorithm
     const paths = this.edges.slice();
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
+        if (i === j) continue;
         for (let k = 0; k < n; k++) {
-          if (paths[i * n + k] && paths[k * n + j]) paths[i * n + j] = 1;
+          if (k === i || k === j) continue;
+          const weight1 = paths[i * n + k];
+          const weight2 = paths[k * n + j];
+          if (weight1 && weight2) {
+            const weight = Math.min(weight1, weight2);
+            if (paths[i * n + j] < weight && paths[j * n + i] < weight) {
+              paths[i * n + j] = weight;
+              paths[j * n + i] = 0;
+            }
+          }
         }
       }
     }
-
     this.paths = paths;
+    // console.log(this.printMatrix(paths));
 
+    // Overwrite edge weights with stronger paths.
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (this.edges[i * n + j]) this.edges[i * n + j] = paths[i * n + j];
+      }
+    }
   }
 
   private simplify(): void {
@@ -287,10 +304,12 @@ export class Graph<V extends Printable> {
       for (let j = 0; j < n; j++) {
         if (!this.edges[i * n + j]) continue;
         for (let k = 0; k < n; k++) {
+          if (k === i || k === j) continue;
           if (paths[i * n + k] && paths[k * n + j]) this.edges[i * n + j] = 0;
         }
       }
     }
+    // console.log(this.printMatrix(this.edges));
   }
 
   private countDependencies(): void {
@@ -339,6 +358,17 @@ export class Graph<V extends Printable> {
     }
     if (this.numTraversedVertices === this.numVertices) return;
     return this.traversedVertices;
+  }
+
+  private printMatrix(matrix: number[]): string {
+    const n = this.numVertices;
+    const lines = [];
+    for (let i = 0; i < n; i++) {
+      const line = [];
+      for (let j = 0; j < n; j++) line.push(matrix[i * n + j]);
+      lines.push(line.join(' '));
+    }
+    return lines.join('\n');
   }
 
 }

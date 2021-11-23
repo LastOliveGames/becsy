@@ -69,4 +69,16 @@ describe('system setup', () => {
     await World.create({defs: [Foo, Bar, SystemC, SystemD]});
     expect(message).toBe('foo 100 bar 45');
   });
+
+  test('order systems transitively', async () => {
+    const group1 = System.group(SystemA);
+    const group2 = System.group(SystemC);
+    const group3 = System.group(SystemD);
+    await World.create({defs: [
+      Foo, Bar,
+      group1.schedule(s => s.after(group2)),
+      group2.schedule(s => s.beforeWritesTo(Foo)),
+      group3.schedule(s => s.beforeReadsFrom(Foo).after(group1))
+    ]});
+  });
 });

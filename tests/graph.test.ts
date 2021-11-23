@@ -44,9 +44,18 @@ describe('bitset operations', () => {
     expect(graph.hasEdge('h', 'g')).toBe(false);
   });
 
+  test('infer stronger paths', () => {
+    graph.addEdge('a', 'c', 1);
+    graph.addEdge('c', 'a', 1);
+    graph.addEdge('a', 'b', 2);
+    graph.addEdge('b', 'c', 2);
+    graph.seal();
+  });
+
   test('find simple cycle', () => {
     graph.addEdge('a', 'b', 1);
     graph.addEdge('b', 'a', 1);
+    graph.derivePaths();
     expect(graph.findCycles()).toEqual([['a', 'b']]);
   });
 
@@ -57,6 +66,7 @@ describe('bitset operations', () => {
     graph.addEdge('d', 'a', 1);
     graph.addEdge('c', 'e', 1);
     graph.addEdge('g', 'a', 1);
+    graph.derivePaths();
     expect(graph.findCycles()).toEqual([['a', 'b', 'c', 'd']]);
   });
 
@@ -64,6 +74,7 @@ describe('bitset operations', () => {
     graph.addEdge('d', 'b', 4);
     graph.addEdge('b', 'c', 4);
     graph.addEdge('c', 'd', 4);
+    graph.derivePaths();
     expect(graph.findCycles()).toEqual([['b', 'c', 'd']]);
   });
 
@@ -77,6 +88,7 @@ describe('bitset operations', () => {
     graph.addEdge('e', 'c', 1);
     graph.addEdge('c', 'f', 1);
     graph.addEdge('f', 'g', 1);
+    graph.derivePaths();
     expect(graph.findCycles()).toEqual([['a', 'b'], ['b', 'c'], ['c', 'd', 'e']]);
   });
 
