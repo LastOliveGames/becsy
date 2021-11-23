@@ -90,11 +90,10 @@ export class Binding<C> {
     this.init = new Function(
       'component', 'values',
       fields
-        .filter(field => field.default !== EMPTY_ARRAY)
-        .map(field =>
-          `component.${field.name} = values.${field.name} === undefined ?
-            ${JSON.stringify(field.default)} : values.${field.name};`
-        )
+        .map(field => `
+          component.${field.name} = values.${field.name} === undefined ?
+            ${JSON.stringify(field.default)} : values.${field.name};
+        `)
         .join('\n')
     ) as (component: any, values: any) => void;
   }

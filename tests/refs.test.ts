@@ -238,6 +238,14 @@ describe('follow backward references', () => {
       expect(d1.read(GlobalDestWithStales).targeters.length).toBe(1);
     });
   });
+
+  test('fail to set backrefs manually', async () => {
+    const world = await createWorld();
+    world.build(sys => {
+      const o = sys.createEntity(Origin);
+      expect(() => sys.createEntity(GlobalDest, {targeters: [o]})).toThrow();
+    });
+  });
 });
 
 describe('backrefs storage variants', () => {
