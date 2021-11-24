@@ -1,10 +1,11 @@
 ### Upcoming
+- Prevented starting coroutines in the `World.build` system.
 
 ### 0.10.10
-- Fix bug with initializing components with backrefs introduced in 0.10.8.
+- Fixed bug with initializing components with backrefs introduced in 0.10.8.
 
 ### 0.10.9
-- Use stronger transitive precedence paths between systems to override weak cycles.
+- Used stronger transitive precedence paths between systems to override weak cycles.
 
 ### 0.10.1, 0.10.2, 0.10.3, 0.10.4, 0.10.5, 0.10.6, 0.10.7, 0.10.8
 - Fixed a lot of entity ref bugs.

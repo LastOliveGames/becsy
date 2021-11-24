@@ -12,6 +12,7 @@ import {
 } from './decorators';
 import {Frame, FrameImpl, SystemGroup, SystemGroupImpl} from './schedule';
 import {Planner} from './planner';
+import type {Coroutine, CoroutineFunction} from './coroutines';
 
 
 // TODO: figure out a better type for interleaved arrays, here and elsewhere
@@ -68,6 +69,10 @@ export interface ControlOptions {
 
 class CallbackSystem extends System {
   __callback: (system: System) => void;
+
+  start<CoFn extends CoroutineFunction>(coroutineFn: CoFn, ...args: Parameters<CoFn>): Coroutine {
+    CHECK: throw new Error('The build system cannot run coroutines');
+  }
 
   execute() {
     this.__callback(this);
