@@ -439,8 +439,12 @@ export class SystemBox {
   }
 
   private __updateShapeQueries(): void {
-    for (const query of this.shapeQueries) query.clearProcessedEntities();
     const shapeLog = this.dispatcher.shapeLog;
+    if (!this.shapeQueries.length) {
+      shapeLog.createPointer(this.shapeLogPointer);
+      return;
+    }
+    for (const query of this.shapeQueries) query.clearProcessedEntities();
     let queries: QueryBox[] | undefined, runLength = 0;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
     while (true) {
@@ -480,6 +484,10 @@ export class SystemBox {
 
   private __updateWriteQueries(): void {
     const writeLog = this.dispatcher.writeLog!;
+    if (!this.writeQueries.length) {
+      writeLog.createPointer(this.writeLogPointer);
+      return;
+    }
     let queries: QueryBox[] | undefined, runLength = 0;
     let componentFlagOffset: number, componentFlagMask: number;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;

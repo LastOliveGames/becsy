@@ -1,5 +1,6 @@
 ### Upcoming
 - Prevented starting coroutines in the `World.build` system.
+- Improve efficiency of processing systems with no queries.
 
 ### 0.10.10
 - Fixed bug with initializing components with backrefs introduced in 0.10.8.

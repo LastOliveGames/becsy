@@ -108,6 +108,12 @@ class CreateAForEachC extends System {
   }
 }
 
+class DoNothing extends System {
+  execute() {
+    // do nothing
+  }
+}
+
 
 let total: {[key: string]: number} = {a: 0, b: 0, c: 0};
 
@@ -189,6 +195,15 @@ describe('basic queries, current iteration, reads and writes', () => {
     await world.execute();
     expect(total.a).toBe(2);
     expect(total.c).toBe(0);
+  });
+
+  test('process system with no queries', async () => {
+    const world = await createWorld(DoNothing);
+    world.createEntity(A);
+    await world.execute();
+    world.createEntity(C);
+    await world.execute();
+    await world.execute();
   });
 });
 
