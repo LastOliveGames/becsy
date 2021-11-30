@@ -230,8 +230,9 @@ export function extendMaskAndSetFlag(mask: number[], type: ComponentType<any>): 
   CHECK: checkTypeDefined(type);
   const flagOffset = type.__binding!.shapeOffset!;
   if (flagOffset >= mask.length) {
+    const oldLength = mask.length;
     mask.length = flagOffset + 1;
-    mask.fill(0, mask.length, flagOffset);
+    mask.fill(0, oldLength, flagOffset);
   }
   mask[flagOffset] |= type.__binding!.shapeMask!;
 }

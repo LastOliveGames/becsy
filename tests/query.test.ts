@@ -15,6 +15,14 @@ import {component, ComponentType, field, Query, System, SystemType, World} from 
 
 @component class D {}
 
+for (let i = 0; i < 30; i++) {
+  @component class Foo { }  // eslint-disable-line @typescript-eslint/no-unused-vars
+}
+
+@component class E {
+  @field.uint8 declare value: number;
+}
+
 
 class IncrementA extends System {
   sked = this.schedule(s => s.afterWritesTo(A));
@@ -115,17 +123,18 @@ class DoNothing extends System {
 }
 
 
-let total: {[key: string]: number} = {a: 0, b: 0, c: 0};
+let total: {[key: string]: number} = {a: 0, b: 0, c: 0, d: 0};
 
 class Count extends System {
   private readonly items: {[key: string]: {type: ComponentType<any>, query: Query}} = {
     a: {type: A, query: this.query(q => q.current.with(A))},
     b: {type: B, query: this.query(q => q.current.with(B))},
-    c: {type: C, query: this.query(q => q.current.with(C))}
+    c: {type: C, query: this.query(q => q.current.with(C))},
+    e: {type: E, query: this.query(q => q.current.with(E))}
   };
 
   execute() {
-    total = {a: 0, b: 0, c: 0};
+    total = {a: 0, b: 0, c: 0, e: 0};
     for (const key in this.items) {
       for (const entity of this.items[key].query.current) {
         total[key] += entity.read(this.items[key].type).value;
@@ -225,6 +234,13 @@ describe('component shape changes', () => {
     world.createEntity(A, C);
     await world.execute();
     expect(total.c).toBe(2);
+  });
+
+  test('iterate high numbered type', async () => {
+    const world = await createWorld();
+    world.createEntity(E, {value: 1});
+    await world.execute();
+    expect(total.e).toBe(1);
   });
 
 });
