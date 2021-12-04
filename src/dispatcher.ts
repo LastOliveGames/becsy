@@ -90,6 +90,7 @@ export class Dispatcher {
   private default: {group: SystemGroup, frame: Frame};
   lastTime: number;
   executing: boolean;
+  executed = false;
   readonly shapeLog: Log;
   readonly writeLog?: Log;
   private readonly shapeLogFramePointer: LogPointer;

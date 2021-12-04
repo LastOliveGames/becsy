@@ -1,5 +1,6 @@
 ### Upcoming
 - Prevented starting coroutines in the `World.build` system.
+- Prevented use of `World.build` and `World.createEntity` after world has started executing.
 - Improve efficiency of processing systems with no queries.
 
 ### 0.10.11

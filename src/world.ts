@@ -54,6 +54,12 @@ export class World {
    * course.)
    */
   build(callback: (system: System) => void): void {
+    CHECK: {
+      if (this.__dispatcher.executed &&
+          (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
+        throw new Error('This method cannot be called after the world has started executing');
+      }
+    }
     this.__dispatcher.executeFunction(callback);
   }
 
@@ -65,6 +71,12 @@ export class World {
    * interleaved with their initial properties.
    */
   createEntity(...initialComponents: (ComponentType<any> | Record<string, unknown>)[]): void {
+    CHECK: {
+      if (this.__dispatcher.executed &&
+        (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
+        throw new Error('This method cannot be called after the world has started executing');
+      }
+    }
     this.__dispatcher.createEntity(initialComponents);
   }
 

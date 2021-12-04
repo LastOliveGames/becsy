@@ -293,6 +293,7 @@ export class FrameImpl {
   begin(): void {
     CHECK: if (this.executing) throw new Error('Frame already executing');
     CHECK: if (this.dispatcher.executing) throw new Error('Another frame already executing');
+    this.dispatcher.executed = true;
     this.executing = this.dispatcher.executing = true;
     const lastTime = this.dispatcher.lastTime ?? this.time;
     this.time = now() / 1000;
