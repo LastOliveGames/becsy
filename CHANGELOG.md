@@ -1,7 +1,8 @@
 ### Upcoming
 - Prevented starting coroutines in the `World.build` system.
 - Prevented use of `World.build` and `World.createEntity` after world has started executing.
-- Improve efficiency of processing systems with no queries.
+- Added `World.terminate` to kill off a world.  This is a no-op for now but in the future will clean up worker threads.
+- Improved efficiency of processing systems with no queries.
 
 ### 0.10.11
 - Fixed queries that involve component types beyond the 31st.

@@ -1,5 +1,5 @@
 import type {ComponentType} from './component';
-import {ControlOptions, Dispatcher, WorldOptions} from './dispatcher';
+import {ControlOptions, Dispatcher, State, WorldOptions} from './dispatcher';
 import {Frame, FrameImpl, SystemGroup} from './schedule';
 import type {Stats} from './stats';
 import type {System} from './system';
@@ -55,7 +55,7 @@ export class World {
    */
   build(callback: (system: System) => void): void {
     CHECK: {
-      if (this.__dispatcher.executed &&
+      if (this.__dispatcher.state !== State.setup &&
           (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
         throw new Error('This method cannot be called after the world has started executing');
       }
@@ -72,7 +72,7 @@ export class World {
    */
   createEntity(...initialComponents: (ComponentType<any> | Record<string, unknown>)[]): void {
     CHECK: {
-      if (this.__dispatcher.executed &&
+      if (this.__dispatcher.state !== State.setup &&
         (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
         throw new Error('This method cannot be called after the world has started executing');
       }
@@ -134,6 +134,19 @@ export class World {
    */
   createCustomExecutor(...groups: SystemGroup[]): Frame {
     return new FrameImpl(this.__dispatcher, groups);
+  }
+
+  /**
+   * Terminates this world once the current frame (if any) completes.  All workers will be
+   * terminated and no further executions will be allowed.
+   */
+  terminate(): void {
+    CHECK: {
+      if (this.__dispatcher.state !== State.setup && this.__dispatcher.state !== State.run) {
+        throw new Error('World terminated');
+      }
+    }
+    this.__dispatcher.terminate();
   }
 
   get stats(): Stats {

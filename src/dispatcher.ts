@@ -13,6 +13,7 @@ import {
 import {Frame, FrameImpl, SystemGroup, SystemGroupImpl} from './schedule';
 import {Planner} from './planner';
 import type {Coroutine, CoroutineFunction} from './coroutines';
+import {InternalError} from './errors';
 
 
 // TODO: figure out a better type for interleaved arrays, here and elsewhere
@@ -79,6 +80,10 @@ class CallbackSystem extends System {
   }
 }
 
+export enum State {
+  init = 0, setup, run, done
+}
+
 
 export class Dispatcher {
   readonly maxEntities;
@@ -90,7 +95,7 @@ export class Dispatcher {
   private default: {group: SystemGroup, frame: Frame};
   lastTime: number;
   executing: boolean;
-  executed = false;
+  state = State.init;
   readonly shapeLog: Log;
   readonly writeLog?: Log;
   private readonly shapeLogFramePointer: LogPointer;
@@ -154,6 +159,7 @@ export class Dispatcher {
       this.writeLogFramePointer = this.writeLog.createPointer();
     }
     for (const box of this.systems) box.finishConstructing();
+    this.state = State.setup;
   }
 
   get threaded(): boolean {return this.threads > 1;}
@@ -306,7 +312,19 @@ export class Dispatcher {
     this.indexer.completeCycle();
   }
 
+  startFrame(time: number): void {
+    CHECK: if (this.executing) throw new Error('Another frame already executing');
+    this.executing = true;
+    CHECK: if (this.state !== State.setup && this.state !== State.run) {
+      throw new Error('World terminated');
+    }
+    this.state = State.run;
+    this.lastTime = time;
+  }
+
   completeFrame(): void {
+    DEBUG: if (!this.executing) throw new InternalError('No frame executing');
+    this.executing = false;
     STATS: this.gatherFrameStats();
     this.processDeferredControls();
   }
@@ -322,6 +340,10 @@ export class Dispatcher {
     this.indexer.flush();  // may update writeLog
     this.shapeLog.commit();
     this.writeLog?.commit();
+  }
+
+  terminate(): void {
+    this.state = State.done;
   }
 
   createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
