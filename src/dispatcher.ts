@@ -286,6 +286,7 @@ export class Dispatcher {
 
   async initialize(): Promise<void> {
     this.default.frame.begin();
+    this.state = State.setup;
     await this.default.group.__plan.initialize();
     this.default.frame.end();
     STATS: this.stats.frames -= 1;
