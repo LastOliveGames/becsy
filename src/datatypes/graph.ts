@@ -324,7 +324,7 @@ export class Graph<V extends Printable> {
 
   /**
    * Traverses vertices of the graph based on dependency order.  When called without an argument it
-   * initialized (or re-initialized) the traversal and returns vertices with no dependencies.  When
+   * initializes (or re-initializes) the traversal and returns vertices with no dependencies.  When
    * called with an argument, it marks that vertex as done and returns the vertices whose
    * dependencies are all satisfied (if any).
    * @param completedVertex The vertex to mark done; if missing, initializes the traversal instead.
