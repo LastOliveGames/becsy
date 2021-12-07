@@ -5,20 +5,21 @@ class Stuff {
 }
 
 @component class Big {
-  @field.boolean boolean: boolean;
-  @field.uint8 uint8: number;
-  @field.int8 int8: number;
-  @field.uint16 uint16: number;
-  @field.int16 int16: number;
-  @field.uint32 uint32: number;
-  @field.int32 int32: number;
-  @field.float32 float32: number;
-  @field.float64 float64: number;
-  @field.staticString(['foo', 'bar', 'baz']) staticString: string;
-  @field.dynamicString(14) dynamicString: string;
-  @field.ref ref?: Entity;
-  @field.object object: Stuff;
-  @field.weakObject weakObject: Stuff;
+  @field.boolean declare boolean: boolean;
+  @field.uint8 declare uint8: number;
+  @field.int8 declare int8: number;
+  @field.uint16 declare uint16: number;
+  @field.int16 declare int16: number;
+  @field.uint32 declare uint32: number;
+  @field.int32 declare int32: number;
+  @field.float32 declare float32: number;
+  @field.float64 declare float64: number;
+  @field.staticString(['foo', 'bar', 'baz']) declare staticString: string;
+  @field.dynamicString(14) declare dynamicString: string;
+  @field.dynamicString(1) declare shortDynamicString: string;
+  @field.ref declare ref?: Entity;
+  @field.object declare object: Stuff;
+  @field.weakObject declare weakObject: Stuff;
 }
 
 async function testReadWrite(prop: string, values: any[]): Promise<void> {
@@ -28,6 +29,12 @@ async function testReadWrite(prop: string, values: any[]): Promise<void> {
     for (const value of values) {
       (entity.write(Big) as any)[prop] = value;
       expect((entity.read(Big) as any)[prop]).toBe(value);
+    }
+    // Check that non-zero offsets work too.
+    const entity2 = system.createEntity(Big);
+    for (const value of values) {
+      (entity2.write(Big) as any)[prop] = value;
+      expect((entity2.read(Big) as any)[prop]).toBe(value);
     }
   });
 }
@@ -76,7 +83,8 @@ describe('getting and setting fields of various types', () => {
   });
 
   test('dynamicString', async () => {
-    await testReadWrite('dynamicString', ['', 'foo', 'foobarbazqux12', '🤷‍♂️']);
+    await testReadWrite('dynamicString', ['', 'a', 'foo', 'foobarbazqux12', '🤷‍♂️']);
+    await testReadWrite('shortDynamicString', ['', 'a']);
   });
 
   test('ref', async () => {

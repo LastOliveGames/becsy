@@ -291,8 +291,8 @@ class DynamicStringType extends Type<string> {
   constructor(maxUtf8Length: number) {
     super('');
     this.maxUtf8Length = maxUtf8Length + (maxUtf8Length % 2);
-    this.lengthsStride = maxUtf8Length / 2 + 1;
     this.bytesStride = this.maxUtf8Length + 2;  // account for length field
+    this.lengthsStride = this.bytesStride / 2;
   }
 
   defineElastic<C>(binding: Binding<C>, field: Field<string>): void {
