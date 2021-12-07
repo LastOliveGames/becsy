@@ -181,7 +181,7 @@ class PackedStorage implements Storage {
     if (!this.index || elementSizeChanged) {
       this.binding.dispatcher.buffers.register(
         `component.${this.binding.type.id!}.storage.index`, this.maxEntities, ArrayType,
-        (index: any) => {this.index = index;}, -1
+        (index: any) => {this.index = index;}, {filler: -1}
       );
     }
     if (elementSizeChanged) {
@@ -272,7 +272,7 @@ class CompactStorage implements Storage {
     STATS: this.binding.dispatcher.stats.forComponent(this.binding.type).capacity = capacity;
     this.binding.dispatcher.buffers.register(
       `component.${this.binding.type.id!}.storage.index`, capacity, Int32Array,
-      this.updateIndex.bind(this), -1
+      this.updateIndex.bind(this), {filler: -1}
     );
     if (this.binding.elastic) for (const field of this.fields) field.updateBuffer!();
   }

@@ -30,6 +30,7 @@ From bitecs we take:
 - [x] Node and browser compatibility with no dependencies
 
 Then we add:
+- [x] multithreaded, lock-free system execution
 - [x] native TypeScript implementation, for a type-friendly design and the best typings
 - [x] selectable component storage strategies, to adjust the performance/memory trade-off
 - [x] entity references that can be traversed in either direction, with strong referential integrity
@@ -39,6 +40,5 @@ Then we add:
 
 Still to come:
 - [ ] examples and docs
-- [ ] multithreaded system execution
 - [ ] built-in support for representing state machines (per [Sander Mertens](https://ajmmertens.medium.com/why-storing-state-machines-in-ecs-is-a-bad-idea-742de7a18e59))
 - [ ] an optional but nicely integrated networked data replication system

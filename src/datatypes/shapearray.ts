@@ -56,8 +56,8 @@ export class UnsharedShapeArray implements ShapeArray {
     const array = this.array;
     const index = entityId * this.stride;
     for (let i = 0; i < positiveMask.length; i++) {
-      const maskByte = positiveMask[i];
-      if ((array[index + i] & maskByte) !== maskByte) return false;
+      const maskWord = positiveMask[i];
+      if ((array[index + i] & maskWord) !== maskWord) return false;
     }
     return true;
   }
@@ -66,8 +66,8 @@ export class UnsharedShapeArray implements ShapeArray {
     const array = this.array;
     const index = entityId * this.stride;
     for (let i = 0; i < negativeMask.length; i++) {
-      const maskByte = negativeMask[i];
-      if ((array[index + i] & maskByte) !== 0) return false;
+      const maskWord = negativeMask[i];
+      if ((array[index + i] & maskWord) !== 0) return false;
     }
     return true;
   }

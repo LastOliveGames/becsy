@@ -327,6 +327,9 @@ export class SystemBox {
   hasWriteQueries: boolean;
   private hasTransientQueries: boolean;
   private ranQueriesLastFrame: boolean;
+  readonly hasCustomPrepare: boolean;
+  readonly hasCustomInitialize: boolean;
+  readonly hasCustomExecute: boolean;
   private shapeLogPointer: LogPointer;
   private writeLogPointer?: LogPointer;
   private state: RunState = RunState.RUNNING;
@@ -335,15 +338,20 @@ export class SystemBox {
   readonly singletonComponentDefs: (ComponentType<any> | Record<string, unknown>)[];
   private propsAssigned = false;
   lane?: Lane;
+  readonly excludedSystemIds: SystemId[] = [];
+  completionLaneImpacts: number[];
   stateless = false;
   weight = 1;
 
-  get id(): number {return this.system.id;}
+  get id(): SystemId {return this.system.id;}
   get name(): string {return this.system.name;}
   toString(): string {return this.name;}
 
   constructor(private readonly system: System, readonly dispatcher: Dispatcher) {
     system.__dispatcher = dispatcher;
+    this.hasCustomPrepare = system.prepare !== System.prototype.prepare;
+    this.hasCustomInitialize = system.initialize !== System.prototype.initialize;
+    this.hasCustomExecute = system.execute !== System.prototype.execute;
     this.shapeLogPointer = dispatcher.shapeLog.createPointer();
     STATS: this.stats = dispatcher.stats.forSystem(system.constructor as SystemType<any>);
     this.attachedSystems = this.system.__attachPlaceholders!.map(
