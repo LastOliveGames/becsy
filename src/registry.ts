@@ -1,4 +1,6 @@
-import {ComponentType, assimilateComponentType, defineAndAllocateComponentType, ComponentId} from './component';
+import {
+  ComponentType, assimilateComponentType, defineAndAllocateComponentType, ComponentId
+} from './component';
 import {Log, LogPointer} from './datatypes/log';
 import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/intpool';
 import type {Dispatcher} from './dispatcher';
