@@ -1,5 +1,9 @@
 ### Upcoming
 
+### 0.10.13
+- Added `usingAll` query modifier to declare a dependency on all component types in the world.
+- Fixed unconstrained queries to actually select all entities.
+
 ### 0.10.12
 - Prevented starting coroutines in the `World.build` system.
 - Prevented use of `World.build` and `World.createEntity` after world has started executing.

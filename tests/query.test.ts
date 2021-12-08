@@ -122,6 +122,16 @@ class DoNothing extends System {
   }
 }
 
+class DeleteAll extends System {
+  entities = this.query(q => q.current.usingAll.write);
+
+  execute() {
+    for (const entity of this.entities.current) {
+      entity.delete();
+    }
+  }
+}
+
 
 let total: {[key: string]: number} = {a: 0, b: 0, c: 0, d: 0};
 
@@ -278,6 +288,18 @@ describe('creating and deleting entities', () => {
     await world.execute();
     await world.execute();
     await world.execute();
+  });
+
+  test('delete all entities', async () => {
+    const world = await createWorld(DeleteAll);
+    world.createEntity(A);
+    world.createEntity(B);
+    world.createEntity(C);
+    world.createEntity(D);
+    world.createEntity(E);
+    await world.execute();
+    await world.execute();
+    expect(world.stats.numEntities).toBe(0);
   });
 
 });

@@ -146,11 +146,11 @@ export class Dispatcher {
     this.systems = this.createSystems(systemTypes);
     this.createCallbackSystem();
     this.registry.initializeComponentTypes();
-    this.registry.hasNegativeQueries = this.systems.some(system => system.hasNegativeQueries);
     this.singleton = this.createSingletons();
     for (const box of this.systems) box.replacePlaceholders();
     this.planner = new Planner(this, this.systems, this.systemGroups);
     this.planner.organize();
+    this.registry.hasNegativeQueries = this.systems.some(system => system.hasNegativeQueries);
     if (this.systems.some(system => system.hasWriteQueries)) {
       this.writeLog = new Log(
         maxWritesPerFrame, 'maxWritesPerFrame', this.buffers,

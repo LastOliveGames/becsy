@@ -174,10 +174,7 @@ export class QueryBuilder {
       this.__query = new QueryBox(this.__userQuery, system);
       this.__callback(this);
       if (!this.__query.withMask && this.__query.flavors) {
-        this.categorize(
-          this.__system.shapeQueriesByComponent,
-          this.__system.dispatcher.registry.Alive
-        );
+        this.set('withMask', [this.__system.dispatcher.registry.Alive]);
       }
       this.__query.complete();
     } catch (e: any) {
@@ -301,6 +298,18 @@ export class QueryBuilder {
    */
   using(...types: ComponentType<any>[]): this {
     this.set(this.__system.rwMasks.read, types);
+    return this;
+  }
+
+  /**
+   * Marks all component types in the world as `read`.  This can be modified with a `.write` as
+   * usual, and may be useful in "sweeper" systems that want to be able to, e.g., delete any entity
+   * without having to worry what it might hold refs to or what components might have backrefs
+   * pointing to it.
+   */
+  get usingAll(): this {
+    // All types except Alive, which is always at index 0.
+    this.set(this.__system.rwMasks.read, this.__system.dispatcher.registry.types.slice(1));
     return this;
   }
 
