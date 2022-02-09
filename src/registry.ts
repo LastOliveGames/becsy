@@ -1,5 +1,5 @@
 import {
-  ComponentType, assimilateComponentType, defineAndAllocateComponentType, ComponentId
+  ComponentType, assimilateComponentType, defineAndAllocateComponentType, ComponentId, dissimilateComponentType
 } from './component';
 import {Log, LogPointer} from './datatypes/log';
 import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/intpool';
@@ -113,6 +113,10 @@ export class Registry {
         throw new InternalError('Alive component was not assigned first available shape mask');
       }
     }
+  }
+
+  releaseComponentTypes(): void {
+    for (const type of this.types) dissimilateComponentType(type);
   }
 
   createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {

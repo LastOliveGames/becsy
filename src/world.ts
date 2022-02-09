@@ -140,12 +140,7 @@ export class World {
    * Terminates this world once the current frame (if any) completes.  All workers will be
    * terminated and no further executions will be allowed.
    */
-  terminate(): void {
-    CHECK: {
-      if (this.__dispatcher.state !== State.setup && this.__dispatcher.state !== State.run) {
-        throw new Error('World terminated');
-      }
-    }
+  async terminate(): Promise<void> {
     this.__dispatcher.terminate();
   }
 

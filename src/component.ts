@@ -466,6 +466,14 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
   }
 }
 
+export function dissimilateComponentType(type: ComponentType<any>): void {
+  delete type.id;
+  delete type.__binding;
+  delete type.__bind;
+  delete type.__allocate;
+  delete type.__free;
+}
+
 
 export function declareSingleton(type: ComponentType<any>): void {
   if (!type.options) type.options = {};

@@ -1,5 +1,9 @@
 ### Upcoming
 
+### 0.11.0
+- Made `World.terminate` async.
+- `World.terminate` will now disentangle the world from all its component types, so they can be bound to a new world.
+
 ### 0.10.13
 - Added `usingAll` query modifier to declare a dependency on all component types in the world.
 - Fixed unconstrained queries to actually select all entities.

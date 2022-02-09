@@ -328,6 +328,7 @@ export class Dispatcher {
     this.executing = false;
     STATS: this.gatherFrameStats();
     this.processDeferredControls();
+    if (this.state === State.done) this.registry.releaseComponentTypes();
   }
 
   gatherFrameStats(): void {
@@ -344,7 +345,13 @@ export class Dispatcher {
   }
 
   terminate(): void {
+    CHECK: {
+      if (this.state !== State.setup && this.state !== State.run) {
+        throw new Error('World terminated');
+      }
+    }
     this.state = State.done;
+    if (!this.executing) this.registry.releaseComponentTypes();
   }
 
   createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
