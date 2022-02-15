@@ -141,11 +141,19 @@ export class World {
    * terminated and no further executions will be allowed.
    */
   async terminate(): Promise<void> {
-    this.__dispatcher.terminate();
+    await this.__dispatcher.terminate();
   }
 
   get stats(): Stats {
     return this.__dispatcher.stats;
+  }
+
+  /**
+   * Returns whether this world is alive and capable of execution (true), or has been terminated
+   * (false).
+   */
+  get alive(): boolean {
+    return this.__dispatcher.state !== State.done;
   }
 }
 

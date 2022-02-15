@@ -40,6 +40,12 @@ class SystemD extends System {
   foo = this.singleton.write(Foo, {speed: 100});
 }
 
+class SystemE extends System {
+  finalize() {
+    message = 'finalized';
+  }
+}
+
 
 describe('system setup', () => {
 
@@ -80,5 +86,14 @@ describe('system setup', () => {
       group2.schedule(s => s.beforeWritesTo(Foo)),
       group3.schedule(s => s.beforeReadsFrom(Foo).after(group1))
     ]});
+  });
+});
+
+describe('system teardown', () => {
+  test('finalize a system', async () => {
+    const world = await World.create({defs: [SystemE]});
+    await world.execute();
+    await world.terminate();
+    expect(message).toBe('finalized');
   });
 });

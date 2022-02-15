@@ -1,5 +1,9 @@
 ### Upcoming
 
+### 0.12.0
+- Added `System.finalize`, to be automatically invoked on all systems when a world is terminated.
+- Made `Frame.begin` and `Frame.end` async.
+
 ### 0.11.0
 - Made `World.terminate` async.
 - `World.terminate` will now disentangle the world from all its component types, so they can be bound to a new world.

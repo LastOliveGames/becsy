@@ -289,7 +289,7 @@ export class FrameImpl {
    *
    * You cannot call `begin` while any other executors are running.
    */
-  begin(): void {
+  async begin(): Promise<void> {
     CHECK: if (this.executing) throw new Error('Frame already executing');
     this.executing = true;
     const lastTime = this.dispatcher.lastTime ?? this.time;
@@ -302,7 +302,7 @@ export class FrameImpl {
    * Indicates that execution of a frame has completed.  Must be called once at the end of each
    * frame, after any calls to `execute`.
    */
-  end(): void {
+  async end(): Promise<void> {
     CHECK: if (!this.executing) throw new Error('Frame not executing');
     this.executing = false;
     allExecuted: {
@@ -310,7 +310,7 @@ export class FrameImpl {
       for (const group of this.groups) group.__executed = false;
       this.dispatcher.completeCycle();
     }
-    this.dispatcher.completeFrame();
+    await this.dispatcher.completeFrame();
   }
 
   /**

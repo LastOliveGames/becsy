@@ -13,6 +13,7 @@ export abstract class Plan {
 
   abstract execute(time: number, delta: number): Promise<void>;
   abstract initialize(): Promise<void>;
+  abstract finalize(): Promise<void>;
 }
 
 
@@ -48,7 +49,6 @@ class SimplePlan extends Plan {
   async initialize(): Promise<void> {
     const dispatcher = this.planner.dispatcher;
     const registry = dispatcher.registry;
-    this.group.__executed = true;
     return new Promise((resolve, reject) => {
       let rejected = false;
 
@@ -75,6 +75,29 @@ class SimplePlan extends Plan {
     });
   }
 
+  async finalize(): Promise<void> {
+    const dispatcher = this.planner.dispatcher;
+    const registry = dispatcher.registry;
+    return new Promise((resolve, reject) => {
+      const finalizeSystem = async (system: SystemBox) => {
+        try {
+          registry.executingSystem = system;
+          system.finalize();
+          dispatcher.flush();
+          registry.executingSystem = undefined;
+          const systems = this.graph.traverse(system);
+          if (!systems) return resolve();
+          for (let i = 0; i < systems.length; i++) finalizeSystem(systems[i]);
+        } catch (e) {
+          reject(e);
+        }
+      };
+
+      const systems = this.graph.traverse();
+      if (!systems) return resolve();
+      for (let i = 0; i < systems.length; i++) finalizeSystem(systems[i]);
+    });
+  }
 }
 
 
@@ -84,6 +107,10 @@ class ThreadedPlan extends Plan {
   }
 
   initialize(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  finalize(): Promise<void> {
     return Promise.resolve();
   }
 }

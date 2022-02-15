@@ -273,6 +273,13 @@ export abstract class System {
    * regular intervals.
    */
   execute(): void { } // eslint-disable-line @typescript-eslint/no-empty-function
+
+  /**
+   * Finalizes the system; to be implemented in a subclass and invoked automatically precisely
+   * once when the world is terminated.  This method is allowed to access the components as declared
+   * in the system's queries.
+   */
+  finalize(): void { } // eslint-disable-line @typescript-eslint/no-empty-function
 }
 
 Object.defineProperty(System.prototype, 'singleton', {
@@ -397,6 +404,10 @@ export class SystemBox {
 
   initialize(): void {
     this.system.initialize();
+  }
+
+  finalize(): void {
+    this.system.finalize();
   }
 
   execute(time: number, delta: number): void {

@@ -81,7 +81,7 @@ class CallbackSystem extends System {
 }
 
 export enum State {
-  init = 0, setup, run, done
+  init = 0, setup, run, finish, done
 }
 
 
@@ -292,6 +292,15 @@ export class Dispatcher {
     STATS: this.stats.frames -= 1;
   }
 
+  private async finalize(): Promise<void> {
+    this.default.frame.begin();
+    this.state = State.done;
+    await this.default.group.__plan.finalize();
+    this.default.frame.end();
+    STATS: this.stats.frames -= 1;
+    this.registry.releaseComponentTypes();
+  }
+
   async execute(time?: number, delta?: number): Promise<void> {
     this.default.frame.begin();
     await this.default.frame.execute(this.default.group, time, delta);
@@ -316,19 +325,21 @@ export class Dispatcher {
   startFrame(time: number): void {
     CHECK: if (this.executing) throw new Error('Another frame already executing');
     this.executing = true;
-    CHECK: if (this.state !== State.setup && this.state !== State.run) {
-      throw new Error('World terminated');
+    CHECK: {
+      if (this.state !== State.setup && this.state !== State.run && this.state !== State.finish) {
+        throw new Error('World terminated');
+      }
     }
     this.state = State.run;
     this.lastTime = time;
   }
 
-  completeFrame(): void {
+  async completeFrame(): Promise<void> {
     DEBUG: if (!this.executing) throw new InternalError('No frame executing');
     this.executing = false;
     STATS: this.gatherFrameStats();
     this.processDeferredControls();
-    if (this.state === State.done) this.registry.releaseComponentTypes();
+    if (this.state === State.finish) await this.finalize();
   }
 
   gatherFrameStats(): void {
@@ -344,14 +355,14 @@ export class Dispatcher {
     this.writeLog?.commit();
   }
 
-  terminate(): void {
+  async terminate(): Promise<void> {
     CHECK: {
       if (this.state !== State.setup && this.state !== State.run) {
         throw new Error('World terminated');
       }
     }
-    this.state = State.done;
-    if (!this.executing) this.registry.releaseComponentTypes();
+    this.state = State.finish;
+    if (!this.executing) await this.finalize();
   }
 
   createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
