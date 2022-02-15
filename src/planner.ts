@@ -49,6 +49,7 @@ class SimplePlan extends Plan {
   async initialize(): Promise<void> {
     const dispatcher = this.planner.dispatcher;
     const registry = dispatcher.registry;
+    this.group.__executed = true;
     return new Promise((resolve, reject) => {
       let rejected = false;
 
@@ -78,6 +79,7 @@ class SimplePlan extends Plan {
   async finalize(): Promise<void> {
     const dispatcher = this.planner.dispatcher;
     const registry = dispatcher.registry;
+    this.group.__executed = true;
     return new Promise((resolve, reject) => {
       const finalizeSystem = async (system: SystemBox) => {
         try {

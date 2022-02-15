@@ -1,5 +1,8 @@
 ### Upcoming
 
+### 0.12.1
+- Fixed world initialization and finalization to run end-of-cycle processing.
+
 ### 0.12.0
 - Added `System.finalize`, to be automatically invoked on all systems when a world is terminated.
 - Made `Frame.begin` and `Frame.end` async.
