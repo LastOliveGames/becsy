@@ -1,4 +1,5 @@
 ### Upcoming
+- Documented ordering of entities in query result lists.
 
 ### 0.12.1
 - Fixed world initialization and finalization to run end-of-cycle processing.
