@@ -30,6 +30,7 @@ export class QueryBox {
   withMask: number[] | undefined;
   withoutMask: number[] | undefined;
   trackMask: number[] | undefined;
+  orderBy: (entity: Entity) => number;
   hasTransientResults: boolean;
   hasChangedResults: boolean;
   private currentEntities: Bitset | undefined;
@@ -59,7 +60,7 @@ export class QueryBox {
     }
     if (this.flavors & QueryFlavor.current) {
       this.results.current =
-        new PackedArrayEntityList(dispatcher.registry.pool, dispatcher.maxEntities);
+        new PackedArrayEntityList(dispatcher.registry.pool, this.orderBy, dispatcher.maxEntities);
     } else {
       this.currentEntities = new Bitset(dispatcher.maxEntities);
     }
@@ -85,7 +86,7 @@ export class QueryBox {
 
   private allocateResult(name: TransientQueryFlavorName): void {
     const dispatcher = this.system.dispatcher;
-    this.results[name] = new ArrayEntityList(dispatcher.registry.pool);
+    this.results[name] = new ArrayEntityList(dispatcher.registry.pool, this.orderBy);
   }
 
   clearTransientResults(): void {
@@ -142,6 +143,16 @@ export class QueryBox {
       this.results.changedOrRemoved?.add(id);
       this.results.addedChangedOrRemoved?.add(id);
     }
+  }
+
+  sort(): void {
+    this.results.current?.sort();
+    this.results.added?.sort();
+    this.results.removed?.sort();
+    this.results.changed?.sort();
+    this.results.addedOrChanged?.sort();
+    this.results.changedOrRemoved?.sort();
+    this.results.addedChangedOrRemoved?.sort();
   }
 
 }
@@ -267,6 +278,17 @@ export class QueryBuilder {
    */
   get addedChangedOrRemoved(): this {
     this.__query.flavors |= QueryFlavor.addedChangedOrRemoved;
+    return this;
+  }
+
+  /**
+   * Order query results in ascending order of the given function's output for each entity.
+   * @example
+   *   q.added.orderBy(entity => entity.ordinal)
+   * @param transformer A function that transforms an entity to a number for sorting.
+   */
+  orderBy(transformer: (entity: Entity) => number): this {
+    this.__query.orderBy = transformer;
     return this;
   }
 

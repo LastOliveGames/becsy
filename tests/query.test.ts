@@ -1,4 +1,4 @@
-import {component, ComponentType, field, Query, System, SystemType, World} from '../src';
+import {component, ComponentType, Entity, field, Query, System, SystemType, World} from '../src';
 
 
 @component class A {
@@ -152,6 +152,31 @@ class Count extends System {
     }
   }
 }
+
+let message: string;
+
+class ListAWithBByOrdinal extends System {
+  entities = this.query(q => q.current.with(A, B).orderBy(entity => entity.ordinal));
+
+  execute() {
+    message = '';
+    for (const entity of this.entities.current) {
+      message += entity.read(A).value;
+    }
+  }
+}
+
+class ListAByValue extends System {
+  entities = this.query(q => q.current.with(A).orderBy(entity => entity.read(A).value));
+
+  execute() {
+    message = '';
+    for (const entity of this.entities.current) {
+      message += entity.read(A).value;
+    }
+  }
+}
+
 
 async function createWorld(...systems: SystemType<System>[]): Promise<World> {
   return World.create({
@@ -313,3 +338,29 @@ describe('creating and deleting entities', () => {
 
 });
 
+describe('ordering query results', () => {
+
+  test('order by ordinal', async () => {
+    const world = await createWorld(ListAWithBByOrdinal);
+    let e1: Entity;
+    world.build(sys => {
+      e1 = sys.createEntity(A, {value: 1}).hold();
+      sys.createEntity(A, {value: 2}, B);
+    });
+    await world.execute();
+    expect(message).toBe('2');
+    world.build(sys => {
+      e1.add(B);
+    });
+    await world.execute();
+    expect(message).toBe('12');
+  });
+
+  test('order by value', async () => {
+    const world = await createWorld(ListAByValue);
+    world.createEntity(A, {value: 2});
+    world.createEntity(A, {value: 1});
+    await world.execute();
+    expect(message).toBe('12');
+  });
+});

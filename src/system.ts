@@ -451,6 +451,7 @@ export class SystemBox {
         this.ranQueriesLastFrame = true;
         if (shapesChanged) this.__updateShapeQueries();
         if (writesMade) this.__updateWriteQueries();
+        for (const query of this.shapeQueries) query.sort();
       }
     }
   }
@@ -564,7 +565,10 @@ export class SystemBox {
           for (const query of this.shapeQueries) query.handleShapeUpdate(id);
         }
       }
-      for (const query of this.shapeQueries) query.clearTransientResults();
+      for (const query of this.shapeQueries) {
+        query.clearTransientResults();
+        query.sort();
+      }
       this.dispatcher.shapeLog.createPointer(this.shapeLogPointer);
       this.dispatcher.writeLog?.createPointer(this.writeLogPointer!);
     }
