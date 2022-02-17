@@ -302,5 +302,14 @@ describe('creating and deleting entities', () => {
     expect(world.stats.numEntities).toBe(0);
   });
 
+  test('assign entity ordinals', async () => {
+    const world = await createWorld();
+    world.build(sys => {
+      const a = sys.createEntity(A);
+      const b = sys.createEntity(B);
+      expect(a.ordinal).toBeLessThan(b.ordinal);
+    });
+  });
+
 });
 

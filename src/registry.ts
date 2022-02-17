@@ -79,6 +79,8 @@ export class Registry {
   executingSystem?: SystemBox;
   includeRecentlyDeleted = false;
   hasNegativeQueries = false;
+  nextEntityOrdinal = 0;
+  entityOrdinals: Uint32Array;
   private readonly removalLog: Log;
   private readonly prevRemovalPointer: LogPointer;
   private readonly oldRemovalPointer: LogPointer;
@@ -99,6 +101,8 @@ export class Registry {
     this.entityIdPool = dispatcher.threaded ?
       new SharedAtomicPool(maxEntities, 'maxEntities', dispatcher.buffers) :
       new UnsharedPool(maxEntities, 'maxEntities');
+    this.entityOrdinals = dispatcher.buffers.register(
+      'registry.entityOrdinals', maxEntities, Uint32Array, array => {this.entityOrdinals = array;});
     this.entityIdPool.fillWithDescendingIntegers(0);
     this.pool = new EntityPool(this, maxEntities);
     CHECK: this.heldEntities = [];
@@ -129,6 +133,7 @@ export class Registry {
 
   createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
     const id = this.entityIdPool.take() as EntityId;
+    this.entityOrdinals[id] = this.nextEntityOrdinal++;
     this.setShape(id, this.Alive);
     const entity = this.pool.borrowTemporarily(id);
     entity.addAll(...initialComponents);

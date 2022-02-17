@@ -30,6 +30,14 @@ export class EntityImpl {
   }
 
   /**
+   * Returns the entity's ordinal number, as determined by the order of entity creation.  Entities
+   * created in systems running concurrently may have overlapping ordinals.
+   */
+  get ordinal(): number {
+    return this.__registry.entityOrdinals[this.__id];
+  }
+
+  /**
    * Adds a component to the entity.  If the entity already possesses a component of this type the
    * call will fail.
    * @param type The type of component to add.
