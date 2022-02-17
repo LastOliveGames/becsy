@@ -33,22 +33,18 @@ class SimplePlan extends Plan {
 
   execute(time: number, delta: number): Promise<void> {
     const dispatcher = this.planner.dispatcher;
-    const registry = dispatcher.registry;
     const systems = this.systems;
     this.group.__executed = true;
     for (let i = 0; i < systems.length; i++) {
       const system = systems[i];
-      registry.executingSystem = system;
       system.execute(time, delta);
       dispatcher.flush();
     }
-    registry.executingSystem = undefined;
     return Promise.resolve();
   }
 
   async initialize(): Promise<void> {
     const dispatcher = this.planner.dispatcher;
-    const registry = dispatcher.registry;
     this.group.__executed = true;
     return new Promise((resolve, reject) => {
       let rejected = false;
@@ -57,10 +53,8 @@ class SimplePlan extends Plan {
         try {
           await system.prepare();
           if (rejected) return;
-          registry.executingSystem = system;
           system.initialize();
           dispatcher.flush();
-          registry.executingSystem = undefined;
           const systems = this.graph.traverse(system);
           if (!systems) return resolve();
           for (let i = 0; i < systems.length; i++) initSystem(systems[i]);
@@ -78,15 +72,12 @@ class SimplePlan extends Plan {
 
   async finalize(): Promise<void> {
     const dispatcher = this.planner.dispatcher;
-    const registry = dispatcher.registry;
     this.group.__executed = true;
     return new Promise((resolve, reject) => {
       const finalizeSystem = async (system: SystemBox) => {
         try {
-          registry.executingSystem = system;
           system.finalize();
           dispatcher.flush();
-          registry.executingSystem = undefined;
           const systems = this.graph.traverse(system);
           if (!systems) return resolve();
           for (let i = 0; i < systems.length; i++) finalizeSystem(systems[i]);

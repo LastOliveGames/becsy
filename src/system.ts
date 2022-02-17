@@ -403,15 +403,18 @@ export class SystemBox {
   }
 
   initialize(): void {
+    this.dispatcher.registry.executingSystem = this;
     this.system.initialize();
   }
 
   finalize(): void {
+    this.dispatcher.registry.executingSystem = this;
     this.system.finalize();
   }
 
   execute(time: number, delta: number): void {
     if (this.state !== RunState.RUNNING) return;
+    this.dispatcher.registry.executingSystem = this;
     this.system.time = time;
     this.system.delta = delta;
     let time1, time2, time3, time4;

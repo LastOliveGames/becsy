@@ -12,6 +12,10 @@ import {AtomicSharedShapeArray, ShapeArray, UnsharedShapeArray} from './datatype
 import {InternalError} from './errors';
 
 
+const SYSTEM_ERROR_TYPES =
+  [EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError, AggregateError];
+
+
 export class EntityPool {
   private readonly borrowed: (Entity | undefined)[];  // indexed by id
   private readonly borrowCounts: Int32Array;  // indexed by id
@@ -70,6 +74,8 @@ export class Registry {
   private readonly entityIdPool: Uint32Pool;
   readonly pool: EntityPool;
   private readonly heldEntities: Entity[];
+  private readonly validators: ComponentType<any>[] = [];
+  private readonly reshapedEntityIds: EntityId[] = [];
   executingSystem?: SystemBox;
   includeRecentlyDeleted = false;
   hasNegativeQueries = false;
@@ -106,6 +112,7 @@ export class Registry {
     // Two-phase init, so components can have dependencies on each other's fields.
     for (const type of this.types) {
       assimilateComponentType(componentId++ as ComponentId, type, this.dispatcher);
+      if (type.validate) this.validators.push(type);
     }
     for (const type of this.types) defineAndAllocateComponentType(type);
     DEBUG: {
@@ -130,7 +137,10 @@ export class Registry {
   }
 
   flush(): void {
+    const lastExecutingSystem = this.executingSystem;
+    this.executingSystem = undefined;
     this.includeRecentlyDeleted = false;
+    CHECK: this.validateShapes(lastExecutingSystem);
     this.pool.returnTemporaryBorrows();
     this.removalLog.commit();
   }
@@ -138,6 +148,29 @@ export class Registry {
   completeCycle(): void {
     this.processRemovalLog();
     CHECK: this.invalidateDeletedHeldEntities();
+  }
+
+  private validateShapes(system: SystemBox | undefined): void {
+    for (const entityId of this.reshapedEntityIds) {
+      for (const componentType of this.validators) {
+        try {
+          componentType.validate!(this.pool.borrowTemporarily(entityId));
+        } catch (e: any) {
+          if (!SYSTEM_ERROR_TYPES.includes(e.constructor)) {
+            const systemSuffix = system ? ` after system ${system.name} executed` : '';
+            const componentNames = this.types
+              .filter(type => type !== this.Alive && this.hasShape(entityId, type, false))
+              .map(type => type.name)
+              .join(', ') || 'none';
+            e.message =
+              `An entity failed to satisfy ${componentType.name}.validate${systemSuffix}: ` +
+              `${e.message} (components: ${componentNames})`;
+          }
+          throw e;
+        }
+      }
+    }
+    this.reshapedEntityIds.length = 0;
   }
 
   private processRemovalLog(): void {
@@ -211,6 +244,7 @@ export class Registry {
   setShape(id: EntityId, type: ComponentType<any>): void {
     this.shapes.set(id, type);
     this.staleShapes.set(id, type);
+    CHECK: this.reshapedEntityIds.push(id);
     if (type !== this.Alive || this.hasNegativeQueries) {
       this.dispatcher.shapeLog.push(id | (type.id! << ENTITY_ID_BITS), type);
     }
@@ -220,6 +254,7 @@ export class Registry {
     this.clearRefs(id, type, false);
     this.shapes.unset(id, type);
     this.removedShapes.set(id, type);
+    CHECK: this.reshapedEntityIds.push(id);
     const logEntry = id | (type.id! << ENTITY_ID_BITS);
     this.removalLog.push(logEntry);
     if (type !== this.Alive || this.hasNegativeQueries) {

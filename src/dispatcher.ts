@@ -68,7 +68,7 @@ export interface ControlOptions {
   restart: DefsArray;
 }
 
-class CallbackSystem extends System {
+class Build extends System {
   __callback: (system: System) => void;
 
   start<CoFn extends CoroutineFunction>(coroutineFn: CoFn, ...args: Parameters<CoFn>): Coroutine {
@@ -106,7 +106,7 @@ export class Dispatcher {
   readonly threads: number;
   readonly buffers: Buffers;
   readonly singleton?: Entity;
-  private userCallbackSystem: CallbackSystem;
+  private userCallbackSystem: Build;
   private callback: {group: SystemGroup, frame: Frame};
   private readonly deferredControls = new Map<SystemBox, RunState>();
 
@@ -191,14 +191,14 @@ export class Dispatcher {
   }
 
   private createCallbackSystem(): void {
-    this.userCallbackSystem = new CallbackSystem();
+    this.userCallbackSystem = new Build();
     this.userCallbackSystem.id = 0 as SystemId;
     const box = new SystemBox(this.userCallbackSystem, this);
     box.rwMasks.read = undefined;
     box.rwMasks.write = undefined;
     this.systems.push(box);
-    this.systemsByClass.set(CallbackSystem, box);
-    this.callback = this.createSingleGroupFrame([CallbackSystem]);
+    this.systemsByClass.set(Build, box);
+    this.callback = this.createSingleGroupFrame([Build]);
   }
 
   private createSingleGroupFrame(
@@ -349,8 +349,8 @@ export class Dispatcher {
   }
 
   flush(): void {
-    this.registry.flush();
     this.indexer.flush();  // may update writeLog
+    this.registry.flush();
     this.shapeLog.commit();
     this.writeLog?.commit();
   }

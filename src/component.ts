@@ -42,6 +42,7 @@ export interface ComponentType<C extends Component> {
   new(): C;
   schema?: Schema;
   options?: ComponentOptions;
+  validate?(entity: Entity): void;
 
   /**
    * A unique, sequential id number for this component type, assigned automatically by becsy.  It

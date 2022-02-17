@@ -111,6 +111,75 @@ export class EntityImpl {
     return this.__registry.hasShape(this.__id, type, true);
   }
 
+  // TODO: see if precomputing the masks and using Registry.match gets better performance on the
+  // following has* methods.
+
+  /**
+   * Returns whether the entity currently contains a component of any of the given types.  If a
+   * system is running in `accessRecentlyDeletedData` mode, this will also consider recently removed
+   * components.
+   * @param types A list of component types to check for.
+   * @returns Whether the entity has a component of at least one of the given types.
+   */
+  hasSomeOf(...types: ComponentType<any>[]): boolean {
+    CHECK: this.__checkValid();
+    for (const type of types) {
+      CHECK: this.__checkMask(type, false);
+      if (this.__registry.hasShape(this.__id, type, true)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Returns whether the entity currently contains a component of every one of the given types.  If
+   * a system is running in `accessRecentlyDeletedData` mode, this will also consider recently
+   * removed components.
+   * @param types A list of component types to check for.
+   * @returns Whether the entity has a component of every one of the given types.
+   */
+  hasAllOf(...types: ComponentType<any>[]): boolean {
+    CHECK: this.__checkValid();
+    for (const type of types) {
+      CHECK: this.__checkMask(type, false);
+      if (!this.__registry.hasShape(this.__id, type, true)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Returns whether the entity currently contains a component of any type other than the given
+   * ones.  If a system is running in `accessRecentlyDeletedData` mode, this will also consider
+   * recently removed components.
+   * @param types A list of component types to exclude from the check.
+   * @returns Whether the entity has a component of a type not given.
+   */
+  hasAnyOtherThan(...types: ComponentType<any>[]): boolean {
+    CHECK: this.__checkValid();
+    const typeSet = new Set(types);
+    for (const type of this.__registry.types) {
+      CHECK: this.__checkMask(type, false);
+      if (!typeSet.has(type) && this.__registry.hasShape(this.__id, type, true)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Counts the number of components of the given types the entity currently contains. If a system
+   * is running in `accessRecentlyDeletedData` mode, this will also consider recently removed
+   * components.
+   * @param types A list of component types to count.
+   * @returns The number of components present from among the given types.
+   */
+  countHas(...types: ComponentType<any>[]): number {
+    CHECK: this.__checkValid();
+    let count = 0;
+    for (const type of types) {
+      CHECK: this.__checkMask(type, false);
+      if (this.__registry.hasShape(this.__id, type, true)) count += 1;
+    }
+    return count;
+  }
+
   /**
    * Obtains a component of the entity that will not allow writing to its fields.  If a component of
    * the given type is not part of this entity this method will fail, unless a system is running in
