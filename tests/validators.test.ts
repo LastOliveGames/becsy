@@ -21,6 +21,12 @@ import {component, World, Entity, System} from '../src';
 
 @component class D {}
 
+class E {
+  static validate(entity: Entity): void {
+    entity.read(E);
+  }
+}
+
 class CreateInvalidEntityOnInitialize extends System {
   q = this.query(q => q.using(C, D).write);
   initialize() {
@@ -96,5 +102,12 @@ describe('run validators on shape change', () => {
       const entity = sys.createEntity(A, B);
       entity.remove(B);
     })).toThrow('missing');
+  });
+});
+
+describe('run validators that use disallowed methods', () => {
+  test('try to read a field', async () => {
+    const world = await World.create({defs: [E]});
+    expect(() => world.createEntity(E)).toThrow();
   });
 });

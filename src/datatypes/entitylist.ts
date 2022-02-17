@@ -1,3 +1,4 @@
+import {InternalError} from '../errors';
 import type {Entity, EntityId} from '../entity';
 import type {EntityPool} from '../registry';
 
@@ -40,7 +41,7 @@ export class PackedArrayEntityList implements EntityList {
 
   remove(id: EntityId): void {
     const index = this.lookupTable[id];
-    if (index < 0) throw new Error('Internal error, entity not in list');
+    DEBUG: if (index < 0) throw new InternalError('Entity not in list');
     this.pool.return(id);
     this.lookupTable[id] = -1;
     const entity = this.entities.pop()!;

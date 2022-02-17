@@ -9,11 +9,13 @@ import {Entity, EntityId, EntityImpl} from './entity';
 import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {SystemBox} from './system';
 import {AtomicSharedShapeArray, ShapeArray, UnsharedShapeArray} from './datatypes/shapearray';
-import {InternalError} from './errors';
+import {CheckError, InternalError} from './errors';
 
 
-const SYSTEM_ERROR_TYPES =
-  [EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError, AggregateError];
+const SYSTEM_ERROR_TYPES = [
+  EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError, AggregateError,
+  CheckError, InternalError
+];
 
 
 export class EntityPool {
@@ -74,8 +76,9 @@ export class Registry {
   private readonly entityIdPool: Uint32Pool;
   readonly pool: EntityPool;
   private readonly heldEntities: Entity[];
-  private readonly validators: ComponentType<any>[] = [];
+  private readonly validators: ComponentType<any>[];
   private readonly reshapedEntityIds: EntityId[] = [];
+  validateSystem: SystemBox;
   executingSystem?: SystemBox;
   includeRecentlyDeleted = false;
   hasNegativeQueries = false;
@@ -106,6 +109,7 @@ export class Registry {
     this.entityIdPool.fillWithDescendingIntegers(0);
     this.pool = new EntityPool(this, maxEntities);
     CHECK: this.heldEntities = [];
+    CHECK: this.validators = [];
     this.removalLog = new Log(maxLimboComponents, 'maxLimboComponents', dispatcher.buffers);
     this.prevRemovalPointer = this.removalLog.createPointer();
     this.oldRemovalPointer = this.removalLog.createPointer();
@@ -143,9 +147,9 @@ export class Registry {
 
   flush(): void {
     const lastExecutingSystem = this.executingSystem;
-    this.executingSystem = undefined;
     this.includeRecentlyDeleted = false;
     CHECK: this.validateShapes(lastExecutingSystem);
+    this.executingSystem = undefined;
     this.pool.returnTemporaryBorrows();
     this.removalLog.commit();
   }
@@ -156,6 +160,7 @@ export class Registry {
   }
 
   private validateShapes(system: SystemBox | undefined): void {
+    this.executingSystem = this.validateSystem;
     for (const entityId of this.reshapedEntityIds) {
       for (const componentType of this.validators) {
         try {

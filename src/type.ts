@@ -2,21 +2,21 @@ import type {TypedArray, TypedArrayConstructor} from './buffers';
 import type {Binding, Component, ComponentType, Field} from './component';
 import {ENTITY_ID_MASK} from './consts';
 import type {Entity, EntityId} from './entity';
-import {InternalError} from './errors';
+import {CheckError, InternalError} from './errors';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 
 function throwNotWritable(binding: Binding<any>) {
-  throw new Error(
+  throw new CheckError(
     `Component is not writable; ` +
     `use entity.write(${binding.type.name}) to acquire a writable version`);
 }
 
 function checkInvalid(component: Component, binding: Binding<any>) {
   if (component.__invalid) {
-    throw new Error(
+    throw new CheckError(
       `Component instance for ${binding.type.name} is no longer valid, as you already bound it ` +
       `to another entity`
     );
@@ -193,7 +193,9 @@ class StaticStringType extends Type<string> {
 
   constructor(private readonly choices: string[]) {
     super(choices[0]);
-    if (!choices?.length) throw new Error('No choices specified for Type.staticString');
+    CHECK: {
+      if (!choices?.length) throw new CheckError('No choices specified for Type.staticString');
+    }
     if (choices.length < 1 << 8) this.TypedArray = Uint8Array;
     else if (choices.length < 1 << 16) this.TypedArray = Uint16Array;
     else this.TypedArray = Uint32Array;
@@ -219,13 +221,17 @@ class StaticStringType extends Type<string> {
         CHECK: checkInvalid(this, binding);
         const index = data[binding.index];
         const result = choices[index];
-        if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
+        CHECK: {
+          if (result === undefined) throw new CheckError(`Invalid static string index: ${index}`);
+        }
         return result;
       },
       set(this: C, value: string): void {
         CHECK: checkInvalid(this, binding);
         const index = choicesIndex.get(value);
-        if (index === undefined) throw new Error(`Static string not in set: "${value}"`);
+        CHECK: {
+          if (index === undefined) throw new CheckError(`Static string not in set: "${value}"`);
+        }
         data[binding.index] = index;
       }
     });
@@ -236,7 +242,9 @@ class StaticStringType extends Type<string> {
         CHECK: checkInvalid(this, binding);
         const index = data[binding.index];
         const result = choices[index];
-        if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
+        CHECK: {
+          if (result === undefined) throw new CheckError(`Invalid static string index: ${index}`);
+        }
         return result;
       },
       set(this: C, value: string): void {
@@ -256,13 +264,17 @@ class StaticStringType extends Type<string> {
         CHECK: checkInvalid(this, binding);
         const index = data[binding.index];
         const result = choices[index];
-        if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
+        CHECK: {
+          if (result === undefined) throw new CheckError(`Invalid static string index: ${index}`);
+        }
         return result;
       },
       set(this: C, value: string): void {
         CHECK: checkInvalid(this, binding);
         const index = choicesIndex.get(value);
-        if (index === undefined) throw new Error(`Static string not in set: "${value}"`);
+        CHECK: {
+          if (index === undefined) throw new CheckError(`Static string not in set: "${value}"`);
+        }
         data[binding.index] = index;
       }
     });
@@ -273,7 +285,9 @@ class StaticStringType extends Type<string> {
         CHECK: checkInvalid(this, binding);
         const index = data[binding.index];
         const result = choices[index];
-        if (result === undefined) throw new Error(`Invalid static string index: ${index}`);
+        CHECK: {
+          if (result === undefined) throw new CheckError(`Invalid static string index: ${index}`);
+        }
         return result;
       },
       set(this: C, value: string): void {
@@ -324,8 +338,11 @@ class DynamicStringType extends Type<string> {
       set(this: C, value: string): void {
         CHECK: checkInvalid(this, binding);
         const encodedString = encoder.encode(value);
-        if (encodedString.byteLength > maxUtf8Length) {
-          throw new Error(`Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
+        CHECK: {
+          if (encodedString.byteLength > maxUtf8Length) {
+            throw new CheckError(
+              `Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
+          }
         }
         lengths[binding.index * lengthsStride] = encodedString.byteLength;
         bytes.set(encodedString, binding.index * bytesStride + 2);
@@ -365,8 +382,11 @@ class DynamicStringType extends Type<string> {
       set(this: C, value: string): void {
         CHECK: checkInvalid(this, binding);
         const encodedString = encoder.encode(value);
-        if (encodedString.byteLength > maxUtf8Length) {
-          throw new Error(`Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
+        CHECK: {
+          if (encodedString.byteLength > maxUtf8Length) {
+            throw new CheckError(
+              `Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
+          }
         }
         lengths[binding.index * lengthsStride] = encodedString.byteLength;
         bytes.set(encodedString, binding.index * bytesStride + 2);
@@ -435,7 +455,7 @@ class RefType extends Type<Entity | undefined> {
       set(this: C, value: Entity | undefined | null): void {
         CHECK: checkInvalid(this, binding);
         CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
-          throw new Error('Referencing a deleted entity is not allowed');
+          throw new CheckError('Referencing a deleted entity is not allowed');
         }
         let oldId = data[binding.index] as EntityId;
         if (oldId !== -1) oldId = (oldId & ENTITY_ID_MASK) as EntityId;
@@ -497,7 +517,7 @@ class RefType extends Type<Entity | undefined> {
       set(this: C, value: Entity | undefined | null): void {
         CHECK: checkInvalid(this, binding);
         CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
-          throw new Error('Referencing a deleted entity is not allowed');
+          throw new CheckError('Referencing a deleted entity is not allowed');
         }
         let oldId = data[binding.index] as EntityId;
         if (oldId !== -1) oldId = (oldId & ENTITY_ID_MASK) as EntityId;
@@ -545,21 +565,21 @@ class BackrefsType extends Type<Entity[]> {
       this.type?.__binding!.fields.find(aField => aField.name === this.fieldName) : undefined;
     CHECK: {
       if (this.fieldName && !refField) {
-        throw new Error(
+        throw new CheckError(
           `Backrefs field ${binding.type.name}.${field.name} refers to ` +
           `an unknown field ${this.type!.name}.${this.fieldName}`);
       }
       if (refField && refField.type !== Type.ref) {
-        throw new Error(
+        throw new CheckError(
           `Backrefs field ${binding.type.name}.${field.name} refers to ` +
           `a field ${this.type!.name}.${this.fieldName} that is not a ref`);
       }
       if (this.fieldName && !this.type) {
-        throw new Error(
+        throw new CheckError(
           `Backrefs selector has field but no component in ${binding.type.name}.${field.name}`);
       }
       if (this.type && !this.fieldName && !this.type.__binding!.refFields.length) {
-        throw new Error(
+        throw new CheckError(
           `Backrefs field ${binding.type.name}.${field.name} refers to ` +
           `component ${this.type!.name} that has no ref fields`);
       }
@@ -575,7 +595,7 @@ class BackrefsType extends Type<Entity[]> {
       get(this: C): Entity[] {
         CHECK: checkInvalid(this, binding);
         CHECK: if (!trackDeletedBackrefs && binding.dispatcher.registry.includeRecentlyDeleted) {
-          throw new Error(
+          throw new CheckError(
             `Backrefs field ${binding.type.name}.${field.name} not configured to track recently ` +
             `deleted refs`);
         }
@@ -584,7 +604,8 @@ class BackrefsType extends Type<Entity[]> {
       set(this: C, value: Entity[]): void {
         CHECK: checkInvalid(this, binding);
         CHECK: if (value !== EMPTY_ARRAY) {
-          throw new Error('Backrefs properties are computed automatically, you cannot set them');
+          throw new CheckError(
+            'Backrefs properties are computed automatically, you cannot set them');
         }
       }
     };

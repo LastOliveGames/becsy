@@ -1,10 +1,11 @@
 import {checkTypeDefined, ComponentType, initComponent} from './component';
+import {CheckError} from './errors';
 import type {Registry} from './registry';
 import type {SystemBox} from './system';
 
 
 export type EntityId = number & {__entityIdBrand: symbol};
-export type ReadWriteMasks = {read?: number[], write?: number[]};
+export type AccessMasks = {read?: number[], write?: number[], check?: number[]};
 
 
 /**
@@ -46,12 +47,12 @@ export class EntityImpl {
   add<C>(type: ComponentType<C>, values?: Partial<C>): void {
     CHECK: {
       this.__checkValid();
-      this.__checkMask(type, true);
+      this.__checkMask(type, 'write');
       if (!this.__registry.hasShape(this.__id, this.__registry.Alive, false)) {
-        throw new Error('Entity has been deleted');
+        throw new CheckError('Entity has been deleted');
       }
       if (this.__registry.hasShape(this.__id, type, false)) {
-        throw new Error(`Entity already has a ${type.name} component`);
+        throw new CheckError(`Entity already has a ${type.name} component`);
       }
     }
     this.__registry.setShape(this.__id, type);
@@ -71,7 +72,7 @@ export class EntityImpl {
       const type = args[i];
       CHECK: {
         if (typeof type !== 'function') {
-          throw new Error(`Bad arguments to bulk add: expected component type, got: ${type}`);
+          throw new CheckError(`Bad arguments to bulk add: expected component type, got: ${type}`);
         }
       }
       let value: ComponentType<any> | Record<string, unknown> | undefined = args[i + 1];
@@ -88,7 +89,7 @@ export class EntityImpl {
   remove(type: ComponentType<any>): void {
     CHECK: {
       this.__checkValid();
-      this.__checkMask(type, true);
+      this.__checkMask(type, 'write');
       this.__checkHas(type, false);
     }
     this.__registry.clearShape(this.__id, type);
@@ -114,7 +115,7 @@ export class EntityImpl {
   has(type: ComponentType<any>): boolean {
     CHECK: {
       this.__checkValid();
-      this.__checkMask(type, false);
+      this.__checkMask(type, 'check');
     }
     return this.__registry.hasShape(this.__id, type, true);
   }
@@ -132,7 +133,7 @@ export class EntityImpl {
   hasSomeOf(...types: ComponentType<any>[]): boolean {
     CHECK: this.__checkValid();
     for (const type of types) {
-      CHECK: this.__checkMask(type, false);
+      CHECK: this.__checkMask(type, 'check');
       if (this.__registry.hasShape(this.__id, type, true)) return true;
     }
     return false;
@@ -148,7 +149,7 @@ export class EntityImpl {
   hasAllOf(...types: ComponentType<any>[]): boolean {
     CHECK: this.__checkValid();
     for (const type of types) {
-      CHECK: this.__checkMask(type, false);
+      CHECK: this.__checkMask(type, 'check');
       if (!this.__registry.hasShape(this.__id, type, true)) return false;
     }
     return true;
@@ -165,7 +166,7 @@ export class EntityImpl {
     CHECK: this.__checkValid();
     const typeSet = new Set(types);
     for (const type of this.__registry.types) {
-      CHECK: this.__checkMask(type, false);
+      CHECK: this.__checkMask(type, 'check');
       if (!typeSet.has(type) && this.__registry.hasShape(this.__id, type, true)) return true;
     }
     return false;
@@ -182,7 +183,7 @@ export class EntityImpl {
     CHECK: this.__checkValid();
     let count = 0;
     for (const type of types) {
-      CHECK: this.__checkMask(type, false);
+      CHECK: this.__checkMask(type, 'check');
       if (this.__registry.hasShape(this.__id, type, true)) count += 1;
     }
     return count;
@@ -202,7 +203,7 @@ export class EntityImpl {
   read<C>(type: ComponentType<C>): Readonly<C> {
     CHECK: {
       this.__checkValid();
-      this.__checkMask(type, false);
+      this.__checkMask(type, 'read');
       this.__checkHas(type, true);
     }
     return type.__bind!(this.__id, false);
@@ -224,7 +225,7 @@ export class EntityImpl {
   write<C>(type: ComponentType<C>): C {
     CHECK: {
       this.__checkValid();
-      this.__checkMask(type, true);
+      this.__checkMask(type, 'write');
       this.__checkHas(type, true);
     }
     if (type.__binding!.trackedWrites) this.__registry.trackWrite(this.__id, type);
@@ -238,11 +239,11 @@ export class EntityImpl {
     CHECK: this.__checkValid();
     const Alive = this.__registry.Alive;
     CHECK: if (!this.__registry.hasShape(this.__id, Alive, false)) {
-      throw new Error('Entity already deleted');
+      throw new CheckError('Entity already deleted');
     }
     for (const type of this.__registry.types) {
       if (this.__registry.hasShape(this.__id, type, false)) {
-        CHECK: if (type !== Alive) this.__checkMask(type, true);
+        CHECK: if (type !== Alive) this.__checkMask(type, 'write');
         this.__registry.clearShape(this.__id, type);
       }
     }
@@ -271,18 +272,18 @@ export class EntityImpl {
     return this.__id === other.__id;
   }
 
-  private __checkMask(type: ComponentType<any>, write: boolean): void {
-    checkMask(type, this.__registry.executingSystem, write);
+  private __checkMask(type: ComponentType<any>, kind: keyof AccessMasks): void {
+    checkMask(type, this.__registry.executingSystem, kind);
   }
 
   private __checkHas(type: ComponentType<any>, allowRecentlyDeleted: boolean): void {
     if (!this.__registry.hasShape(this.__id, type, allowRecentlyDeleted)) {
-      throw new Error(`Entity doesn't have a ${type.name} component`);
+      throw new CheckError(`Entity doesn't have a ${type.name} component`);
     }
   }
 
   private __checkValid(): void {
-    if (!this.__valid) throw new Error('Entity handle no longer valid');
+    if (!this.__valid) throw new CheckError('Entity handle no longer valid');
   }
 }
 
@@ -292,14 +293,15 @@ export interface Entity extends EntityImpl {}
 
 
 export function checkMask(
-  type: ComponentType<any>, system: SystemBox | undefined, write: boolean
+  type: ComponentType<any>, system: SystemBox | undefined, kind: keyof AccessMasks
 ): void {
   checkTypeDefined(type);
-  const mask = write ? system?.rwMasks.write : system?.rwMasks.read;
+  const mask = system?.accessMasks[kind];
   const ok = !mask || ((mask[type.__binding!.shapeOffset] ?? 0) & type.__binding!.shapeMask) !== 0;
   if (!ok) {
-    throw new Error(
-      `System didn't mark component ${type.name} as ${write ? 'writable' : 'readable'}`);
+    throw new CheckError(
+      `System ${system.name} didn't mark component ${type.name} as ` +
+      (kind === 'write' ? 'writeable' : 'readable'));
   }
 }
 

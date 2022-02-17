@@ -1,5 +1,6 @@
 import type {ComponentType} from './component';
 import {ControlOptions, Dispatcher, State, WorldOptions} from './dispatcher';
+import {CheckError} from './errors';
 import {Frame, FrameImpl, SystemGroup} from './schedule';
 import type {Stats} from './stats';
 import type {System} from './system';
@@ -36,8 +37,10 @@ export class World {
    * This is a private constructor, please use the World.create() method instead.
    */
   private constructor(options: WorldOptions, magicCookie: any) {
-    if (magicCookie !== MAGIC_COOKIE) {
-      throw new Error(`Don't call World constructor directly; use World.create instead`);
+    CHECK: {
+      if (magicCookie !== MAGIC_COOKIE) {
+        throw new CheckError(`Don't call World constructor directly; use World.create instead`);
+      }
     }
     this.__dispatcher = new Dispatcher(options);
   }
@@ -57,7 +60,7 @@ export class World {
     CHECK: {
       if (this.__dispatcher.state !== State.setup &&
           (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
-        throw new Error('This method cannot be called after the world has started executing');
+        throw new CheckError('This method cannot be called after the world has started executing');
       }
     }
     this.__dispatcher.executeFunction(callback);
@@ -74,7 +77,7 @@ export class World {
     CHECK: {
       if (this.__dispatcher.state !== State.setup &&
         (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
-        throw new Error('This method cannot be called after the world has started executing');
+        throw new CheckError('This method cannot be called after the world has started executing');
       }
     }
     this.__dispatcher.createEntity(initialComponents);

@@ -1,5 +1,6 @@
 import type {ComponentType} from './component';
 import type {Dispatcher} from './dispatcher';
+import {CheckError} from './errors';
 import type {Plan} from './planner';
 import type {System, SystemBox, SystemType} from './system';
 
@@ -85,7 +86,7 @@ export class ScheduleBuilder {
 
   private __checkNoLaneAssigned(): void {
     if (this.__systems.some(system => system.lane)) {
-      throw new Error(`Threading semantics already specified`);
+      throw new CheckError(`Threading semantics already specified`);
     }
   }
 
@@ -252,10 +253,10 @@ export class SystemGroupImpl {
    */
   schedule(buildCallback: (s: ScheduleBuilder) => void): this {
     CHECK: if (this.__scheduleBuilder === null) {
-      throw new Error(`Attempt to define group schedule after world initialized`);
+      throw new CheckError(`Attempt to define group schedule after world initialized`);
     }
     CHECK: if (this.__scheduleBuilder) {
-      throw new Error(`Attempt to define multiple schedules in a group`);
+      throw new CheckError(`Attempt to define multiple schedules in a group`);
     }
     this.__scheduleBuilder = new ScheduleBuilder(buildCallback, new Schedule());
     return this;
@@ -273,11 +274,11 @@ export class FrameImpl {
 
   constructor(private readonly dispatcher: Dispatcher, private readonly groups: SystemGroup[]) {
     CHECK: if (groups.length === 0) {
-      throw new Error('At least one system group needed');
+      throw new CheckError('At least one system group needed');
     }
     CHECK: for (const group of groups) {
       if (!dispatcher.systemGroups.includes(group)) {
-        throw new Error('Some groups in the frame are not parts of the world defs');
+        throw new CheckError('Some groups in the frame are not parts of the world defs');
       }
     }
   }
@@ -290,7 +291,7 @@ export class FrameImpl {
    * You cannot call `begin` while any other executors are running.
    */
   async begin(): Promise<void> {
-    CHECK: if (this.executing) throw new Error('Frame already executing');
+    CHECK: if (this.executing) throw new CheckError('Frame already executing');
     this.executing = true;
     const lastTime = this.dispatcher.lastTime ?? this.time;
     this.time = now() / 1000;
@@ -303,7 +304,7 @@ export class FrameImpl {
    * frame, after any calls to `execute`.
    */
   async end(): Promise<void> {
-    CHECK: if (!this.executing) throw new Error('Frame not executing');
+    CHECK: if (!this.executing) throw new CheckError('Frame not executing');
     this.executing = false;
     allExecuted: {
       for (const group of this.groups) if (!group.__executed) break allExecuted;
@@ -331,8 +332,10 @@ export class FrameImpl {
    * It's not used internally so you can pass in any numeric value that's expected by your systems.
    */
   execute(group: SystemGroup, time?: number, delta?: number): Promise<void> {
-    CHECK: if (!this.groups.includes(group)) throw new Error('Group not included in this frame');
-    CHECK: if (!this.executing) throw new Error('Frame not executing');
+    CHECK: if (!this.groups.includes(group)) {
+      throw new CheckError('Group not included in this frame');
+    }
+    CHECK: if (!this.executing) throw new CheckError('Frame not executing');
     return group.__plan.execute(time ?? this.time, delta ?? this.delta);
   }
 }

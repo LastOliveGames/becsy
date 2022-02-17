@@ -3,3 +3,5 @@ export class InternalError extends Error {
     super(`Internal error: ${message}. Please report a bug!`);
   }
 }
+
+export class CheckError extends Error {}

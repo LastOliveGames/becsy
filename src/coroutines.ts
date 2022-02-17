@@ -1,5 +1,6 @@
 import type {ComponentType} from './component';
 import type {Entity} from './entity';
+import {CheckError} from './errors';
 import type {System} from './system';
 
 interface Waitable<T> {
@@ -202,7 +203,7 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
   // CurrentCoroutine methods
 
   waitForFrames(frames: number): Waitable<void> {
-    CHECK: if (frames <= 0) throw new Error('Number of frames to wait for must be >0');
+    CHECK: if (frames <= 0) throw new CheckError('Number of frames to wait for must be >0');
     return {
       isReady() {return --frames <= 0;}
     };
@@ -238,9 +239,9 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
   }
 
   scope(entity: Entity): this {
-    CHECK: if (this.__scope) throw new Error('Scope already set for this coroutine');
+    CHECK: if (this.__scope) throw new CheckError('Scope already set for this coroutine');
     CHECK: if (this.__cancellers.length) {
-      throw new Error('Scope must be set before any cancelation conditions');
+      throw new CheckError('Scope must be set before any cancelation conditions');
     }
     this.__scope = entity;
     this.cancelIf(() => !entity.alive);
@@ -248,7 +249,7 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
   }
 
   cancelIfComponentMissing(type: ComponentType<any>): this {
-    CHECK: if (!this.__scope) throw new Error('Required scope not set for this coroutine');
+    CHECK: if (!this.__scope) throw new CheckError('Required scope not set for this coroutine');
     this.cancelIf(() => !this.__scope?.has(type));
     return this;
   }
@@ -263,19 +264,19 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
   // not be called by the user, however.
 
   return(value: void): IteratorResult<any, void> {
-    throw new Error('Generator methods not available for coroutines');
+    throw new CheckError('Generator methods not available for coroutines');
   }
 
   throw(e: any): IteratorResult<any, void> {
-    throw new Error('Generator methods not available for coroutines');
+    throw new CheckError('Generator methods not available for coroutines');
   }
 
   next(...args: [] | [unknown]): IteratorResult<any, void> {
-    throw new Error('Generator methods not available for coroutines');
+    throw new CheckError('Generator methods not available for coroutines');
   }
 
   [Symbol.iterator](): Generator<any, void, unknown> {
-    throw new Error('Generator methods not available for coroutines');
+    throw new CheckError('Generator methods not available for coroutines');
   }
 }
 
@@ -339,7 +340,7 @@ coDecorator.self = function*() {yield;};
 
 
 function checkCurrentCoroutine(): void {
-  if (!currentCoroutine) throw new Error('Cannot call co methods outside coroutine context');
+  if (!currentCoroutine) throw new CheckError('Cannot call co methods outside coroutine context');
 }
 
 

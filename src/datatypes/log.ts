@@ -1,7 +1,7 @@
 import type {ComponentType} from '../component';
 import type {Buffers} from '../buffers';
 import {ENTITY_ID_BITS} from '../consts';
-import {InternalError} from '../errors';
+import {CheckError, InternalError} from '../errors';
 
 
 export interface LogPointer {
@@ -281,7 +281,7 @@ export class Log {
   }
 
   private throwCapacityExceeded(): void {
-    throw new Error(
+    throw new CheckError(
       `Log capacity exceeded, please raise ${this.configParamName} above ${this.maxEntries}`);
   }
 }

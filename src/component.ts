@@ -2,7 +2,7 @@ import {EMPTY_ARRAY, Type} from './type';
 import type {Entity, EntityId} from './entity';
 import {MAX_NUM_FIELDS} from './consts';
 import type {Dispatcher} from './dispatcher';
-import {InternalError} from './errors';
+import {CheckError, InternalError} from './errors';
 
 
 interface SchemaDef<JSType> {
@@ -121,7 +121,7 @@ interface Storage {
 
 export function checkTypeDefined(type: ComponentType<any>): void {
   if (!type.__binding) {
-    throw new Error(`Component ${type.name} not defined; add to world defs`);
+    throw new CheckError(`Component ${type.name} not defined; add to world defs`);
   }
 }
 
@@ -147,7 +147,7 @@ class PackedStorage implements Storage {
       } else {
         if (this.spares[1] === this.spares[2]) {
           CHECK: if (!this.binding.elastic) {
-            throw new Error(
+            throw new CheckError(
               `Storage exhausted for component ${this.binding.type.name}; ` +
               `raise its capacity above ${this.binding.capacity}`);
           }
@@ -242,7 +242,7 @@ class CompactStorage implements Storage {
     }
     if (firstEmpty === undefined) {
       CHECK: if (!this.binding.elastic) {
-        throw new Error(
+        throw new CheckError(
           `Storage exhausted for component ${this.binding.type.name}; ` +
           `raise its capacity above ${this.binding.capacity}`);
       }
@@ -290,7 +290,7 @@ export function initComponent(type: ComponentType<any>, id: EntityId, values: an
     if (values !== undefined) {
       for (const key in values) {
         if (!type.schema?.[key]) {
-          throw new Error(`Property ${key} not defined for component ${type.name}`);
+          throw new CheckError(`Property ${key} not defined for component ${type.name}`);
         }
       }
     }
@@ -317,7 +317,7 @@ function gatherFields(type: ComponentType<any>): Field<any>[] {
       fields.push({name, seq: seq++, type: entry.type, default: entry.default});
     }
     CHECK: if (seq > MAX_NUM_FIELDS) {
-      throw new Error(`Component ${type.name} declares too many fields`);
+      throw new CheckError(`Component ${type.name} declares too many fields`);
     }
   }
   return fields;
@@ -337,25 +337,25 @@ export function assimilateComponentType<C>(
   CHECK: {
     if (typeof type.options?.capacity !== 'undefined') {
       if (storage === 'sparse') {
-        throw new Error(
+        throw new CheckError(
           `Component type ${type.name} cannot combine custom capacity with sparse storage`
         );
       }
       if (type.options.capacity <= 0) {
-        throw new Error(
+        throw new CheckError(
           `Component type ${type.name} capacity option must be great than zero: got ${capacity}`);
       }
       if (typeof type.options.initialCapacity !== 'undefined') {
-        throw new Error(
+        throw new CheckError(
           `Component type ${type.name} cannot have both capacity and initialCapacity options`);
       }
     }
     if (type.options?.restrictedToMainThread && fields.every(field => field.type.shared)) {
-      throw new Error(
+      throw new CheckError(
         `Component type ${type.name} is restrictedToMainThread but has no thread-exclusive fields`);
     }
     if ((typeof process === 'undefined' || process.env.NODE_ENV !== 'test') && type.__bind) {
-      throw new Error(`Component type ${type.name} is already in use in another world`);
+      throw new CheckError(`Component type ${type.name} is already in use in another world`);
     }
   }
   type.id = typeId;
@@ -463,7 +463,7 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
     }
 
     default:
-      CHECK: throw new Error(`Invalid storage type "${binding.storage}`);
+      CHECK: throw new CheckError(`Invalid storage type "${binding.storage}`);
   }
 }
 
@@ -480,16 +480,16 @@ export function declareSingleton(type: ComponentType<any>): void {
   if (!type.options) type.options = {};
   CHECK: {
     if (type.options.storage && type.options.storage !== 'compact') {
-      throw new Error(
+      throw new CheckError(
         `Component ${type.name} ${type.options.storage} storage is incompatible with singletons`);
     }
     if (type.options.capacity && type.options.capacity !== 1) {
-      throw new Error(
+      throw new CheckError(
         `Component ${type.name} capacity of ${type.options.capacity} ` +
         `is incompatible with singletons`);
     }
     if (type.options.initialCapacity) {
-      throw new Error(
+      throw new CheckError(
         `Component ${type.name} initial capacity of ${type.options.initialCapacity} ` +
         `is incompatible with singletons`);
     }

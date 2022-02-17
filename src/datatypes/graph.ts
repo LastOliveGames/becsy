@@ -1,4 +1,4 @@
-import {InternalError} from '../errors';
+import {CheckError, InternalError} from '../errors';
 
 interface Printable {
   toString(): string;
@@ -102,7 +102,7 @@ export class Graph<V extends Printable> {
     const cycles = this.findCycles();
     if (cycles.length) {
       cycles.sort((x, y) => x.length - y.length);
-      throw new Error(
+      throw new CheckError(
         'Precedence cycles detected for the following systems, ' +
         'please resolve by adjusting their schedules: ' +
         cycles.map(cycle => cycle.map(u => u.toString()).join('—')).join(', ')

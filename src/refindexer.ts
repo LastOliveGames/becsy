@@ -8,7 +8,7 @@ import {
 } from './consts';
 import type {Dispatcher} from './dispatcher';
 import type {Registry} from './registry';
-import {InternalError} from './errors';
+import {CheckError, InternalError} from './errors';
 
 
 interface Selector {
@@ -73,7 +73,7 @@ class Tracker {
     const sourceSeq = (tag >>> COMPONENT_ID_BITS) & FIELD_SEQ_MASK;
     const internalIndex = tag >>> (COMPONENT_ID_BITS + FIELD_SEQ_BITS);
     const sourceType = this.registry.types[sourceTypeId];
-    CHECK: checkMask(sourceType, this.registry.executingSystem, true);
+    CHECK: checkMask(sourceType, this.registry.executingSystem, 'write');
     sourceType.__bind!(sourceId, true);
     sourceType.__binding!.fields[sourceSeq].clearRef!(final, this.targetEntityId, internalIndex);
   }
@@ -204,7 +204,7 @@ class Tracker {
   private checkWriteMask(): void {
     const system = this.registry.executingSystem;
     for (const targetType of this.selector.targetTypes) {
-      checkMask(targetType, system, true);
+      checkMask(targetType, system, 'write');
     }
   }
 }
@@ -263,7 +263,7 @@ export class RefIndexer {
       selectorId = selector.id;
       this.selectorIdsBySourceKey.set(selectorSourceKey, selectorId);
       CHECK: if (selectorId > MAX_NUM_COMPONENTS) {
-        throw new Error(`Too many distinct backrefs selectors`);
+        throw new CheckError(`Too many distinct backrefs selectors`);
       }
     } else {
       const selector = this.selectors[selectorId];

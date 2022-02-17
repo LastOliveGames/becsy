@@ -1,6 +1,6 @@
 import type {LogPointer} from './datatypes/log';
 import type {Dispatcher} from './dispatcher';
-import type {Entity, EntityId, ReadWriteMasks} from './entity';
+import type {Entity, EntityId, AccessMasks} from './entity';
 import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {World} from './world';  // eslint-disable-line @typescript-eslint/no-unused-vars
 import {Query, QueryBox, QueryBuilder} from './query';
@@ -12,7 +12,7 @@ import type {Lane} from './planner';
 import type {SystemStats} from './stats';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import {co, Coroutine, CoroutineFunction, Supervisor} from './coroutines';
-import {InternalError} from './errors';
+import {CheckError, InternalError} from './errors';
 
 
 export interface SystemType<S extends System> {
@@ -123,7 +123,7 @@ export abstract class System {
     const query = new Query();
     const builder = new QueryBuilder(buildCallback, query);
     CHECK: if (!this.__queryBuilders) {
-      throw new Error(
+      throw new CheckError(
         `Attempt to create a new query after world initialized in system ${this.name}`);
     }
     this.__queryBuilders.push(builder);
@@ -142,10 +142,11 @@ export abstract class System {
    */
   schedule(buildCallback: (s: ScheduleBuilder) => void): Schedule {
     CHECK: if (this.__scheduleBuilder === null) {
-      throw new Error(`Attempt to define schedule after world initialized in system ${this.name}`);
+      throw new CheckError(
+        `Attempt to define schedule after world initialized in system ${this.name}`);
     }
     CHECK: if (this.__scheduleBuilder) {
-      throw new Error(`Attempt to define multiple schedules in system ${this.name}`);
+      throw new CheckError(`Attempt to define multiple schedules in system ${this.name}`);
     }
     const schedule = new Schedule();
     this.__scheduleBuilder = new ScheduleBuilder(buildCallback, schedule);
@@ -200,7 +201,8 @@ export abstract class System {
    */
   attach<S extends System>(systemType: SystemType<S>): S {
     CHECK: if (!this.__attachPlaceholders) {
-      throw new Error(`Attempt to attach a system after world initialized in system ${this.name}`);
+      throw new CheckError(
+        `Attempt to attach a system after world initialized in system ${this.name}`);
     }
     const placeholder = new AttachPlaceholder(systemType);
     this.__attachPlaceholders.push(placeholder);
@@ -288,7 +290,7 @@ Object.defineProperty(System.prototype, 'singleton', {
     const singleton = {
       read<T>(type: ComponentType<T>): T {
         CHECK: if (!self.__singletonPlaceholders) {
-          throw new Error(
+          throw new CheckError(
             `Attempt to declare a singleton after world initialized in system ${self.name}`);
         }
         declareSingleton(type);
@@ -299,7 +301,7 @@ Object.defineProperty(System.prototype, 'singleton', {
       },
       write<T>(type: ComponentType<T>, initialValues?: Record<string, unknown>): T {
         CHECK: if (!self.__singletonPlaceholders) {
-          throw new Error(
+          throw new CheckError(
             `Attempt to declare a singleton after world initialized in system ${self.name}`);
         }
         declareSingleton(type);
@@ -316,7 +318,7 @@ Object.defineProperty(System.prototype, 'singleton', {
 
 
 export class SystemBox {
-  readonly rwMasks: ReadWriteMasks = {read: [], write: []};
+  readonly accessMasks: AccessMasks = {read: [], write: [], check: []};
   readonly shapeQueries: QueryBox[] = [];
   readonly shapeQueriesByComponent: QueryBox[][] = [];
   readonly writeQueries: QueryBox[] = [];
@@ -354,7 +356,7 @@ export class SystemBox {
 
   assignProps(props: Record<string, unknown>): void {
     if (this.propsAssigned) {
-      throw new Error(`System ${this.name} has multiple props assigned in world defs`);
+      throw new CheckError(`System ${this.name} has multiple props assigned in world defs`);
     }
     Object.assign(this.system, props);
     this.propsAssigned = true;
@@ -387,7 +389,8 @@ export class SystemBox {
         const targetSystemType = value.type;
         const targetSystem = this.dispatcher.systemsByClass.get(targetSystemType);
         CHECK: if (!targetSystem) {
-          throw new Error(`Attached system ${targetSystemType.name} not defined in this world`);
+          throw new CheckError(
+            `Attached system ${targetSystemType.name} not defined in this world`);
         }
         openSystem[prop] = targetSystem.system;
       } else if (value instanceof SingletonPlaceholder) {

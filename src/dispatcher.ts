@@ -1,5 +1,5 @@
 import type {ComponentStorage, ComponentType} from './component';
-import type {Entity} from './entity';
+import {Entity, extendMaskAndSetFlag} from './entity';
 import {MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './consts';
 import {Log, LogPointer} from './datatypes/log';
 import {RunState, System, SystemBox, SystemId, SystemType} from './system';
@@ -13,7 +13,7 @@ import {
 import {Frame, FrameImpl, SystemGroup, SystemGroupImpl} from './schedule';
 import {Planner} from './planner';
 import type {Coroutine, CoroutineFunction} from './coroutines';
-import {InternalError} from './errors';
+import {CheckError, InternalError} from './errors';
 
 
 // TODO: figure out a better type for interleaved arrays, here and elsewhere
@@ -72,12 +72,15 @@ class Build extends System {
   __callback: (system: System) => void;
 
   start<CoFn extends CoroutineFunction>(coroutineFn: CoFn, ...args: Parameters<CoFn>): Coroutine {
-    CHECK: throw new Error('The build system cannot run coroutines');
+    CHECK: throw new CheckError('The build system cannot run coroutines');
   }
 
   execute() {
     this.__callback(this);
   }
+}
+
+class Validate extends System {
 }
 
 export enum State {
@@ -106,7 +109,7 @@ export class Dispatcher {
   readonly threads: number;
   readonly buffers: Buffers;
   readonly singleton?: Entity;
-  private userCallbackSystem: Build;
+  private buildSystem: Build;
   private callback: {group: SystemGroup, frame: Frame};
   private readonly deferredControls = new Map<SystemBox, RunState>();
 
@@ -120,15 +123,15 @@ export class Dispatcher {
     maxRefChangesPerFrame = maxEntities,
     defaultComponentStorage = 'packed'
   }: WorldOptions) {
-    if (threads < 1) throw new Error('Minimum of one thread');
-    if (threads > 1) throw new Error('Multithreading not yet implemented');
+    if (threads < 1) throw new CheckError('Minimum of one thread');
+    if (threads > 1) throw new CheckError('Multithreading not yet implemented');
     if (maxEntities > MAX_NUM_ENTITIES) {
-      throw new Error(`maxEntities too high, the limit is ${MAX_NUM_ENTITIES}`);
+      throw new CheckError(`maxEntities too high, the limit is ${MAX_NUM_ENTITIES}`);
     }
     const {componentTypes, systemTypes, systemGroups} =
       this.splitDefs([defs ?? [], decoratedComponentTypes, decoratedSystemTypes]);
     if (componentTypes.length > MAX_NUM_COMPONENTS) {
-      throw new Error(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
+      throw new CheckError(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
     }
     STATS: this.stats = new Stats();
     this.threads = threads;
@@ -144,8 +147,9 @@ export class Dispatcher {
     this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.systemGroups = systemGroups;
     this.systems = this.createSystems(systemTypes);
-    this.createCallbackSystem();
+    this.createBuildSystem();
     this.registry.initializeComponentTypes();
+    this.registry.validateSystem = this.createValidateSystem(componentTypes);
     this.singleton = this.createSingletons();
     for (const box of this.systems) box.replacePlaceholders();
     this.planner = new Planner(this, this.systems, this.systemGroups);
@@ -175,7 +179,7 @@ export class Dispatcher {
       if (!box) {
         systemClasses.push(SystemClass);
         const system = new SystemClass();
-        system.id = (i + 1) as SystemId;  // 0 is reserved for the callback system
+        system.id = (i + 2) as SystemId;  // 0 and 1 are reserved for internal systems
         box = new SystemBox(system, this);
         systems.push(box);
         this.systemsByClass.set(SystemClass, box);
@@ -190,15 +194,26 @@ export class Dispatcher {
     return systems;
   }
 
-  private createCallbackSystem(): void {
-    this.userCallbackSystem = new Build();
-    this.userCallbackSystem.id = 0 as SystemId;
-    const box = new SystemBox(this.userCallbackSystem, this);
-    box.rwMasks.read = undefined;
-    box.rwMasks.write = undefined;
+  private createBuildSystem(): void {
+    this.buildSystem = new Build();
+    this.buildSystem.id = 0 as SystemId;
+    const box = new SystemBox(this.buildSystem, this);
+    box.accessMasks.read = undefined;
+    box.accessMasks.write = undefined;
+    box.accessMasks.check = undefined;
     this.systems.push(box);
     this.systemsByClass.set(Build, box);
     this.callback = this.createSingleGroupFrame([Build]);
+  }
+
+  private createValidateSystem(componentTypes: ComponentType<any>[]): SystemBox {
+    const system = new Validate();
+    system.id = 1 as SystemId;
+    const box = new SystemBox(system, this);
+    for (const type of componentTypes) extendMaskAndSetFlag(box.accessMasks.check!, type);
+    this.systems.push(box);
+    this.systemsByClass.set(Validate, box);
+    return box;
   }
 
   private createSingleGroupFrame(
@@ -269,7 +284,9 @@ export class Dispatcher {
           componentTypesSet.add(def);
         }
       } else {
-        CHECK: if (!lastDefWasSystem) throw new Error('Unexpected value in world defs: ' + def);
+        CHECK: {
+          if (!lastDefWasSystem) throw new CheckError('Unexpected value in world defs: ' + def);
+        }
         systemTypes.push(def);
         lastDefWasSystem = false;
       }
@@ -280,7 +297,7 @@ export class Dispatcher {
   getSystems(designator: SystemType<System> | SystemGroup): SystemBox[] {
     if (designator instanceof SystemGroupImpl) return designator.__systems;
     const system = this.systemsByClass.get(designator);
-    if (!system) throw new Error(`System ${designator.name} not registered in world`);
+    if (!system) throw new CheckError(`System ${designator.name} not registered in world`);
     return [system];
   }
 
@@ -309,7 +326,7 @@ export class Dispatcher {
 
   executeFunction(fn: (system: System) => void): void {
     this.callback.frame.begin();
-    this.userCallbackSystem.__callback = fn;
+    this.buildSystem.__callback = fn;
     // We know this execution will always be synchronous.
     this.callback.frame.execute(this.callback.group, 0, 0);
     this.callback.frame.end();
@@ -323,11 +340,11 @@ export class Dispatcher {
   }
 
   startFrame(time: number): void {
-    CHECK: if (this.executing) throw new Error('Another frame already executing');
+    CHECK: if (this.executing) throw new CheckError('Another frame already executing');
     this.executing = true;
     CHECK: {
       if (this.state !== State.setup && this.state !== State.run && this.state !== State.finish) {
-        throw new Error('World terminated');
+        throw new CheckError('World terminated');
       }
     }
     this.state = State.run;
@@ -358,7 +375,7 @@ export class Dispatcher {
   async terminate(): Promise<void> {
     CHECK: {
       if (this.state !== State.setup && this.state !== State.run) {
-        throw new Error('World terminated');
+        throw new CheckError('World terminated');
       }
     }
     this.state = State.finish;
@@ -382,7 +399,7 @@ export class Dispatcher {
     for (const def of this.splitDefs(defs).systemTypes) {
       if (!def.__system) continue;
       const system = this.systemsByClass.get(def as SystemType<System>);
-      CHECK: if (!system) throw new Error(`System ${def.name} not defined for this world`);
+      CHECK: if (!system) throw new CheckError(`System ${def.name} not defined for this world`);
       this.deferredControls!.set(system, state);
     }
   }
@@ -395,7 +412,7 @@ export class Dispatcher {
     for (const def of this.splitDefs(options.restart).systemTypes) {
       if (!def.__system) continue;
       if (stopSet.has(def as SystemType<System>)) {
-        throw new Error(`Request to both stop and restart system ${def.name}`);
+        throw new CheckError(`Request to both stop and restart system ${def.name}`);
       }
     }
   }

@@ -3,6 +3,7 @@ import type {ComponentType} from './component';
 import {Entity, EntityId, extendMaskAndSetFlag} from './entity';
 import type {SystemBox} from './system';
 import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/entitylist';
+import {CheckError, InternalError} from './errors';
 
 type MaskKind = 'withMask' | 'withoutMask' | 'trackMask';
 
@@ -48,13 +49,13 @@ export class QueryBox {
       const minLength = Math.min(this.withMask.length, this.withoutMask.length);
       for (let i = 0; i < minLength; i++) {
         if ((this.withMask[i] & this.withoutMask[i]) !== 0) {
-          throw new Error(
+          throw new CheckError(
             'Query must not list a component type in both `with` and `without` clauses');
         }
       }
     }
     CHECK: if (this.hasChangedResults && !this.trackMask) {
-      throw new Error(`Query for changed entities must track at least one component`);
+      throw new CheckError(`Query for changed entities must track at least one component`);
     }
     if (this.flavors & QueryFlavor.current) {
       this.results.current =
@@ -275,7 +276,7 @@ export class QueryBuilder {
    * @param types The types of components required to match the query.
    */
   with(...types: ComponentType<any>[]): this {
-    this.set(this.__system.rwMasks.read, types);
+    this.set(this.__system.accessMasks.read, types);
     this.set('withMask');
     return this;
   }
@@ -286,7 +287,7 @@ export class QueryBuilder {
    * @param types The types of components that must not be present to match the query.
    */
   without(...types: ComponentType<any>[]): this {
-    this.set(this.__system.rwMasks.read, types);
+    this.set(this.__system.accessMasks.read, types);
     this.set('withoutMask');
     return this;
   }
@@ -297,7 +298,7 @@ export class QueryBuilder {
    * query.
    */
   using(...types: ComponentType<any>[]): this {
-    this.set(this.__system.rwMasks.read, types);
+    this.set(this.__system.accessMasks.read, types);
     return this;
   }
 
@@ -309,7 +310,7 @@ export class QueryBuilder {
    */
   get usingAll(): this {
     // All types except Alive, which is always at index 0.
-    this.set(this.__system.rwMasks.read, this.__system.dispatcher.registry.types.slice(1));
+    this.set(this.__system.accessMasks.read, this.__system.dispatcher.registry.types.slice(1));
     return this;
   }
 
@@ -337,7 +338,7 @@ export class QueryBuilder {
    * concurrent performance.
    */
   get write(): this {
-    this.set(this.__system.rwMasks.write);
+    this.set(this.__system.accessMasks.write);
     return this;
   }
 
@@ -349,14 +350,14 @@ export class QueryBuilder {
   ): void {
     if (!mask) return;
     if (!types) types = this.__lastTypes;
-    if (!types) throw new Error('No component type to apply query modifier to');
+    DEBUG: if (!types) throw new InternalError('No component type to apply query modifier to');
     this.__lastTypes = types;
     if (typeof mask === 'string') {
       if (!this.__query[mask]) this.__query[mask] = [];
       mask = this.__query[mask]!;
     }
-    const readMask = mask === this.__system.rwMasks.read;
-    const writeMask = mask === this.__system.rwMasks.write;
+    const readMask = mask === this.__system.accessMasks.read;
+    const writeMask = mask === this.__system.accessMasks.write;
     const shapeMask = mask === this.__query.withMask || mask === this.__query.withoutMask;
     const trackMask = mask === this.__query.trackMask;
     const map =
@@ -364,6 +365,7 @@ export class QueryBuilder {
         writeMask ? this.__system.dispatcher.planner.writers! : undefined;
     for (const type of types) {
       extendMaskAndSetFlag(mask, type);
+      if (readMask) extendMaskAndSetFlag(this.__system.accessMasks.check!, type);
       if (map) map.get(type)!.add(this.__system);
       if (shapeMask) this.categorize(this.__system.shapeQueriesByComponent, type);
       if (trackMask) this.categorize(this.__system.writeQueriesByComponent, type);
@@ -469,7 +471,7 @@ export class Query {
   private __checkList(flavor: QueryFlavorName): void {
     const list = this.__results[flavor];
     if (!list) {
-      throw new Error(
+      throw new CheckError(
         `Query '${flavor}' not configured, please add .${flavor} to your query definition in ` +
         `system ${this.__systemName}`);
     }
