@@ -388,12 +388,6 @@ export class Query {
    * A list of all entities that match this query as of the beginning of the system's current (or
    * last) execution.
    *
-   * The order of entities in this list is generally unspecified. The exception is that if your
-   * query has no `or` clauses (currenty unsupported anyway) and you used
-   * {@link System.createEntity} to create your entities and never added or removed components from
-   * them thereafter, then those entities that match the query will be listed in the order they were
-   * created.  (Though the order between systems that execute concurrently is still undefined.)
-   *
    * You must not keep a reference to these entities beyond the local scope of a system's execution.
    * To obtain an object for long-term use please see {@link Entity.hold}.
    */
@@ -406,13 +400,6 @@ export class Query {
    * A list of all entities that newly started matching this query between the system's current (or
    * last) and previous executions.
    *
-   * The order of entities in this list is generally unspecified. The exception is that if your
-   * query has no `or` clauses (currenty unsupported anyway) and you used
-   * {@link System.createEntity} to create your entities and never added or removed components from
-   * them thereafter, then those entities that match the query will be listed in the order they were
-   * created.  (Though the ordering of entities created by systems that execute concurrently is
-   * still undefined.)
-   *
    * You must not keep a reference to these entities beyond the local scope of a system's execution.
    * To obtain an object for long-term use please see {@link Entity.hold}.
    */
@@ -424,8 +411,6 @@ export class Query {
   /**
    * A list of all entities that newly stopped matching this query between the system's current (or
    * last) and previous executions.
-   *
-   * The order of entities in this list is unspecified.
    *
    * You must not keep a reference to these entities beyond the local scope of a system's execution.
    * To obtain an object for long-term use please see {@link Entity.hold}.
@@ -440,8 +425,6 @@ export class Query {
    * last) execution, and that had tracked components written to between the system's current (or
    * last) and previous executions.
    *
-   * The order of entities in this list is unspecified.
-   *
    * You must not keep a reference to these entities beyond the local scope of a system's execution.
    * To obtain an object for long-term use please see {@link Entity.hold}.
    */
@@ -452,8 +435,6 @@ export class Query {
 
   /**
    * A list that combines `added` and `changed`, but without duplicate entities.
-   *
-   * The order of entities in this list is unspecified.
    *
    * You must not keep a reference to these entities beyond the local scope of a system's execution.
    * To obtain an object for long-term use please see {@link Entity.hold}.
@@ -466,8 +447,6 @@ export class Query {
   /**
    * A list that combines `changed` and `removed`, but without duplicate entities.
    *
-   * The order of entities in this list is unspecified.
-   *
    * You must not keep a reference to these entities beyond the local scope of a system's execution.
    * To obtain an object for long-term use please see {@link Entity.hold}.
    */
@@ -478,8 +457,6 @@ export class Query {
 
   /**
    * A list that combines `added`, `changed`, and `removed`, but without duplicate entities.
-   *
-   * The order of entities in this list is unspecified.
    *
    * You must not keep a reference to these entities beyond the local scope of a system's execution.
    * To obtain an object for long-term use please see {@link Entity.hold}.
