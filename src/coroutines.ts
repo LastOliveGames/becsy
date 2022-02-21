@@ -61,7 +61,7 @@ export interface Coroutine {
   scope(entity: Entity): this;
 
   /**
-   * Cancels this coroutine if the give component is missing from the scoped entity at any `yield`
+   * Cancels this coroutine if the given component is missing from the scoped entity at any `yield`
    * point.
    * @param type The type of component to check for.
    */

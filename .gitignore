@@ -4,6 +4,7 @@
 node_modules/
 /benchmarks/current_results.json
 /examples/dist/
+/docs/.vitepress/dist/
 
 /.gitconfig
 /.vscode/
