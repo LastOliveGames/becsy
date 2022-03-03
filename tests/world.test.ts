@@ -5,7 +5,14 @@ class A {
 }
 
 class SysA extends System {
+}
 
+class SysB extends System {
+  sched = this.schedule(s => s.after(SysA));
+}
+
+class SysC extends System {
+  sched = this.schedule(s => s.after(SysA));
 }
 
 
@@ -51,6 +58,12 @@ describe('world creation', () => {
 });
 
 describe('world destruction', () => {
+  test('terminate world with multiple systems', async () => {
+    process.env.NODE_ENV = 'test';
+    const world = await World.create({defs: [SysA, SysB, SysC]});
+    await world.terminate();
+  });
+
   test('terminate world then create another one with same components', async () => {
     let world = await World.create({defs: [A]});
     await world.terminate();

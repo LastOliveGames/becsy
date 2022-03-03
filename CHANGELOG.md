@@ -1,5 +1,9 @@
 ### Upcoming
 
+### 0.12.3
+- Fixed systems getting skipped when initializing / finalizing, and occasional world lock-ups due to that.
+
+
 ### 0.12.2
 - Added `hasSomeOf`, `hasAllOf`, `hasAnyOtherThan`, and `countHas` to `Entity`.
 - Implemented experimenal global component combination validators.  You can add a static `validate(entity)` method to any component type and check for valid combinations of components using the `has` collection of methods, throwing an error if a check fails.  *All* validation methods are executed for *all* entities whose components have changed after each system executes (not just ones that have a component of the method's host type), and the system's read entitlements are bypassed during these checks.  Entities are not validated in response to writes, so validators shouldn't look at fields.  Entities are not validated at all in the perf build.

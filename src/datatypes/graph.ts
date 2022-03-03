@@ -21,7 +21,6 @@ export class Graph<V extends Printable> {
   private sortedVertices: V[];
   private readonly dependencyCounts: number[];
   private readonly traversalCounts: number[];
-  private readonly traversedVertices: V[] = [];
   private numTraversedVertices: number;
 
   constructor(private readonly vertices: V[]) {
@@ -333,7 +332,7 @@ export class Graph<V extends Printable> {
    */
   traverse(completedVertex?: V): V[] | void {
     DEBUG: if (!this.sealed) throw new InternalError('Graph not yet sealed');
-    this.traversedVertices.length = 0;
+    const traversedVertices = [];
     if (completedVertex) {
       this.numTraversedVertices += 1;
       const sourceId = this.vertexIndexMap.get(completedVertex);
@@ -343,7 +342,7 @@ export class Graph<V extends Printable> {
       for (let i = 0; i < this.numVertices; i++) {
         if (this.edges[sourceId * this.numVertices + i]) {
           if (--this.traversalCounts[i] === 0) {
-            this.traversedVertices.push(this.vertices[i]);
+            traversedVertices.push(this.vertices[i]);
           }
         }
       }
@@ -352,12 +351,12 @@ export class Graph<V extends Printable> {
       for (let i = 0; i < this.numVertices; i++) {
         const count = this.traversalCounts[i] = this.dependencyCounts[i];
         if (count === 0) {
-          this.traversedVertices.push(this.vertices[i]);
+          traversedVertices.push(this.vertices[i]);
         }
       }
     }
     if (this.numTraversedVertices === this.numVertices) return;
-    return this.traversedVertices;
+    return traversedVertices;
   }
 
   private printMatrix(matrix: number[]): string {

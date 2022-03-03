@@ -74,7 +74,7 @@ class SimplePlan extends Plan {
     const dispatcher = this.planner.dispatcher;
     this.group.__executed = true;
     return new Promise((resolve, reject) => {
-      const finalizeSystem = async (system: SystemBox) => {
+      const finalizeSystem = (system: SystemBox) => {
         try {
           system.finalize();
           dispatcher.flush();
