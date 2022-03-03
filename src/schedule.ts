@@ -49,8 +49,15 @@ export class ScheduleBuilder {
   }
 
   /**
-   * Force this system to only execute on the main thread.  This is needed for systems that interact
-   * with APIs only available in the main thread such as the DOM.
+   * Returns a group that includes all the world's systems.
+   */
+  get allSystems(): SystemGroup {
+    return this.__dispatcher.defaultGroup;
+  }
+
+  /**
+   * Forces this system to only execute on the main thread.  This is needed for systems that
+   * interact with APIs only available in the main thread such as the DOM.
    * @returns The builder for chaining calls.
    */
   get onMainThread(): this {
@@ -60,7 +67,7 @@ export class ScheduleBuilder {
   }
 
   /**
-   * Execute this system consistently on a single thread.  This is the default behavior to
+   * Executes this system consistently on a single thread.  This is the default behavior to
    * accommodate systems with internal state.
    * @returns The builder for chaining calls.
    */
@@ -71,7 +78,7 @@ export class ScheduleBuilder {
   }
 
   /**
-   * Replicate this system among multiple threads and execute it on any one of them, possibly a
+   * Replicates this system among multiple threads and execute it on any one of them, possibly a
    * different one each time.  This allows Becsy to better utilize available CPUs but requires the
    * system to be stateless (except for queries and attached systems).  Note that `prepare` and
    * `initialize` will be called on each replicated instance of the system!
@@ -91,13 +98,16 @@ export class ScheduleBuilder {
   }
 
   /**
-   * Schedule this system before all the given ones (highest priority).
+   * Schedules this system before all the given ones (highest priority).  Any systems present in
+   * both the receiver and the target are skipped.
    * @param systemTypes The systems or groups that this one should precede.
    * @returns The builder for chaining calls.
    */
   before(...systemTypes: (SystemType<System> | SystemGroup)[]): this {
+    const thisSet = new Set(this.__systems);
     for (const type of systemTypes) {
       for (const other of this.__dispatcher.getSystems(type)) {
+        if (thisSet.has(other)) continue;
         for (const system of this.__systems) {
           this.__dispatcher.planner.graph.addEdge(system, other, 4);
         }
@@ -107,13 +117,16 @@ export class ScheduleBuilder {
   }
 
   /**
-   * Schedule this system after all the given ones (highest priority).
+   * Schedules this system after all the given ones (highest priority).  Any systems present in
+   * both the receiver and the target are skipped.
    * @param systemTypes The systems or groups that this one should follow.
    * @returns The builder for chaining calls.
    */
   after(...systemTypes: (SystemType<System> | SystemGroup)[]): this {
+    const thisSet = new Set(this.__systems);
     for (const type of systemTypes) {
       for (const other of this.__dispatcher.getSystems(type)) {
+        if (thisSet.has(other)) continue;
         for (const system of this.__systems) {
           this.__dispatcher.planner.graph.addEdge(other, system, 4);
         }
@@ -123,7 +136,7 @@ export class ScheduleBuilder {
   }
 
   /**
-   * Schedule this system in any order relative to the given ones (high priority).
+   * Schedules this system in any order relative to the given ones (high priority).
    * @param systemTypes The systems or groups whose order doesn't matter relative to this one.
    * @returns The builder for chaining calls.
    */
@@ -139,7 +152,7 @@ export class ScheduleBuilder {
   }
 
   /**
-   * Schedule this system before all other systems that declared a read dependency on the given
+   * Schedules this system before all other systems that declared a read dependency on the given
    * component types (medium priority).
    * @param componentTypes The component types whose readers this system should precede.
    * @returns The builder for chaining calls.
@@ -156,7 +169,7 @@ export class ScheduleBuilder {
   }
 
   /**
-   * Schedule this system after all other systems that declared a read dependency on the given
+   * Schedules this system after all other systems that declared a read dependency on the given
    * component types (medium priority).
    * @param componentTypes The component types whose readers this system should follow.
    * @returns The builder for chaining calls.
@@ -173,7 +186,7 @@ export class ScheduleBuilder {
   }
 
   /**
-   * Schedule this system before all other systems that declared a write dependency on the given
+   * Schedules this system before all other systems that declared a write dependency on the given
    * component types (medium priority).
    * @param componentTypes The component types whose writers this system should precede.
    * @returns The builder for chaining calls.
@@ -190,7 +203,7 @@ export class ScheduleBuilder {
   }
 
   /**
-   * Schedule this system after all other systems that declared a write dependency on the given
+   * Schedules this system after all other systems that declared a write dependency on the given
    * component types (medium priority).
    * @param componentTypes The component types whose writers this system should follow.
    * @returns The builder for chaining calls.

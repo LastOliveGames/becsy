@@ -1,6 +1,8 @@
 ### Upcoming
 
 ### 0.12.3
+- Added `allSystems` to the schedule builder object to faciliate sweeping precedence constraints.
+- Changed `before` and `after` constraints (when used on groups) to ignore any systems that show up in both the subject and target sets.
 - Fixed systems getting skipped when initializing / finalizing, and occasional world lock-ups due to that.
 
 

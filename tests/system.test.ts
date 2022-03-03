@@ -1,6 +1,7 @@
 import {Entity, field, System, World} from '../src';
 
 let message: string;
+let initOrder: string[];
 
 class Foo {
   @field.int16 declare speed: number;
@@ -13,6 +14,11 @@ class Bar {
 
 class SystemA extends System {
   message: string;
+
+  initialize() {
+    initOrder.push(this.name);
+  }
+
   execute() {
     message = this.message;
   }
@@ -21,6 +27,11 @@ class SystemA extends System {
 class SystemB extends System {
   sked = this.schedule(s => s.before(SystemA));
   systemA = this.attach(SystemA);
+
+  initialize() {
+    initOrder.push(this.name);
+  }
+
   execute() {
     this.systemA.message = 'hello';
   }
@@ -31,6 +42,7 @@ class SystemC extends System {
   bar = this.singleton.write(Bar);
 
   initialize() {
+    initOrder.push(this.name);
     this.bar.direction = 45;
     message = `foo ${this.foo.speed} bar ${this.bar.direction}`;
   }
@@ -38,13 +50,25 @@ class SystemC extends System {
 
 class SystemD extends System {
   foo = this.singleton.write(Foo, {speed: 100});
+
+  initialize() {
+    initOrder.push(this.name);
+  }
 }
 
 class SystemE extends System {
+  initialize() {
+    initOrder.push(this.name);
+  }
+
   finalize() {
     message = 'finalized';
   }
 }
+
+beforeEach(() => {
+  initOrder = [];
+});
 
 
 describe('system setup', () => {
@@ -86,6 +110,18 @@ describe('system setup', () => {
       group2.schedule(s => s.beforeWritesTo(Foo)),
       group3.schedule(s => s.beforeReadsFrom(Foo).after(group1))
     ]});
+    expect(initOrder.join(' ')).toBe('SystemC SystemA SystemD');
+  });
+
+  test('order systems before all', async () => {
+    const group2 = System.group(SystemC, SystemD);
+    await World.create({
+      defs: [
+        Foo, Bar, SystemA,
+        group2.schedule(s => s.before(s.allSystems))
+      ]
+    });
+    expect(initOrder.join(' ')).toBe('SystemD SystemC SystemA');
   });
 });
 

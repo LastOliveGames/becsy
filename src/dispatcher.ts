@@ -168,6 +168,8 @@ export class Dispatcher {
 
   get threaded(): boolean {return this.threads > 1;}
 
+  get defaultGroup(): SystemGroup {return this.default.group;}
+
   private createSystems(
     systemTypes: (SystemType<System> | Record<string, unknown>)[]
   ): SystemBox[] {
