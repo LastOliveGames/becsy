@@ -2,6 +2,7 @@ import {defineConfig} from 'vitepress';
 import container from 'markdown-it-container';
 
 export default defineConfig({
+  base: '/becsy/',
   lang: 'en-US',
   title: 'Becsy',
   description: 'Multi-threaded Entity Component System framework for TS and JS.',
