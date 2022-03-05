@@ -24,7 +24,7 @@ export default defineConfig({
     lastUpdated: 'Last updated',
 
     nav: [
-      {text: 'Guide', link: '/', activeMatch: '^/$|^/guide/'},
+      {text: 'Guide', link: '/guide/introduction', activeMatch: '^/guide/'},
       // TODO: generate API reference docs
       // {text: 'API Reference', link: '/api', activeMatch: '^/api/'},
       {text: 'Community', items: [
@@ -53,7 +53,7 @@ function getGuideSidebar() {
     {
       text: 'Introduction',
       children: [
-        {text: 'What is Becsy?', link: '/'},
+        {text: 'What is Becsy?', link: '/guide/introduction'},
         {text: 'Getting Started', link: '/guide/getting-started'},
         {text: 'Deploying', link: '/guide/deploying'}
       ]
