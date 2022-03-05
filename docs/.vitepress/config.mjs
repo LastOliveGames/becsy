@@ -15,7 +15,7 @@ export default defineConfig({
   },
 
   themeConfig: {
-    logo: 'logo.png',
+    logo: '/logo.png',
     repo: 'lastolivegames/becsy',
     docsDir: 'docs',
     docsBranch: 'main',
