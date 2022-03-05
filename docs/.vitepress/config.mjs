@@ -15,7 +15,7 @@ export default defineConfig({
   },
 
   themeConfig: {
-    logo: '/logo.png',
+    logo: 'logo.png',
     repo: 'lastolivegames/becsy',
     docsDir: 'docs',
     docsBranch: 'main',
@@ -39,12 +39,11 @@ export default defineConfig({
       '/': getGuideSidebar()
     },
 
-    // TODO: configure search
-    // algolia: {
-    //   appId: '8J64VVRP8K',
-    //   apiKey: 'a18e2f4cc5665f6602c5631fd868adfd',
-    //   indexName: 'vitepress'
-    // },
+    algolia: {
+      appId: '4K8CJKMVMJ',
+      apiKey: 'f59a14a50a6e068c1f6e556d76f14861',
+      indexName: 'Becsy'
+    },
   }
 });
 
