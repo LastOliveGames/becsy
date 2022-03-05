@@ -17,6 +17,7 @@ watch(language, () => {update();});
 
 onMounted(() => {
   language.value = localStorage.getItem('language') ?? 'ts';
+  update();
 });
 
 if (import.meta.hot) {
