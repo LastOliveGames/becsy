@@ -39,11 +39,11 @@ export default defineConfig({
       '/': getGuideSidebar()
     },
 
-    algolia: {
-      appId: '4K8CJKMVMJ',
-      apiKey: 'f59a14a50a6e068c1f6e556d76f14861',
-      indexName: 'Becsy'
-    },
+    // algolia: {
+    //   appId: '4K8CJKMVMJ',
+    //   apiKey: 'f59a14a50a6e068c1f6e556d76f14861',
+    //   indexName: 'Becsy'
+    // },
   }
 });
 
