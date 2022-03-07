@@ -1,4 +1,5 @@
 ---
+index: true
 sidebarDepth: 3
 ---
 

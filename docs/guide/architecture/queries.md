@@ -1,3 +1,7 @@
+---
+index: true
+---
+
 <language-switcher/>
 
 # Queries

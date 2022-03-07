@@ -1,3 +1,7 @@
+---
+index: true
+---
+
 # Examples
 
 This section has some worked examples with step-by-step explanations.  They're roughly in order of increasing complexity.

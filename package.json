@@ -14,7 +14,8 @@
     "update": "yarn upgrade-interactive --latest",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:serve": "vitepress serve docs"
+    "docs:serve": "vitepress serve docs",
+    "docs:index": "hugo-algolia --config docs/algolia.yaml -i \"docs/guide/**/*.md\" -o docs/algolia-index.json -s"
   },
   "files": [
     "index.*",
@@ -40,6 +41,7 @@
     "eslint": "^8.1.0",
     "eslint-plugin-disable": "^2.0.1",
     "eslint-plugin-import": "^2.25.2",
+    "hugo-algolia": "^1.2.14",
     "jest": "^27.3.1",
     "markdown-it-container": "^3.0.0",
     "rollup": "^2.58.0",

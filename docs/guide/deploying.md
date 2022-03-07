@@ -1,3 +1,7 @@
+---
+index: true
+---
+
 # Deploying
 
 When you import from `@lastolivegames/becsy` you get the development version of Becsy.  It enforces all limitations and invariants and throws useful exceptions, but due to that it can be a bit slow.
