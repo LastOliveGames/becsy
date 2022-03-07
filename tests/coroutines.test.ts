@@ -10,7 +10,7 @@ let coroutineHandle: Coroutine;
 }
 
 class StartCoroutine extends System {
-  q = this.query(q => q.using(Foo));
+  q = this.query(q => q.using(Foo).read);
 
   initialize(): void {
     coroutineHandle = this.start(coroutine);

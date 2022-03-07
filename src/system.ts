@@ -294,7 +294,7 @@ Object.defineProperty(System.prototype, 'singleton', {
             `Attempt to declare a singleton after world initialized in system ${self.name}`);
         }
         declareSingleton(type);
-        self.query(q => q.using(type));
+        self.query(q => q.using(type).read);
         const placeholder = new SingletonPlaceholder('read', type);
         self.__singletonPlaceholders.push(placeholder);
         return placeholder as unknown as T;

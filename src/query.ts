@@ -315,24 +315,24 @@ export class QueryBuilder {
   }
 
   /**
-   * Marks all the given component types as `read`.
-   * @param types The types of components that the system will read, but that don't constrain the
+   * Mentions some component types for follow-up modifiers.
+   * @param types The types of components for follow-up modifiers, but that don't constrain the
    * query.
    */
   using(...types: ComponentType<any>[]): this {
-    this.set(this.__system.accessMasks.read, types);
+    this.__lastTypes = types;
     return this;
   }
 
   /**
-   * Marks all component types in the world as `read`.  This can be modified with a `.write` as
-   * usual, and may be useful in "sweeper" systems that want to be able to, e.g., delete any entity
-   * without having to worry what it might hold refs to or what components might have backrefs
-   * pointing to it.
+   * Makes all component types in the world available for follow-up modifiers.  This can be modified
+   * with a `.write` as usual, and may be useful in "sweeper" systems that want to be able to, e.g.,
+   * delete any entity without having to worry what it might hold refs to or what components might
+   * have backrefs pointing to it.
    */
   get usingAll(): this {
     // All types except Alive, which is always at index 0.
-    this.set(this.__system.accessMasks.read, this.__system.dispatcher.registry.types.slice(1));
+    this.__lastTypes = this.__system.dispatcher.registry.types.slice(1);
     return this;
   }
 
@@ -346,20 +346,22 @@ export class QueryBuilder {
   }
 
   /**
-   * Marks the most recently mentioned component types as read by the system.  Redundant, since any
-   * mention of component types automatically marks them as read, but can be included for clarity.
+   * Marks the most recently mentioned component types as read by the system.  This declaration
+   * is enforced: you will only be able to read components of types thus declared.
    */
   get read(): this {
+    this.set(this.__system.accessMasks.read);
     return this;
   }
 
   /**
-   * Marks the most recently mentioned component types as written by the system.  This declaration
-   * is enforced: you will only be able to write to component of types thus declared.  You should
-   * try to declare the minimum writable set that your system will need to improve ordering and
-   * concurrent performance.
+   * Marks the most recently mentioned component types as read and written by the system.  This
+   * declaration is enforced: you will only be able to write to component of types thus declared.
+   * You should try to declare the minimum writable set that your system will need to improve
+   * ordering and concurrent performance.
    */
   get write(): this {
+    this.set(this.__system.accessMasks.read);
     this.set(this.__system.accessMasks.write);
     return this;
   }

@@ -1,5 +1,8 @@
 ### Upcoming
 
+### 0.13.0
+- Changed query clauses `using` and `usingAll` to **not** automatically grab a `read` entitlement.  You'll need to explicitly suffix with `.read` from now on.  (`with` and `without` still automatically claim `read`.)
+
 ### 0.12.3
 - Added `allSystems` to the schedule builder object to facilitate sweeping precedence constraints.
 - Changed `before` and `after` constraints (when used on groups) to ignore any systems that show up in both the subject and target sets.
