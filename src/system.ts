@@ -318,7 +318,7 @@ Object.defineProperty(System.prototype, 'singleton', {
 
 
 export class SystemBox {
-  readonly accessMasks: AccessMasks = {read: [], write: [], check: []};
+  readonly accessMasks: AccessMasks = {read: [], create: [], write: [], check: []};
   readonly shapeQueries: QueryBox[] = [];
   readonly shapeQueriesByComponent: QueryBox[][] = [];
   readonly writeQueries: QueryBox[] = [];

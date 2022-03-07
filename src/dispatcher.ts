@@ -201,6 +201,7 @@ export class Dispatcher {
     this.buildSystem.id = 0 as SystemId;
     const box = new SystemBox(this.buildSystem, this);
     box.accessMasks.read = undefined;
+    box.accessMasks.create = undefined;
     box.accessMasks.write = undefined;
     box.accessMasks.check = undefined;
     this.systems.push(box);

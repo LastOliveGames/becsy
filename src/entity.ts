@@ -5,7 +5,7 @@ import type {SystemBox} from './system';
 
 
 export type EntityId = number & {__entityIdBrand: symbol};
-export type AccessMasks = {read?: number[], write?: number[], check?: number[]};
+export type AccessMasks = {read?: number[], create?: number[], write?: number[], check?: number[]};
 
 
 /**
@@ -77,7 +77,7 @@ export class EntityImpl {
       const type = args[i];
       CHECK: {
         if (typeof type !== 'function') {
-          throw new CheckError(`Bad arguments to bulk add: expected component type, got: ${type}`);
+          throw new CheckError(`Bad arguments to addAll: expected component type, got: ${type}`);
         }
       }
       let value: ComponentType<any> | Record<string, unknown> | undefined = args[i + 1];
@@ -302,12 +302,17 @@ export function checkMask(
 ): void {
   checkTypeDefined(type);
   const mask = system?.accessMasks[kind];
-  const ok = !mask || ((mask[type.__binding!.shapeOffset] ?? 0) & type.__binding!.shapeMask) !== 0;
-  if (!ok) {
-    throw new CheckError(
-      `System ${system.name} didn't mark component ${type.name} as ` +
-      (kind === 'write' ? 'writeable' : 'readable'));
+  if (!mask) return;
+  // Inline isMaskFlagSet for performance.
+  const binding = type.__binding!;
+  if (((mask[binding.shapeOffset] ?? 0) & binding.shapeMask) === 0) {
+    throw new CheckError(`System ${system.name} didn't mark component ${type.name} as ${kind}able`);
   }
+}
+
+export function isMaskFlagSet(mask: number[], type: ComponentType<any>): boolean {
+  const binding = type.__binding!;
+  return ((mask[binding.shapeOffset] ?? 0) & binding.shapeMask) !== 0;
 }
 
 export function extendMaskAndSetFlag(mask: number[], type: ComponentType<any>): void {

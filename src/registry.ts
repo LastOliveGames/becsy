@@ -1,6 +1,8 @@
 import {
   ComponentType, assimilateComponentType, defineAndAllocateComponentType, ComponentId,
-  dissimilateComponentType
+  dissimilateComponentType,
+  initComponent,
+  checkTypeDefined
 } from './component';
 import {Log, LogPointer} from './datatypes/log';
 import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/intpool';
@@ -140,9 +142,44 @@ export class Registry {
     this.entityOrdinals[id] = this.nextEntityOrdinal++;
     this.setShape(id, this.Alive);
     const entity = this.pool.borrowTemporarily(id);
-    entity.addAll(...initialComponents);
+    this.createComponents(id, initialComponents);
     STATS: this.dispatcher.stats.numEntities += 1;
     return entity;
+  }
+
+  // Everything is copied over from Entity and inlined here to keep performance from cratering.
+  // Just calling checkMask with 'create' kills it...
+  private createComponents(
+    id: EntityId, initialComponents: (ComponentType<any> | Record<string, unknown>)[]
+  ): void {
+    for (let i = 0; i < initialComponents.length; i++) {
+      const type = initialComponents[i];
+      CHECK: {
+        if (typeof type !== 'function') {
+          throw new CheckError(
+            `Bad arguments to createEntity: expected component type, got: ${type}`);
+        }
+        checkTypeDefined(type);
+        const mask = this.executingSystem?.accessMasks.create;
+        if (mask) {
+          const binding = type.__binding!;
+          if (((mask[binding.shapeOffset] ?? 0) & binding.shapeMask) === 0) {
+            throw new CheckError(
+              `System ${this.executingSystem?.name} didn't mark component ${type.name} ` +
+              `as createable`);
+          }
+        }
+        if (this.hasShape(id, type, false)) {
+          throw new CheckError(`Duplicate ${type.name} component when creating entity`);
+        }
+      }
+      let value: ComponentType<any> | Record<string, unknown> | undefined =
+        initialComponents[i + 1];
+      if (typeof value === 'function') value = undefined; else i++;
+      this.setShape(id, type);
+      STATS: this.dispatcher.stats.forComponent(type).numEntities += 1;
+      initComponent(type, id, value);
+    }
   }
 
   flush(): void {

@@ -108,7 +108,7 @@ class DeleteA extends System {
 
 class CreateAForEachC extends System {
   sked = this.schedule(s => s.before(DeleteA));
-  entities = this.query(q => q.current.with(C).and.using(A).write);
+  entities = this.query(q => q.current.with(C).and.using(A).create);
   execute() {
     for (const entity of this.entities.current) {
       this.createEntity(A, {value: entity.read(C).value});

@@ -1,6 +1,6 @@
 import {Bitset} from './datatypes/bitset';
 import type {ComponentType} from './component';
-import {Entity, EntityId, extendMaskAndSetFlag} from './entity';
+import {Entity, EntityId, extendMaskAndSetFlag, isMaskFlagSet} from './entity';
 import type {SystemBox} from './system';
 import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/entitylist';
 import {CheckError, InternalError} from './errors';
@@ -355,19 +355,27 @@ export class QueryBuilder {
   }
 
   /**
-   * Marks the most recently mentioned component types as read and written by the system.  This
-   * declaration is enforced: you will only be able to write to component of types thus declared.
-   * You should try to declare the minimum writable set that your system will need to improve
-   * ordering and concurrent performance.
+   * Marks the most recently mentioned component types as created (and only created!) by the system.
+   * This means that the component types will only be used in `createEntity` calls; they cannot be
+   * otherwise read, check for (`has` methods), or written.
    */
-  get write(): this {
-    this.set(this.__system.accessMasks.read);
-    this.set(this.__system.accessMasks.write);
+  get create(): this {
+    this.set(this.__system.accessMasks.create);
     return this;
   }
 
-  // TODO: add support for create mode; precedence like write, but systems can run concurrently if
-  // component has inelastic storage and atomic component allocation
+  /**
+   * Marks the most recently mentioned component types as read and written by the system.  This
+   * declaration is enforced: you will only be able to read and write to component of types thus
+   * declared. You should try to declare the minimum writable set that your system will need to
+   * improve ordering and concurrency.
+   */
+  get write(): this {
+    this.set(this.__system.accessMasks.write);
+    this.set(this.__system.accessMasks.read);
+    this.set(this.__system.accessMasks.create);
+    return this;
+  }
 
   private set(
     mask: MaskKind | number[] | undefined, types?: ComponentType<any>[]
@@ -381,13 +389,26 @@ export class QueryBuilder {
       mask = this.__query[mask]!;
     }
     const readMask = mask === this.__system.accessMasks.read;
+    const createMask = mask === this.__system.accessMasks.create;
     const writeMask = mask === this.__system.accessMasks.write;
     const shapeMask = mask === this.__query.withMask || mask === this.__query.withoutMask;
     const trackMask = mask === this.__query.trackMask;
     const map =
       readMask ? this.__system.dispatcher.planner.readers! :
-        writeMask ? this.__system.dispatcher.planner.writers! : undefined;
+        createMask ? this.__system.dispatcher.planner.creators! :
+          writeMask ? this.__system.dispatcher.planner.writers! : undefined;
     for (const type of types) {
+      CHECK: {
+        if (!isMaskFlagSet(this.__system.accessMasks.write!, type) && (
+          readMask && isMaskFlagSet(this.__system.accessMasks.create!, type) ||
+          createMask && isMaskFlagSet(this.__system.accessMasks.read!, type)
+        )) {
+          throw new CheckError(
+            `Cannot combine create and read entitlements for component type ${type.name}; ` +
+            `just use a write entitlement instead`
+          );
+        }
+      }
       extendMaskAndSetFlag(mask, type);
       if (readMask) extendMaskAndSetFlag(this.__system.accessMasks.check!, type);
       if (map) map.get(type)!.add(this.__system);

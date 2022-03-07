@@ -136,6 +136,7 @@ export class Lane {
 export class Planner {
   readonly graph: Graph<SystemBox>;
   readers? = new Map<ComponentType<Component>, Set<SystemBox>>();
+  creators? = new Map<ComponentType<Component>, Set<SystemBox>>();
   writers? = new Map<ComponentType<Component>, Set<SystemBox>>();
   lanes: Lane[] = [];
   replicatedLane?: Lane;
@@ -148,6 +149,7 @@ export class Planner {
     this.graph = new Graph(systems);
     for (const componentType of dispatcher.registry.types) {
       this.readers!.set(componentType, new Set());
+      this.creators!.set(componentType, new Set());
       this.writers!.set(componentType, new Set());
     }
     if (dispatcher.threaded) {
@@ -172,11 +174,12 @@ export class Planner {
     for (const system of this.systems) system.buildQueries();
     for (const system of this.systems) system.buildSchedule();
     for (const group of this.groups) group.__buildSchedule();
-    this.addComponentReaderWriterDependencies();
+    this.addComponentEntitlementDependencies();
     this.graph.seal();
     if (this.dispatcher.threaded) this.assignSystemsToLanes();
     STATS: for (const system of this.systems) system.stats.worker = system.lane?.id ?? 0;
     delete this.readers;
+    delete this.creators;
     delete this.writers;
     for (const group of this.groups) {
       group.__plan =
@@ -184,11 +187,14 @@ export class Planner {
     }
   }
 
-  private addComponentReaderWriterDependencies(): void {
+  private addComponentEntitlementDependencies(): void {
     for (const [componentType, systems] of this.readers!.entries()) {
       for (const reader of systems) {
         for (const writer of this.writers!.get(componentType)!) {
           this.graph.addEdge(writer, reader, 1);
+        }
+        for (const creator of this.creators!.get(componentType)!) {
+          this.graph.addEdge(creator, reader, 1);
         }
       }
     }
@@ -196,7 +202,7 @@ export class Planner {
 
   private assignSystemsToLanes(): void {
     this.initSystemLanes();
-    this.mergeReadersOfUnsharedComponentTypes();
+    this.mergeAccessorsOfUnsharedComponentTypes();
     this.mergeAttachedSystems();
     this.pruneEmptyLanes();
     this.reduceLanes(this.dispatcher.threads + 1);
@@ -209,13 +215,17 @@ export class Planner {
     }
   }
 
-  private mergeReadersOfUnsharedComponentTypes(): void {
+  private mergeAccessorsOfUnsharedComponentTypes(): void {
     for (const componentType of this.dispatcher.registry.types) {
       if (componentType.__binding!.fields.every(field => field.type.shared)) continue;
       const readers = this.readers!.get(componentType);
-      if (!readers) continue;
+      const creators = this.creators!.get(componentType);
+      if (!readers && !creators) continue;
       let lane = componentType.options?.restrictedToMainThread ? this.mainLane! : this.createLane();
-      readers.forEach(system => {
+      readers?.forEach(system => {
+        lane = lane.merge(system.lane!);
+      });
+      creators?.forEach(system => {
         lane = lane.merge(system.lane!);
       });
     }
