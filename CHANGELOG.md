@@ -1,4 +1,5 @@
 ### Upcoming
+- Improved performance in a few cases by ~10%.
 
 ### 0.13.0
 - Changed query clauses `using` and `usingAll` to **not** automatically grab a `read` entitlement.  You'll need to explicitly suffix with `.read` from now on.  (`with` and `without` still automatically claim `read`.)

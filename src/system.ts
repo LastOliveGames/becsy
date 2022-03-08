@@ -318,25 +318,25 @@ Object.defineProperty(System.prototype, 'singleton', {
 
 
 export class SystemBox {
-  readonly accessMasks: AccessMasks = {read: [], create: [], write: [], check: []};
-  readonly shapeQueries: QueryBox[] = [];
-  readonly shapeQueriesByComponent: QueryBox[][] = [];
-  readonly writeQueries: QueryBox[] = [];
-  readonly writeQueriesByComponent: QueryBox[][] = [];
-  hasNegativeQueries: boolean;
-  hasWriteQueries: boolean;
-  private hasTransientQueries: boolean;
-  private ranQueriesLastFrame: boolean;
-  private shapeLogPointer: LogPointer;
-  private writeLogPointer?: LogPointer;
-  private state: RunState = RunState.RUNNING;
-  readonly stats: SystemStats;
-  readonly attachedSystems: (SystemBox | undefined)[];
-  readonly singletonComponentDefs: (ComponentType<any> | Record<string, unknown>)[];
-  private propsAssigned = false;
-  lane?: Lane;
-  stateless = false;
-  weight = 1;
+  declare readonly accessMasks: AccessMasks;
+  declare readonly shapeQueries: QueryBox[];
+  declare readonly shapeQueriesByComponent: QueryBox[][];
+  declare readonly writeQueries: QueryBox[];
+  declare readonly writeQueriesByComponent: QueryBox[][];
+  declare hasNegativeQueries: boolean;
+  declare hasWriteQueries: boolean;
+  declare private hasTransientQueries: boolean;
+  declare private ranQueriesLastFrame: boolean;
+  declare private shapeLogPointer: LogPointer;
+  declare private writeLogPointer?: LogPointer;
+  declare private state: RunState;
+  declare readonly stats: SystemStats;
+  declare readonly attachedSystems: (SystemBox | undefined)[];
+  declare readonly singletonComponentDefs: (ComponentType<any> | Record<string, unknown>)[];
+  declare private propsAssigned: boolean;
+  declare lane?: Lane;
+  declare stateless: boolean;
+  declare weight: number;
 
   get id(): number {return this.system.id;}
   get name(): string {return this.system.name;}
@@ -344,6 +344,15 @@ export class SystemBox {
 
   constructor(private readonly system: System, readonly dispatcher: Dispatcher) {
     system.__dispatcher = dispatcher;
+    this.accessMasks = {read: [], create: [], write: [], check: []};
+    this.shapeQueries = [];
+    this.shapeQueriesByComponent = [];
+    this.writeQueries = [];
+    this.writeQueriesByComponent = [];
+    this.state = RunState.RUNNING;
+    this.propsAssigned = false;
+    this.stateless = false;
+    this.weight = 1;
     this.shapeLogPointer = dispatcher.shapeLog.createPointer();
     STATS: this.stats = dispatcher.stats.forSystem(system.constructor as SystemType<any>);
     this.attachedSystems = this.system.__attachPlaceholders!.map(

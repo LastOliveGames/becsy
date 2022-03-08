@@ -58,17 +58,17 @@ export interface ComponentType<C extends Component> {
 }
 
 export class Binding<C> {
-  readonlyInstance: C;
-  writableInstance: C;
-  readonly shapeOffset: number;
-  readonly shapeMask: number;
-  readonly refFields: Field<Entity | null>[];
-  trackedWrites = false;
-  internallyIndexed = false;
-  entityId = 0 as EntityId;
-  index = 0;
-  readonly initDefault: (component: any) => void;
-  readonly init: (component: any, values: any) => void;
+  declare readonlyInstance: C;
+  declare writableInstance: C;
+  declare readonly shapeOffset: number;
+  declare readonly shapeMask: number;
+  declare readonly refFields: Field<Entity | null>[];
+  declare trackedWrites: boolean;
+  declare internallyIndexed: boolean;
+  declare entityId: EntityId;
+  declare index: number;
+  declare readonly initDefault: (component: any) => void;
+  declare readonly init: (component: any, values: any) => void;
 
   constructor(
     readonly type: ComponentType<C>, readonly fields: Field<any>[], readonly dispatcher: Dispatcher,
@@ -79,6 +79,10 @@ export class Binding<C> {
     this.shapeOffset = type.id! >> 5;
     this.shapeMask = 1 << (type.id! & 31);
     this.refFields = fields.filter(field => field.type === Type.ref);
+    this.trackedWrites = false;
+    this.internallyIndexed = false;
+    this.entityId = 0 as EntityId;
+    this.index = 0;
     // eslint-disable-next-line no-new-func
     this.initDefault = new Function(
       'component',
@@ -127,9 +131,9 @@ export function checkTypeDefined(type: ComponentType<any>): void {
 
 
 class PackedStorage implements Storage {
-  index: Int8Array | Int16Array | Int32Array;
+  declare index: Int8Array | Int16Array | Int32Array;
   // layout: bytesPerElement, nextIndex, capacity, numSpares, ...spareIndices
-  private spares: Int8Array | Int16Array | Int32Array;
+  declare private spares: Int8Array | Int16Array | Int32Array;
 
   constructor(
     private readonly maxEntities: number, private readonly binding: Binding<any>,
@@ -218,7 +222,7 @@ class PackedStorage implements Storage {
 
 
 class CompactStorage implements Storage {
-  private index: Int32Array;
+  declare private index: Int32Array;
 
   constructor(
     private readonly maxEntities: number, private readonly binding: Binding<any>,
