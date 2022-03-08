@@ -30,8 +30,8 @@
     "perfRel": 5.261330786053644
   },
   "ecs-benchmark/entityCycle": {
-    "devOps": 265,
-    "devRel": 0.006661471556773334,
+    "devOps": 384,
+    "devRel": 0.009614903099804697,
     "perfOps": 2088,
     "perfRel": 0.05248736834167065
   },
@@ -66,8 +66,8 @@
     "perfRel": 3.47515145421181
   },
   "ecs-packed/entityCycle": {
-    "devOps": 264,
-    "devRel": 0.006636333928257208,
+    "devOps": 377,
+    "devRel": 0.009439631428714507,
     "perfOps": 1986,
     "perfRel": 0.049923330233025816
   },
@@ -102,8 +102,8 @@
     "perfRel": 2.2775194188180286
   },
   "ecs-packed-elastic/entityCycle": {
-    "devOps": 265,
-    "devRel": 0.006661471556773334,
+    "devOps": 373,
+    "devRel": 0.009339476188091542,
     "perfOps": 1956,
     "perfRel": 0.04916920137754204
   },
