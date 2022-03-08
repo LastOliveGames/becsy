@@ -31,7 +31,7 @@ export default defineConfig({
         {text: 'Discord', link: 'https://discord.gg/X72ct6hZSr'},
         {text: 'Issues', link: 'https://github.com/lastolivegames/becsy/issues'}
       ]},
-      {text: 'Release Notes', link: 'https://github.com/lastolivegames/becsy/CHANGELOG.md'}
+      {text: 'Release Notes', link: 'https://github.com/LastOliveGames/becsy/blob/main/CHANGELOG.md'}
     ],
 
     sidebar: {
