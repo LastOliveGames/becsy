@@ -54,6 +54,4 @@ I'm actively supporting this package but it's not my primary job, so responses m
 
 ## Acknowledgements
 
-Many thanks to Becsy's early users, who helped shape the feature set and API, and found tons of bugs!  Also, thanks to [ECSY](https://ecsy.io) for the inspiration and their fine documentation, which served as the starting point for this site.
-
-Icon by Kareemov Benzema from The Noun Project.
+Many thanks to Becsy's early users, who helped shape the feature set and API, and found tons of bugs!  Thanks to [ECSY](https://ecsy.io) for the inspiration and their fine documentation, which served as the starting point for this site.  And thanks to [Kate Liu](https://www.instagram.com/lemonikate/) for the logo design!
