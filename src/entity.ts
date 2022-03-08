@@ -16,10 +16,15 @@ export type AccessMasks = {read?: number[], write?: number[], check?: number[]};
  * Instead, call {@link Entity.hold} to obtain a long-lived version of the object.
  */
 export class EntityImpl {
-  __id: EntityId;
-  __valid = true;
+  declare __id: EntityId;
+  declare __valid: boolean;
 
-  constructor(private readonly __registry: Registry) {}
+  constructor(private readonly __registry: Registry) {
+    this.__id = undefined as unknown as EntityId;
+    CHECK: {
+      this.__valid = true;
+    }
+  }
 
   /**
    * Returns whether the entity is alive, i.e. has not been deleted.  Turning on
