@@ -72,6 +72,10 @@
   height: 1.8rem !important;
 }
 
+.dialog-item .icon.outbound {
+  margin-left: 0.25em;
+}
+
 :root {
   --c-brand: #5e58e8;
   --c-brand-light: #7e77f4;
