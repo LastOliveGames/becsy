@@ -123,7 +123,7 @@ class PositionLogSystem extends System {
         `Entity with ordinal ${entity.ordinal} has component ` +
         `Position={x: ${pos.x}, y: ${pos.y}, z: ${pos.z}}`
       );
-    });
+    }
   }
 }
 ```
@@ -142,7 +142,7 @@ class PositionLogSystem extends System {
         `Entity with ordinal ${entity.ordinal} has component ` +
         `Position={x: ${pos.x}, y: ${pos.y}, z: ${pos.z}}`
       );
-    });
+    }
   }
 }
 ```
@@ -166,10 +166,10 @@ class MovableSystem extends System {
 
       // Get the `Position` component as read-write.
       const position = entity.write(Position);
-      position.x += acceleration * delta;
-      position.y += acceleration * delta;
-      position.z += acceleration * delta;
-    });
+      position.x += acceleration * this.delta;
+      position.y += acceleration * this.delta;
+      position.z += acceleration * this.delta;
+    }
   }
 }
 ```
@@ -190,10 +190,10 @@ class MovableSystem extends System {
 
       // Get the `Position` component as read-write.
       const position = entity.write(Position);
-      position.x += acceleration * delta;
-      position.y += acceleration * delta;
-      position.z += acceleration * delta;
-    });
+      position.x += acceleration * this.delta;
+      position.y += acceleration * this.delta;
+      position.z += acceleration * this.delta;
+    }
   }
 }
 ```
@@ -290,7 +290,7 @@ class PositionLogSystem extends System {
         `Entity with ordinal ${entity.ordinal} has component ` +
         `Position={x: ${pos.x}, y: ${pos.y}, z: ${pos.z}}`
       );
-    });
+    }
   }
 }
 
@@ -302,10 +302,10 @@ class MovableSystem extends System {
     for (const entity of this.entities.current) {
       const acceleration = entity.read(Acceleration).value;
       const position = entity.write(Position);
-      position.x += acceleration * delta;
-      position.y += acceleration * delta;
-      position.z += acceleration * delta;
-    });
+      position.x += acceleration * this.delta;
+      position.y += acceleration * this.delta;
+      position.z += acceleration * this.delta;
+    }
   }
 }
 
@@ -352,7 +352,7 @@ import {component, field, system, System, Type, World} from '@lastolivegames/bec
         `Entity with ordinal ${entity.ordinal} has component ` +
         `Position={x: ${pos.x}, y: ${pos.y}, z: ${pos.z}}`
       );
-    });
+    }
   }
 }
 
@@ -364,10 +364,10 @@ import {component, field, system, System, Type, World} from '@lastolivegames/bec
     for (const entity of this.entities.current) {
       const acceleration = entity.read(Acceleration).value;
       const position = entity.write(Position);
-      position.x += acceleration * delta;
-      position.y += acceleration * delta;
-      position.z += acceleration * delta;
-    });
+      position.x += acceleration * this.delta;
+      position.y += acceleration * this.delta;
+      position.z += acceleration * this.delta;
+    }
   }
 }
 
