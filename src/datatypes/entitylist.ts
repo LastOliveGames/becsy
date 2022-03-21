@@ -43,9 +43,9 @@ export class ArrayEntityList implements EntityList {
   sort(): void {
     if (this.sorted) return;
     const orderBy = this.orderBy!;
+    for (const entity of this.entities) entity.__sortKey = orderBy(entity);
     this.entities.sort((a, b) => {
-      const aKey = orderBy(a), bKey = orderBy(b);
-      return aKey < bKey ? -1 : aKey > bKey ? +1 : 0;
+      return a.__sortKey < b.__sortKey ? -1 : a.__sortKey > b.__sortKey ? +1 : 0;
     });
     this.sorted = true;
   }
@@ -89,6 +89,7 @@ export class PackedArrayEntityList implements EntityList {
     if (index < this.entities.length) {
       this.entities[index] = entity;
       this.lookupTable[entity.__id] = index;
+      if (this.orderBy) this.sorted = false;
     }
   }
 
@@ -107,10 +108,13 @@ export class PackedArrayEntityList implements EntityList {
   sort(): void {
     if (this.sorted) return;
     const orderBy = this.orderBy!;
+    for (const entity of this.entities) entity.__sortKey = orderBy(entity);
     this.entities.sort((a, b) => {
-      const aKey = orderBy(a), bKey = orderBy(b);
-      return aKey < bKey ? -1 : aKey > bKey ? +1 : 0;
+      return a.__sortKey < b.__sortKey ? -1 : a.__sortKey > b.__sortKey ? +1 : 0;
     });
+    for (let i = 0; i < this.entities.length; i++) {
+      this.lookupTable[this.entities[i].__id] = i;
+    }
     this.sorted = true;
   }
 }

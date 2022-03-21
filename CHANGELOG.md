@@ -1,5 +1,9 @@
 ### Upcoming
+
+### 0.13.1
 - Improved performance in a few cases by ~10%.
+- Improved query `orderBy` performance.
+- Fixed a case where a `current` query could become corrupted after an entity was removed from the results.
 
 ### 0.13.0
 - Changed query clauses `using` and `usingAll` to **not** automatically grab a `read` entitlement.  You'll need to explicitly suffix with `.read` from now on.  (`with` and `without` still automatically claim `read`.)

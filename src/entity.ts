@@ -18,9 +18,11 @@ export type AccessMasks = {read?: number[], create?: number[], write?: number[],
 export class EntityImpl {
   declare __id: EntityId;
   declare __valid: boolean;
+  declare __sortKey: any;
 
   constructor(private readonly __registry: Registry) {
     this.__id = undefined as unknown as EntityId;
+    this.__sortKey = undefined;
     CHECK: {
       this.__valid = true;
     }

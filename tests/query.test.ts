@@ -363,4 +363,19 @@ describe('ordering query results', () => {
     await world.execute();
     expect(message).toBe('12');
   });
+
+  test('order by value after removal', async () => {
+    const world = await createWorld(ListAByValue);
+    let entity: Entity;
+    world.build(sys => {
+      sys.createEntity(A, {value: 3});
+      entity = sys.createEntity(A, {value: 2}).hold();
+      sys.createEntity(A, {value: 1});
+    });
+    await world.execute();
+    expect(message).toBe('123');
+    entity!.remove(A);
+    await world.execute();
+    expect(message).toBe('13');
+  });
 });
