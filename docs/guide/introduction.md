@@ -41,11 +41,11 @@ Then we add:<br>
 :white_check_mark: bidirectional entity references with strong referential integrity<br>
 :white_check_mark: declarative system ordering based on data dependencies<br>
 :white_check_mark: coroutines for more natural multi-stage workflows<br>
+:white_check_mark: built-in support for representing state machines (per [Sander Mertens](https://ajmmertens.medium.com/why-storing-state-machines-in-ecs-is-a-bad-idea-742de7a18e59))<br>
 :white_check_mark: weak references to native JS objects, for better integration with other frameworks<br>
 
 Still to come:<br>
 :white_large_square: multithreaded system execution<br>
-:white_large_square: built-in support for representing state machines (per [Sander Mertens](https://ajmmertens.medium.com/why-storing-state-machines-in-ecs-is-a-bad-idea-742de7a18e59))<br>
 :white_large_square: an optional but nicely integrated networked data replication system<br>
 
 ## Support

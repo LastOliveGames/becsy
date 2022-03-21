@@ -51,6 +51,17 @@ class IncrementAC extends System {
   }
 }
 
+class IncrementAOrC extends System {
+  sked = this.schedule(s => s.afterWritesTo(A, C));
+  entities = this.query(q => q.current.withAny(A, C).write);
+  execute() {
+    for (const entity of this.entities.current) {
+      if (entity.has(A)) entity.write(A).value += 1;
+      if (entity.has(C)) entity.write(C).value += 1;
+    }
+  }
+}
+
 class IncrementANotC extends System {
   sked = this.schedule(s => s.afterWritesTo(A));
   entities = this.query(q => q.current.with(A).write.but.without(C));
@@ -200,6 +211,17 @@ describe('basic queries, current iteration, reads and writes', () => {
 
   test('iterate overlapping types', async () => {
     const world = await createWorld(IncrementA, IncrementC);
+    world.createEntity(A);
+    world.createEntity(A);
+    world.createEntity(A, C);
+    world.createEntity(C);
+    await world.execute();
+    expect(total.a).toBe(3);
+    expect(total.c).toBe(2);
+  });
+
+  test('iterate type disjunction', async () => {
+    const world = await createWorld(IncrementAOrC);
     world.createEntity(A);
     world.createEntity(A);
     world.createEntity(A, C);

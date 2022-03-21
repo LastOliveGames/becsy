@@ -1,5 +1,6 @@
-import type {ComponentType} from './component';
+import type {Component, ComponentType} from './component';
 import {ControlOptions, Dispatcher, State, WorldOptions} from './dispatcher';
+import {ComponentEnum} from './enums';
 import {CheckError} from './errors';
 import {Frame, FrameImpl, SystemGroup} from './schedule';
 import type {Stats} from './stats';
@@ -31,6 +32,37 @@ export class World {
     const world = new World(options, MAGIC_COOKIE);
     await world.__dispatcher.initialize();
     return world;
+  }
+
+  /**
+   * Defines a new enum of component types.  It will be automatically added to a world's defs if any
+   * of its component types are.
+   *
+   * @param name The name of the enum, used only in error messages.
+   * @param componentTypes The list of component types that belong to this enum.  You can also use
+   *  the `@component` decorator to add component types to an enum.  A component type can belong to
+   *  at most one enum.
+   * @returns The newly defined enum.
+   */
+  static defineEnum(name: string, ...componentTypes: ComponentType<any>[]): ComponentEnum;
+  /**
+   * Defines a new anonymous enum of component types.  It will be automatically added to a world's
+   * defs if any of its component types are.
+   *
+   * @param componentTypes The list of component types that belong to this enum.  You can also use
+   *  the `@component` decorator to add component types to an enum.  A component type can belong to
+   *  at most one enum.
+   * @returns The newly defined enum.
+   */
+  static defineEnum(...componentTypes: ComponentType<any>[]): ComponentEnum;
+  static defineEnum(
+    name: string | ComponentType<Component>, ...componentTypes: ComponentType<any>[]
+  ): ComponentEnum {
+    if (typeof name === 'function') {
+      componentTypes.unshift(name);
+      name = '<anonymous>';
+    }
+    return new ComponentEnum(name, componentTypes);
   }
 
   /**

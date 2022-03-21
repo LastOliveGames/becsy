@@ -1,4 +1,5 @@
 import {checkTypeDefined, ComponentType, initComponent} from './component';
+import type {ComponentEnum} from './enums';
 import {CheckError} from './errors';
 import type {Registry} from './registry';
 import type {SystemBox} from './system';
@@ -75,6 +76,17 @@ export class EntityImpl {
    */
   addAll(...args: (ComponentType<any> | Record<string, unknown>)[]): void {
     CHECK: this.__checkValid();
+    CHECK: {
+      const enums = new Set<ComponentEnum>();
+      for (const arg of args) {
+        if (typeof arg === 'function' && arg.enum) {
+          if (enums.has(arg.enum)) {
+            throw new CheckError(`Can't add multiple components from the same enum`);
+          }
+          enums.add(arg.enum);
+        }
+      }
+    }
     for (let i = 0; i < args.length; i++) {
       const type = args[i];
       CHECK: {
@@ -89,15 +101,22 @@ export class EntityImpl {
   }
 
   /**
-   * Remove a component from the entity.  If the entity doesn't posssess a component of this type
+   * Remove a component from the entity.  If the entity doesn't possess a component of this type
    * the call will fail.
    * @param type The type of component to remove.
    */
-  remove(type: ComponentType<any>): void {
+  remove(type: ComponentType<any> | ComponentEnum): void {
     CHECK: {
       this.__checkValid();
       this.__checkMask(type, 'write');
-      this.__checkHas(type, false);
+      if (typeof type === 'function') this.__checkHas(type, false);
+    }
+    if (typeof type !== 'function') {
+      const currentType = this.__registry.getEnumShape(this.__id, type, false);
+      CHECK: if (!currentType) {
+        throw new CheckError(`Entity doesn't have any components from ${type.name} enumeration`);
+      }
+      type = currentType;
     }
     this.__registry.clearShape(this.__id, type);
   }
@@ -107,7 +126,7 @@ export class EntityImpl {
    * of the given types, the call will fail.
    * @param types A list of component types to remove.
    */
-  removeAll(...types: ComponentType<any>[]): void {
+  removeAll(...types: (ComponentType<any> | ComponentEnum)[]): void {
     for (const type of types) this.remove(type);
   }
 
@@ -119,12 +138,13 @@ export class EntityImpl {
    * @param type The type of component to check for.
    * @returns Whether the entity has a component of the given type.
    */
-  has(type: ComponentType<any>): boolean {
+  has(type: ComponentType<any> | ComponentEnum): boolean {
     CHECK: {
       this.__checkValid();
       this.__checkMask(type, 'check');
     }
-    return this.__registry.hasShape(this.__id, type, true);
+    if (typeof type === 'function') return this.__registry.hasShape(this.__id, type, true);
+    return !!this.__registry.getEnumShape(this.__id, type, true);
   }
 
   // TODO: see if precomputing the masks and using Registry.match gets better performance on the
@@ -137,12 +157,9 @@ export class EntityImpl {
    * @param types A list of component types to check for.
    * @returns Whether the entity has a component of at least one of the given types.
    */
-  hasSomeOf(...types: ComponentType<any>[]): boolean {
+  hasSomeOf(...types: (ComponentType<any> | ComponentEnum)[]): boolean {
     CHECK: this.__checkValid();
-    for (const type of types) {
-      CHECK: this.__checkMask(type, 'check');
-      if (this.__registry.hasShape(this.__id, type, true)) return true;
-    }
+    for (const type of types) if (this.has(type)) return true;
     return false;
   }
 
@@ -155,10 +172,7 @@ export class EntityImpl {
    */
   hasAllOf(...types: ComponentType<any>[]): boolean {
     CHECK: this.__checkValid();
-    for (const type of types) {
-      CHECK: this.__checkMask(type, 'check');
-      if (!this.__registry.hasShape(this.__id, type, true)) return false;
-    }
+    for (const type of types) if (!this.has(type)) return false;
     return true;
   }
 
@@ -169,12 +183,13 @@ export class EntityImpl {
    * @param types A list of component types to exclude from the check.
    * @returns Whether the entity has a component of a type not given.
    */
-  hasAnyOtherThan(...types: ComponentType<any>[]): boolean {
+  hasAnyOtherThan(...types: (ComponentType<any> | ComponentEnum)[]): boolean {
     CHECK: this.__checkValid();
     const typeSet = new Set(types);
     for (const type of this.__registry.types) {
       CHECK: this.__checkMask(type, 'check');
-      if (!typeSet.has(type) && this.__registry.hasShape(this.__id, type, true)) return true;
+      if (!(typeSet.has(type) || type.enum && typeSet.has(type.enum)) &&
+          this.__registry.hasShape(this.__id, type, true)) return true;
     }
     return false;
   }
@@ -186,14 +201,24 @@ export class EntityImpl {
    * @param types A list of component types to count.
    * @returns The number of components present from among the given types.
    */
-  countHas(...types: ComponentType<any>[]): number {
+  countHas(...types: (ComponentType<any> | ComponentEnum)[]): number {
     CHECK: this.__checkValid();
     let count = 0;
-    for (const type of types) {
-      CHECK: this.__checkMask(type, 'check');
-      if (this.__registry.hasShape(this.__id, type, true)) count += 1;
-    }
+    for (const type of types) if (this.has(type)) count += 1;
     return count;
+  }
+
+  /**
+   * Returns the type from the given enumeration currently contained by the entity, if any.  If a
+   * system is running in `accessRecentlyDeletedData` mode, this will also consider recently removed
+   * components.
+   * @param enumeration The enumeration of the desired types.
+   * @returns A type from the enumeration if contained by the entity, or `undefined` if none.
+   */
+  hasWhich(enumeration: ComponentEnum): ComponentType<any> | undefined {
+    CHECK: this.__checkValid();
+    CHECK: this.__checkMask(enumeration, 'check');
+    return this.__registry.getEnumShape(this.__id, enumeration, true);
   }
 
   /**
@@ -279,7 +304,7 @@ export class EntityImpl {
     return this.__id === other.__id;
   }
 
-  private __checkMask(type: ComponentType<any>, kind: keyof AccessMasks): void {
+  private __checkMask(type: ComponentType<any> | ComponentEnum, kind: keyof AccessMasks): void {
     checkMask(type, this.__registry.executingSystem, kind);
   }
 
@@ -300,7 +325,7 @@ export interface Entity extends EntityImpl {}
 
 
 export function checkMask(
-  type: ComponentType<any>, system: SystemBox | undefined, kind: keyof AccessMasks
+  type: ComponentType<any> | ComponentEnum, system: SystemBox | undefined, kind: keyof AccessMasks
 ): void {
   checkTypeDefined(type);
   const mask = system?.accessMasks[kind];
@@ -312,12 +337,21 @@ export function checkMask(
   }
 }
 
-export function isMaskFlagSet(mask: number[], type: ComponentType<any>): boolean {
+export function isMaskFlagSet(mask: number[], type: ComponentType<any> | ComponentEnum): boolean {
   const binding = type.__binding!;
   return ((mask[binding.shapeOffset] ?? 0) & binding.shapeMask) !== 0;
 }
 
-export function extendMaskAndSetFlag(mask: number[], type: ComponentType<any>): void {
+export function extendMaskAndSetFlag(
+  mask: number[], type: ComponentType<any> | ComponentEnum, useValues?: false
+): void;
+export function extendMaskAndSetFlag(
+  mask: number[], type: ComponentType<any>, useValues: true
+): void;
+
+export function extendMaskAndSetFlag(
+  mask: number[], type: ComponentType<any> | ComponentEnum, useValues = false
+): void {
   CHECK: checkTypeDefined(type);
   const flagOffset = type.__binding!.shapeOffset!;
   if (flagOffset >= mask.length) {
@@ -325,5 +359,6 @@ export function extendMaskAndSetFlag(mask: number[], type: ComponentType<any>): 
     mask.length = flagOffset + 1;
     mask.fill(0, oldLength, flagOffset);
   }
-  mask[flagOffset] |= type.__binding!.shapeMask!;
+  mask[flagOffset] |=
+    useValues ? (type as ComponentType<any>).__binding!.shapeValue : type.__binding!.shapeMask!;
 }

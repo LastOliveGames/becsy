@@ -2,8 +2,10 @@ import {
   ComponentType, assimilateComponentType, defineAndAllocateComponentType, ComponentId,
   dissimilateComponentType,
   initComponent,
-  checkTypeDefined
+  checkTypeDefined,
+  Component
 } from './component';
+import {ComponentEnum} from './enums';
 import {Log, LogPointer} from './datatypes/log';
 import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/intpool';
 import type {Dispatcher} from './dispatcher';
@@ -71,7 +73,11 @@ export class EntityPool {
 }
 
 
+type AllocationItem = {typeOrEnum: ComponentType<Component> | ComponentEnum, size: number};
+
 export class Registry {
+  private readonly allocationItems: AllocationItem[];
+  private readonly numShapeBits: number = 0;
   private readonly shapes: ShapeArray;
   private readonly staleShapes: ShapeArray;
   private readonly removedShapes: ShapeArray;
@@ -93,16 +99,17 @@ export class Registry {
 
   constructor(
     maxEntities: number, maxLimboComponents: number, readonly types: ComponentType<any>[],
-    readonly dispatcher: Dispatcher
+    readonly enums: ComponentEnum[], readonly dispatcher: Dispatcher
   ) {
-    this.types.unshift(this.Alive);
+    this.allocationItems = this.prepareComponentTypesAndEnums();
+    for (const item of this.allocationItems) this.numShapeBits += item.size;
     const ShapeArrayClass = dispatcher.threaded ? AtomicSharedShapeArray : UnsharedShapeArray;
     this.shapes = new ShapeArrayClass(
-      'registry.shapes', types.length, maxEntities, dispatcher.buffers);
+      'registry.shapes', this.numShapeBits, maxEntities, dispatcher.buffers);
     this.staleShapes = new ShapeArrayClass(
-      'registry.staleShapes', types.length, maxEntities, dispatcher.buffers);
+      'registry.staleShapes', this.numShapeBits, maxEntities, dispatcher.buffers);
     this.removedShapes = new ShapeArrayClass(
-      'registry.removedShapes', types.length, maxEntities, dispatcher.buffers);
+      'registry.removedShapes', this.numShapeBits, maxEntities, dispatcher.buffers);
     this.entityIdPool = dispatcher.threaded ?
       new SharedAtomicPool(maxEntities, 'maxEntities', dispatcher.buffers) :
       new UnsharedPool(maxEntities, 'maxEntities');
@@ -118,19 +125,86 @@ export class Registry {
   }
 
   initializeComponentTypes(): void {
-    let componentId = 0;
     // Two-phase init, so components can have dependencies on each other's fields.
-    for (const type of this.types) {
-      assimilateComponentType(componentId++ as ComponentId, type, this.dispatcher);
-      if (type.validate) this.validators.push(type);
+    let bitIndex = 0, typeId = 0;
+    while (this.allocationItems.length) {
+      const shift = bitIndex % 32;
+      const item = this.removeBiggestNoLargerThan(32 - shift);
+      if (!item) {
+        bitIndex += 32 - shift;
+        continue;
+      }
+      const shapeSpec = {
+        offset: bitIndex >>> 5, mask: ((1 << item.size) - 1) << shift, value: 1 << shift
+      };
+      bitIndex += item.size;
+      if (item.typeOrEnum instanceof ComponentEnum) {
+        const enumeration = item.typeOrEnum;
+        enumeration.__binding = {
+          shapeOffset: shapeSpec.offset, shapeMask: shapeSpec.mask, shapeShift: shift
+        };
+        for (const type of enumeration.__types) {
+          assimilateComponentType(typeId++ as ComponentId, type, shapeSpec, this.dispatcher);
+          if (type.validate) this.validators.push(type);
+          shapeSpec.value += 1 << shift;
+        }
+      } else {
+        const type = item.typeOrEnum;
+        assimilateComponentType(typeId++ as ComponentId, type, shapeSpec, this.dispatcher);
+        if (type.validate) this.validators.push(type);
+      }
     }
+
     for (const type of this.types) defineAndAllocateComponentType(type);
+
     DEBUG: {
-      const aliveBinding = this.types[0].__binding!;
-      if (!(aliveBinding.shapeOffset === 0 && aliveBinding.shapeMask === 1)) {
+      const aliveBinding = this.Alive.__binding!;
+      if (!(aliveBinding.shapeOffset === 0 && aliveBinding.shapeMask === 1 &&
+            aliveBinding.shapeValue === 1)) {
         throw new InternalError('Alive component was not assigned first available shape mask');
       }
     }
+  }
+
+  private prepareComponentTypesAndEnums(): AllocationItem[] {
+    const pool: AllocationItem[] = [];
+    const enumTypes = new Set<ComponentType<Component>>();
+    for (const type of this.types) {
+      if (type.enum) {
+        CHECK: if (!this.enums.includes(type.enum)) {
+          throw new CheckError(
+            `Component type ${type.name} references an enum that's not in the world's defs`);
+        }
+        if (!type.enum.__types.includes(type)) type.enum.__types.push(type);
+      }
+    }
+    for (const enumeration of this.enums) {
+      CHECK: if (enumeration.__types.length > 2 ** 31) {
+        throw new CheckError(`Too many types in enum: ${enumeration.__types.length}`);
+      }
+      pool.push({typeOrEnum: enumeration, size: Math.ceil(Math.log2(enumeration.__types.length))});
+      for (const type of enumeration.__types) {
+        CHECK: if (enumTypes.has(type)) {
+          throw new CheckError(`Component type ${type.name} is a member of more than one enum`);
+        }
+        type.enum = enumeration;
+        enumTypes.add(type);
+      }
+    }
+    for (const type of this.types) {
+      if (!enumTypes.has(type)) pool.push({typeOrEnum: type, size: 1});
+    }
+    pool.sort((a, b) => b.size - a.size);
+    // Ensure that Alive will always be the first type allocated.
+    this.types.unshift(this.Alive);
+    pool.unshift({typeOrEnum: this.Alive, size: 1});
+    return pool;
+  }
+
+  private removeBiggestNoLargerThan(maxSize: number): AllocationItem | undefined {
+    const k = this.allocationItems.findIndex(item => item.size <= maxSize);
+    if (k === -1) return;
+    return this.allocationItems.splice(k, 1)[0];
   }
 
   releaseComponentTypes(): void {
@@ -169,7 +243,13 @@ export class Registry {
               `as createable`);
           }
         }
-        if (this.hasShape(id, type, false)) {
+        if (type.enum) {
+          if (this.getEnumShape(id, type.enum, false)) {
+            throw new CheckError(
+              `Can't add multiple components from the same enum when creating entity: ` +
+              type.name);
+          }
+        } else if (this.hasShape(id, type, false)) {
           throw new CheckError(`Duplicate ${type.name} component when creating entity`);
         }
       }
@@ -288,7 +368,21 @@ export class Registry {
     return false;
   }
 
+  getEnumShape(
+    id: EntityId, enumeration: ComponentEnum, allowRecentlyDeleted: boolean
+  ): ComponentType<any> | undefined {
+    let index = this.shapes.get(id, enumeration);
+    if (index === 0 && allowRecentlyDeleted && this.includeRecentlyDeleted) {
+      index = this.staleShapes.get(id, enumeration);
+    }
+    if (index > 0) return enumeration.__types[index - 1];
+  }
+
   setShape(id: EntityId, type: ComponentType<any>): void {
+    if (type.enum) {
+      const oldType = this.getEnumShape(id, type.enum, false);
+      if (oldType) this.clearShape(id, oldType);
+    }
     this.shapes.set(id, type);
     this.staleShapes.set(id, type);
     CHECK: this.reshapedEntityIds.push(id);
@@ -322,9 +416,20 @@ export class Registry {
     }
   }
 
-  matchShape(id: EntityId, positiveMask?: number[], negativeMask?: number[]): boolean {
-    if (positiveMask && !this.shapes.match(id, positiveMask)) return false;
+  matchShape(
+    id: EntityId, positiveMask?: number[], positiveValues?: number[], positiveAnyMasks?: number[][],
+    negativeMask?: number[], negativeTypes?: ComponentType<any>[]
+  ): boolean {
+    if (positiveMask && positiveValues && !this.shapes.match(id, positiveMask, positiveValues)) {
+      return false;
+    }
+    if (positiveAnyMasks) {
+      for (const mask of positiveAnyMasks) if (this.shapes.matchNot(id, mask)) return false;
+    }
     if (negativeMask && !this.shapes.matchNot(id, negativeMask)) return false;
+    if (negativeTypes) {
+      for (const type of negativeTypes) if (this.shapes.isSet(id, type)) return false;
+    }
     return true;
   }
 }

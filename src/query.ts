@@ -4,6 +4,7 @@ import {Entity, EntityId, extendMaskAndSetFlag, isMaskFlagSet} from './entity';
 import type {SystemBox} from './system';
 import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/entitylist';
 import {CheckError, InternalError} from './errors';
+import type {ComponentEnum} from './enums';
 
 type MaskKind = 'withMask' | 'withoutMask' | 'trackMask';
 
@@ -28,7 +29,10 @@ export class QueryBox {
   results: Partial<Record<QueryFlavorName, EntityList>> & {current?: PackedArrayEntityList} = {};
   flavors = 0;
   withMask: number[] | undefined;
+  withValues: number[] | undefined;
+  withAnyMasks: number[][] | undefined;
   withoutMask: number[] | undefined;
+  withoutEnumTypes: ComponentType<any>[];
   trackMask: number[] | undefined;
   orderBy: (entity: Entity) => number;
   hasTransientResults: boolean;
@@ -114,7 +118,9 @@ export class QueryBox {
     this.processedEntities.set(id);
     const registry = this.system.dispatcher.registry;
     const oldMatch = this.results.current?.has(id) ?? this.currentEntities!.get(id);
-    const newMatch = registry.matchShape(id, this.withMask, this.withoutMask);
+    const newMatch = registry.matchShape(
+      id, this.withMask, this.withValues, this.withAnyMasks, this.withoutMask,
+      this.withoutEnumTypes);
     if (newMatch && !oldMatch) {
       this.currentEntities?.set(id);
       this.changedEntities?.set(id);
@@ -133,8 +139,11 @@ export class QueryBox {
   }
 
   handleWrite(id: EntityId, componentFlagOffset: number, componentFlagMask: number): void {
-    if (!this.changedEntities!.get(id) &&
-      this.system.dispatcher.registry.matchShape(id, this.withMask, this.withoutMask) &&
+    if (
+      !this.changedEntities!.get(id) &&
+      this.system.dispatcher.registry.matchShape(
+        id, this.withMask, this.withValues, this.withAnyMasks, this.withoutMask,
+        this.withoutEnumTypes) &&
       (this.trackMask![componentFlagOffset] ?? 0) & componentFlagMask
     ) {
       this.changedEntities!.set(id);
@@ -174,7 +183,7 @@ export class QueryBox {
 export class QueryBuilder {
   private __query: QueryBox;
   private __system: SystemBox;
-  protected __lastTypes: ComponentType<any>[];
+  protected __lastTypes: (ComponentType<any> | ComponentEnum)[];
 
   constructor(
     private readonly __callback: (q: QueryBuilder) => void,
@@ -295,6 +304,11 @@ export class QueryBuilder {
   /**
    * Constrains the query to entities that possess components of all the given types.  All given
    * types are also marked as `read`.
+   *
+   * All `with` clauses are combined into a single `O(1)` check.
+   *
+   * You cannot pass in enums since by definition it's impossible for an entity to possess more than
+   * one component from an enum.  See {@link QueryBuilder.withAny} instead.
    * @param types The types of components required to match the query.
    */
   with(...types: ComponentType<any>[]): this {
@@ -304,11 +318,39 @@ export class QueryBuilder {
   }
 
   /**
+   * Constrains the query to entities that possess a component of at least one of the given types.
+   * All given types are also marked as `read`.
+   *
+   * Unlike `with`, `withAny` clauses are not combined; each is evaluated as a separate check, which
+   * may affect performance.
+   *
+   * You cannot pass in enum component types, only whole enums.
+   * @param types
+   */
+  withAny(...types: (ComponentType<any> | ComponentEnum)[]): this {
+    CHECK: for (const type of types) {
+      if (typeof type === 'function' && type.enum) {
+        throw new CheckError(`Cannot use enum types in a withAny clause: ${type.name}`);
+      }
+    }
+    this.set(this.__system.accessMasks.read, types);
+    if (!this.__query.withAnyMasks) this.__query.withAnyMasks = [];
+    const mask: number[] = [];
+    this.__query.withAnyMasks.push(mask);
+    this.set(mask);
+    return this;
+  }
+
+  /**
    * Constrains the query to entities that don't possess components of any of the given types.  All
    * given types are also marked as `read`.
+   *
+   * While you can pass in enum component types, evaluating such queries is inefficient (`O(n)` in
+   * the number of enum types passed).  Passing in whole enums is fine, though (the query stays
+   * `O(1)`).
    * @param types The types of components that must not be present to match the query.
    */
-  without(...types: ComponentType<any>[]): this {
+  without(...types: (ComponentType<any> | ComponentEnum)[]): this {
     this.set(this.__system.accessMasks.read, types);
     this.set('withoutMask');
     return this;
@@ -319,7 +361,7 @@ export class QueryBuilder {
    * @param types The types of components for follow-up modifiers, but that don't constrain the
    * query.
    */
-  using(...types: ComponentType<any>[]): this {
+  using(...types: (ComponentType<any> | ComponentEnum)[]): this {
     this.__lastTypes = types;
     return this;
   }
@@ -341,7 +383,13 @@ export class QueryBuilder {
    */
   get track(): this {
     this.set('trackMask');
-    for (const type of this.__lastTypes) type.__binding!.trackedWrites = true;
+    for (const type of this.__lastTypes) {
+      if (typeof type === 'function') {
+        type.__binding!.trackedWrites = true;
+      } else {
+        for (const enumType of type.__types) enumType.__binding!.trackedWrites = true;
+      }
+    }
     return this;
   }
 
@@ -378,7 +426,7 @@ export class QueryBuilder {
   }
 
   private set(
-    mask: MaskKind | number[] | undefined, types?: ComponentType<any>[]
+    mask: MaskKind | number[] | undefined, types?: (ComponentType<any> | ComponentEnum)[]
   ): void {
     if (!mask) return;
     if (!types) types = this.__lastTypes;
@@ -391,7 +439,11 @@ export class QueryBuilder {
     const readMask = mask === this.__system.accessMasks.read;
     const createMask = mask === this.__system.accessMasks.create;
     const writeMask = mask === this.__system.accessMasks.write;
-    const shapeMask = mask === this.__query.withMask || mask === this.__query.withoutMask;
+    const withMask = mask === this.__query.withMask;
+    const withoutMask = mask === this.__query.withoutMask;
+    const shapeMask =
+      mask === this.__query.withMask || mask === this.__query.withoutMask ||
+      this.__query.withAnyMasks?.includes(mask);
     const trackMask = mask === this.__query.trackMask;
     const map =
       readMask ? this.__system.dispatcher.planner.readers! :
@@ -409,11 +461,28 @@ export class QueryBuilder {
           );
         }
       }
-      extendMaskAndSetFlag(mask, type);
+      if (withoutMask && typeof type === 'function' && type.enum) {
+        this.__query.withoutEnumTypes = this.__query.withoutEnumTypes ?? [];
+        this.__query.withoutEnumTypes.push(type);
+      } else {
+        extendMaskAndSetFlag(mask, type);
+        if (withMask) {
+          if (!this.__query.withValues) this.__query.withValues = [];
+          extendMaskAndSetFlag(this.__query.withValues!, type as ComponentType<any>, true);
+        }
+      }
       if (readMask) extendMaskAndSetFlag(this.__system.accessMasks.check!, type);
-      if (map) map.get(type)!.add(this.__system);
-      if (shapeMask) this.categorize(this.__system.shapeQueriesByComponent, type);
-      if (trackMask) this.categorize(this.__system.writeQueriesByComponent, type);
+      if (typeof type === 'function') {
+        if (map) map.get(type)!.add(this.__system);
+        if (shapeMask) this.categorize(this.__system.shapeQueriesByComponent, type);
+        if (trackMask) this.categorize(this.__system.writeQueriesByComponent, type);
+      } else {
+        for (const enumType of type.__types) {
+          if (map) map.get(enumType)!.add(this.__system);
+          if (shapeMask) this.categorize(this.__system.shapeQueriesByComponent, enumType);
+          if (trackMask) this.categorize(this.__system.writeQueriesByComponent, enumType);
+        }
+      }
     }
   }
 

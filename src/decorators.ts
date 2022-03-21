@@ -1,4 +1,5 @@
-import type {ComponentOptions, ComponentType} from './component';
+import type {Component, ComponentOptions, ComponentType} from './component';
+import {ComponentEnum} from './enums';
 import type {ScheduleBuilder, SystemGroup} from './schedule';
 import type {SystemType} from './system';
 import {Type} from './type';
@@ -59,24 +60,39 @@ field.object = addFieldSchema.bind(null, {type: Type.object});
 field.weakObject = addFieldSchema.bind(null, {type: Type.weakObject});
 
 
-export const componentTypes: ComponentType<any>[] = [];
+export const componentTypes: (ComponentType<any> | ComponentEnum)[] = [];
 
 /**
- * Declare this class as a component type that will be automatically added to any new world.
+ * Declares this class as a component type that will be automatically added to any new world.
  * @param componentClass The component class.
  */
 export function component(componentClass: ComponentType<any>): void;
 
 /**
- * Declare this class as a component type that will be automatically added to any new world.
+ * Declares this class as a component type that will be automatically added to any new world.
  * @param options The options to apply to the component type.
  */
 export function component(options: ComponentOptions): (constructor: ComponentType<any>) => void;
 
-export function component(arg: ComponentType<any> | ComponentOptions):
-    ((componentClass: ComponentType<any>) => void) | void {
+/**
+ * Declares this class as a component type that will be automatically added to any new world.
+ * @param enumeration An enum of component types to join.
+ * @param options Other options to apply to the component type.
+ */
+export function component(enumeration: ComponentEnum, options?: ComponentOptions):
+  (constructor: ComponentType<any>) => void;
+
+export function component(
+  arg: ComponentType<Component> | ComponentOptions | ComponentEnum, options?: ComponentOptions
+): ((componentClass: ComponentType<any>) => void) | void {
   if (typeof arg === 'function') {
     componentTypes.push(arg);
+  } else if (arg instanceof ComponentEnum) {
+    return (componentClass: ComponentType<any>) => {
+      if (!arg.__types.includes(componentClass)) arg.__types.push(componentClass);
+      componentTypes.push(arg);  // duplicates will be removed by Dispatcher
+      if (options) componentClass.options = options;
+    };
   } else {
     return (componentClass: ComponentType<any>) => {
       componentClass.options = arg;

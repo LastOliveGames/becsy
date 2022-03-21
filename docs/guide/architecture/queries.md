@@ -13,7 +13,8 @@ Queries use a small domain-specific language to express their constraints and ar
 ```ts
 @system class SystemA extends System {
   // Query for all entities with an Enemy component but no Dead component.
-  private activeEnemies = this.query(q => q.current.with(Enemy).but.without(Dead));
+  private activeEnemies = this.query(
+    q => q.current.with(Enemy).and.withAny(stateEnum).but.without(Dead));
 
   execute(): void {
     for (const entity of this.activeEnemies.current) {
@@ -26,7 +27,8 @@ Queries use a small domain-specific language to express their constraints and ar
 class SystemA extends System {
   constructor() {
     // Query for all entities with an Enemy component but no Dead component.
-    this.activeEnemies = this.query(q => q.current.with(Enemy).but.without(Dead));
+    this.activeEnemies = this.query(
+      q => q.current.with(Enemy).and.withAny(stateEnum).but.without(Dead));
   }
 
   execute() {
@@ -37,7 +39,12 @@ class SystemA extends System {
 }
 ```
 
-First you specify that you want all `current` entities that satisfy the constraints; we'll introduce other options [later](#reactive-queries).  Then you use `with` and `without` to constrain what component types an entity must and must not have to satisfy the query.  Each clause can list any number of component types, which is equivalent to repeating the clause.
+First you specify that you want all `current` entities that satisfy the constraints; we'll introduce other options [later](#reactive-queries).  Then you constrain what component types an entity must and must not have to satisfy the query:
+- an entity must have all the components listed in `with` clauses;
+- an entity must have at least one of the component listed in *each* `withAny` clause;
+- an entity must not have any of the components listed in `without` clauses.
+
+Each clause can list any number of component types.  Enum types and [enums](components#component-enums) can be used in most of the clauses, but check the API docs as some combinations cannot be evaluated efficiently.
 
 The query object will have a `current` property that's an array of entities you can iterate over in your `execute` hook.
 

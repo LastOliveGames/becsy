@@ -55,7 +55,7 @@ entity.addAll(ComponentA, {value: 10}, ComponentB, {message: 'hello'});
 
 The arguments to `add` and `addAll` are the same as those to `createEntity` above.
 
-Trying to add the same component type to an entity more than once will result in an error.
+Trying to add the same component type to an entity more than once will result in an error.  Adding an [enum component type](components#component-enums) will automatically [remove](#removing-components) any other component from the same enum.
 
 ## Accessing and modifying components
 
@@ -111,7 +111,7 @@ entity.remove(ComponentA);
 entity.removeAll(ComponentA, ComponentB);
 ```
 
-Trying to remove a component that an entity doesn't have will result in an error.
+Removing an [enum](components#component-enums) from an entity will instead remove the entity's current enum component.  Trying to remove a component that an entity doesn't have will result in an error.
 
 Removing a component makes it disappear from the entity immediately, but Becsy actually keeps it around until the end of the next frame.  This is done so that every system that needs to react to the removal gets a chance to access the data of removed components.  You can access recently removed components like this:
 
@@ -158,7 +158,16 @@ entity.hasAnyOtherThan(ComponentA, ComponentB);
 entity.countHas(ComponentA, ComponentB, ComponentC);
 ```
 
-All these methods respects `System.accessRecentlyDeletedData()`, in case you need to check whether a component was recently removed, but [reactive queries](./queries#reactive-queries) are usually better for this.
+All these methods respect `System.accessRecentlyDeletedData()`, in case you need to check whether a component was recently removed, but [reactive queries](./queries#reactive-queries) are usually better for this.
+
+All of the above methods (except `hasAllOf`) will accept an [enum](components#component-enums) to stand in for all its member component types.  There's also an extra method for efficiently figuring out which component of an enum is currently present on the entity, if any:
+
+```ts
+entity.hasWhich(enumA);  // returns a component type or undefined
+```
+```js
+entity.hasWhich(enumA);  // returns a component type or undefined
+```
 
 ## Deleting entities
 

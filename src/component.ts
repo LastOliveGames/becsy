@@ -3,6 +3,7 @@ import type {Entity, EntityId} from './entity';
 import {MAX_NUM_FIELDS} from './consts';
 import type {Dispatcher} from './dispatcher';
 import {CheckError, InternalError} from './errors';
+import type {ComponentEnum} from './enums';
 
 
 interface SchemaDef<JSType> {
@@ -38,10 +39,13 @@ export interface Component {
   __invalid?: boolean;
 }
 
+type ShapeSpec = {offset: number, mask: number, value: number};
+
 export interface ComponentType<C extends Component> {
   new(): C;
   schema?: Schema;
   options?: ComponentOptions;
+  enum?: ComponentEnum;
   validate?(entity: Entity): void;
 
   /**
@@ -62,6 +66,7 @@ export class Binding<C> {
   declare writableInstance: C;
   declare readonly shapeOffset: number;
   declare readonly shapeMask: number;
+  declare readonly shapeValue: number;
   declare readonly refFields: Field<Entity | null>[];
   declare trackedWrites: boolean;
   declare internallyIndexed: boolean;
@@ -71,13 +76,15 @@ export class Binding<C> {
   declare readonly init: (component: any, values: any) => void;
 
   constructor(
-    readonly type: ComponentType<C>, readonly fields: Field<any>[], readonly dispatcher: Dispatcher,
-    public capacity: number, readonly storage: ComponentStorage, readonly elastic: boolean
+    readonly type: ComponentType<C>, readonly fields: Field<any>[], shapeSpec: ShapeSpec,
+    readonly dispatcher: Dispatcher, public capacity: number, readonly storage: ComponentStorage,
+    readonly elastic: boolean
   ) {
     this.readonlyInstance = new type();  // eslint-disable-line new-cap
     this.writableInstance = new type();  // eslint-disable-line new-cap
-    this.shapeOffset = type.id! >> 5;
-    this.shapeMask = 1 << (type.id! & 31);
+    this.shapeOffset = shapeSpec.offset;
+    this.shapeMask = shapeSpec.mask;
+    this.shapeValue = shapeSpec.value;
     this.refFields = fields.filter(field => field.type === Type.ref);
     this.trackedWrites = false;
     this.internallyIndexed = false;
@@ -123,7 +130,7 @@ interface Storage {
 }
 
 
-export function checkTypeDefined(type: ComponentType<any>): void {
+export function checkTypeDefined(type: ComponentType<any> | ComponentEnum): void {
   if (!type.__binding) {
     throw new CheckError(`Component ${type.name} not defined; add to world defs`);
   }
@@ -329,7 +336,7 @@ function gatherFields(type: ComponentType<any>): Field<any>[] {
 
 
 export function assimilateComponentType<C>(
-  typeId: ComponentId, type: ComponentType<C>, dispatcher: Dispatcher
+  typeId: ComponentId, type: ComponentType<C>, shapeSpec: ShapeSpec, dispatcher: Dispatcher
 ): void {
   const fields = gatherFields(type);
   // For tag components, force sparse storage since we don't actually need to allocate anything.
@@ -364,7 +371,7 @@ export function assimilateComponentType<C>(
   }
   type.id = typeId;
   const binding = new Binding<C>(
-    type, fields, dispatcher, capacity || initialCapacity, storage, !capacity);
+    type, fields, shapeSpec, dispatcher, capacity || initialCapacity, storage, !capacity);
   type.__binding = binding;
 }
 

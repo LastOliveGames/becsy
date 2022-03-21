@@ -1,4 +1,6 @@
 ### Upcoming
+- Added support for enum component types.  You can use them when a set of components is mutually exclusive, and you need to be able to easily find out which (if any) is currently present on an entity.  Enum component types are fully-featured, though they're most often used as tags.
+- Added a `withAny` clause for queries that's useful for enums, but also works well with normal component types.
 - Fixed `singleton.write` to track changes in every frame when used in a system's declaration.
 - Allowed `singleton.read` and `singleton.write` to be used inside `execute` to dynamically access a singleton (and only trigger change tracking when needed).
 

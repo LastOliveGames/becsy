@@ -14,11 +14,13 @@ import {Frame, FrameImpl, SystemGroup, SystemGroupImpl} from './schedule';
 import {Planner} from './planner';
 import type {Coroutine, CoroutineFunction} from './coroutines';
 import {CheckError, InternalError} from './errors';
+import {ComponentEnum} from './enums';
 
 
 // TODO: figure out a better type for interleaved arrays, here and elsewhere
 // https://stackoverflow.com/questions/67467302/type-for-an-interleaved-array-of-classes-and-values
-type DefElement = ComponentType<any> | SystemType<System> | Record<string, unknown> | SystemGroup;
+type DefElement =
+  ComponentType<any> | SystemType<System> | Record<string, unknown> | SystemGroup | ComponentEnum;
 type DefsArray = (DefElement | DefsArray)[];
 
 /**
@@ -128,7 +130,7 @@ export class Dispatcher {
     if (maxEntities > MAX_NUM_ENTITIES) {
       throw new CheckError(`maxEntities too high, the limit is ${MAX_NUM_ENTITIES}`);
     }
-    const {componentTypes, systemTypes, systemGroups} =
+    const {componentTypes, componentEnums, systemTypes, systemGroups} =
       this.splitDefs([defs ?? [], decoratedComponentTypes, decoratedSystemTypes]);
     if (componentTypes.length > MAX_NUM_COMPONENTS) {
       throw new CheckError(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
@@ -138,7 +140,8 @@ export class Dispatcher {
     this.buffers = new Buffers(threads > 1);
     this.maxEntities = maxEntities;
     this.defaultComponentStorage = defaultComponentStorage;
-    this.registry = new Registry(maxEntities, maxLimboComponents, componentTypes, this);
+    this.registry =
+      new Registry(maxEntities, maxLimboComponents, componentTypes, componentEnums, this);
     this.indexer = new RefIndexer(this, maxRefChangesPerFrame);
     this.shapeLog = new Log(
       maxShapeChangesPerFrame, 'maxShapeChangesPerFrame', this.buffers,
@@ -259,11 +262,13 @@ export class Dispatcher {
 
   private splitDefs(defs: DefsArray): {
     componentTypes: ComponentType<any>[],
+    componentEnums: ComponentEnum[],
     systemTypes: (SystemType<System> | Record<string, unknown>)[],
     systemGroups: SystemGroupImpl[]
   } {
     const componentTypes: ComponentType<any>[] = [];
     const componentTypesSet = new Set<ComponentType<any>>();
+    const componentEnums = new Set<ComponentEnum>();
     const systemTypes: (SystemType<System> | Record<string, unknown>)[] = [];
     const systemGroups: SystemGroupImpl[] = [];
     let lastDefWasSystem = false;
@@ -275,17 +280,19 @@ export class Dispatcher {
           systemTypes: nestedSystemTypes,
           systemGroups: nestedSystemGroups
         } = this.splitDefs(def.__contents);
-        componentTypes.push(...nestedComponentTypes);
+        for (const type of nestedComponentTypes) addUniqueComponentType(type);
         systemTypes.push(...nestedSystemTypes);
         systemGroups.push(...nestedSystemGroups);
       } else if (typeof def === 'function') {
         lastDefWasSystem = !!(def as any).__system;
         if (lastDefWasSystem) {
           systemTypes.push(def as SystemType<any>);
-        } else if (!componentTypesSet.has(def)) {
-          componentTypes.push(def);
-          componentTypesSet.add(def);
+        } else {
+          addUniqueComponentType(def);
         }
+      } else if (def instanceof ComponentEnum) {
+        componentEnums.add(def);
+        for (const type of def.__types) addUniqueComponentType(type);
       } else {
         CHECK: {
           if (!lastDefWasSystem) throw new CheckError('Unexpected value in world defs: ' + def);
@@ -294,7 +301,17 @@ export class Dispatcher {
         lastDefWasSystem = false;
       }
     }
-    return {componentTypes, systemTypes, systemGroups};
+    return {componentTypes, componentEnums: Array.from(componentEnums), systemTypes, systemGroups};
+
+    function addUniqueComponentType(type: ComponentType<any>) {
+      if (type.enum && !componentEnums.has(type.enum)) {
+        componentEnums.add(type.enum);
+        for (const enumType of type.enum.__types) addUniqueComponentType(enumType);
+      } else if (!componentTypesSet.has(type)) {
+        componentTypes.push(type);
+        componentTypesSet.add(type);
+      }
+    }
   }
 
   getSystems(designator: SystemType<System> | SystemGroup): SystemBox[] {

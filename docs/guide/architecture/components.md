@@ -260,6 +260,36 @@ world.build(sys => {
 
 A validation method can only check for the presence of components using the "`has`" family of methods on `Entity`.  It cannot `read` the entity to access the field values, so your component constraints cannot depend on data values.  Validators are also exempt from the system's access entitlements &mdash; they can check for the presence or absence of every type of component.
 
+## Component enums
+
+A very common restriction on component combinations is to allow at most one from a list of types to be present on an entity.  This is similar to "enums" in many programming languages and is often used to implement state machines.  Becsy supports this pattern directly and throws in a few extra features to boot.
+
+You can define an enum and populate it with component types like so:
+```js{4-5}
+class A {}
+class B {}
+class C {}
+// Define an enum of component types A, B, and C.
+const myEnum = World.defineEnum('myEnum', A, B, C);
+```
+```ts
+const myEnum = World.defineEnum('myEnum');
+@component(myEnum) class A {}
+@component(myEnum) class B {}
+@component(myEnum) class C {}
+```
+::: only-ts
+(You can also list the component types directly as part of the enum's definition instead.)
+:::
+
+Any component types can be members of an enum, including ones with data fields.  The enum name parameter is optional but will make any error message more useful.  Passing the enum or any one of its members into the world's `defs` will automatically pull in all the rest.
+
+::: warning
+A component type can be a member of at most one enum.
+:::
+
+In general, enum components are used just like normal ones, and the enum itself can be used to represent the list of its members in any API that deals with components.  The following chapters will also call out enum-specific features in each area.
+
 ## Storage strategies
 
 Behind the scenes, rather than putting field values in properties of individual objects, Becsy stores them in contiguous, homogeneous buffers.  All the values for field `foo` of all components of type `A` are stored in one buffer, all the values for field `bar` in another, and so on.  There are different strategies for allocating and indexing these buffers that offer trade-offs between memory usage and performance.  (Note, though, that except for the `compact` storage strategy, performance differences only show up in the [performance build](../deploying)).
