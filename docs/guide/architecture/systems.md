@@ -290,6 +290,10 @@ class SystemB extends System {
 
 You must set the result of the `attach` method on a property of the system object, and it will become an instance of the designated system by the time your system starts its lifecycle.  (It will have a different value in the constructor, though, so don't use it there!)
 
+::: danger
+Properties holding attached systems must not be ES2022 private fields (the ones prefixed with `#`), but if you're using TypeScript it's fine if they're declared as `private`.
+:::
+
 It's fine for two systems to attach to each other and otherwise create attachment cycles.
 
 ::: warning
@@ -331,6 +335,10 @@ class SystemA extends System {
 ```
 
 You can declare a singleton with either `read` or `write` access and Becsy will automatically create an entity to hold it, add the component, set its storage strategy to `compact` with a capacity of 1, and return a handle that you can use throughout the system's lifecycle.  Naturally, once you declare a component type as a singleton you can no longer add it to your own entities.
+
+::: danger
+Properties holding singletons must not be ES2022 private fields (the ones prefixed with `#`), but if you're using TypeScript it's fine if they're declared as `private`.
+:::
 
 ::: warning
 Keep in mind that any systems with write access to a singleton will not be able to run concurrently, just like with any other component type.
