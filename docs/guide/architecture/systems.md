@@ -334,11 +334,13 @@ class SystemA extends System {
 }
 ```
 
-You can declare a singleton with either `read` or `write` access and Becsy will automatically create an entity to hold it, add the component, set its storage strategy to `compact` with a capacity of 1, and return a handle that you can use throughout the system's lifecycle.  Naturally, once you declare a component type as a singleton you can no longer add it to your own entities.
-
 ::: danger
 Properties holding singletons must not be ES2022 private fields (the ones prefixed with `#`), but if you're using TypeScript it's fine if they're declared as `private`.
 :::
+
+You can declare a singleton with either `read` or `write` access and Becsy will automatically create an entity to hold it, add the component, set its storage strategy to `compact` with a capacity of 1, and return a handle that you can use throughout the system's lifecycle.  Naturally, once you declare a component type as a singleton you can no longer add it to your own entities.
+
+One thing to watch out for is that any singletons declared with `write` access will track a change event every time the system executes, whether the system made any changes to the component's value or not.  If you have a `changed` query tracking a singleton component and the system doesn't actually update it every frame, you should instead move the `this.singleton.write` call into your `execute` method.  This will give you a writable handle and track changes only when you need it, though you'll need to explicitly claim a write entitlement to the component type and you'll still need to declare the singleton in the usual way in another system (with `this.singleton.read` in the constructor) to get it set up correctly.
 
 ::: warning
 Keep in mind that any systems with write access to a singleton will not be able to run concurrently, just like with any other component type.

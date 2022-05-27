@@ -100,6 +100,57 @@ describe('system setup', () => {
     expect(message).toBe('foo 100 bar 45');
   });
 
+  test('track changes in declared singleton', async () => {
+    message = '';
+    const world = await World.create({defs: [
+      Foo,
+      class WritingSystem extends System {
+        foo = this.singleton.write(Foo);
+        execute() {
+          this.foo.speed = 100;
+        }
+      },
+      class TrackingSystem extends System {
+        entities = this.query(q => q.changed.with(Foo).track);
+        execute() {
+          for (const entity of this.entities.changed) {
+            message = `foo ${entity.read(Foo).speed}`;
+          }
+        }
+      }
+    ]});
+    await world.execute();  // first run triggers 'added', not 'changed'
+    await world.execute();
+    expect(message).toBe('foo 100');
+  });
+
+  test('track changes in dynamically accessed singleton', async () => {
+    message = '';
+    const world = await World.create({
+      defs: [
+        Foo,
+        class WritingSystem extends System {
+          decl = this.query(q => q.using(Foo).write);
+          execute() {
+            this.singleton.write(Foo).speed = 100;
+          }
+        },
+        class TrackingSystem extends System {
+          foo = this.singleton.read(Foo);
+          entities = this.query(q => q.changed.with(Foo).track);
+          execute() {
+            for (const entity of this.entities.changed) {
+              message = `foo ${entity.read(Foo).speed}`;
+            }
+          }
+        }
+      ]
+    });
+    await world.execute();  // first run triggers 'added', not 'changed'
+    await world.execute();
+    expect(message).toBe('foo 100');
+  });
+
   test('order systems transitively', async () => {
     const group1 = System.group(SystemA);
     const group2 = System.group(SystemC);

@@ -1,4 +1,6 @@
 ### Upcoming
+- Fixed `singleton.write` to track changes in every frame when used in a system's declaration.
+- Allowed `singleton.read` and `singleton.write` to be used inside `execute` to dynamically access a singleton (and only trigger change tracking when needed).
 
 ### 0.13.1
 - Improved performance in a few cases by ~10%.
@@ -16,7 +18,7 @@
 
 ### 0.12.2
 - Added `hasSomeOf`, `hasAllOf`, `hasAnyOtherThan`, and `countHas` to `Entity`.
-- Implemented experimenal global component combination validators.  You can add a static `validate(entity)` method to any component type and check for valid combinations of components using the `has` collection of methods, throwing an error if a check fails.  *All* validation methods are executed for *all* entities whose components have changed after each system executes (not just ones that have a component of the method's host type), and the system's read entitlements are bypassed during these checks.  Entities are not validated in response to writes, so validators shouldn't look at fields.  Entities are not validated at all in the perf build.
+- Implemented experimental global component combination validators.  You can add a static `validate(entity)` method to any component type and check for valid combinations of components using the `has` collection of methods, throwing an error if a check fails.  *All* validation methods are executed for *all* entities whose components have changed after each system executes (not just ones that have a component of the method's host type), and the system's read entitlements are bypassed during these checks.  Entities are not validated in response to writes, so validators shouldn't look at fields.  Entities are not validated at all in the perf build.
 - Added `Entity.ordinal`.
 - Implemented query result ordering via `orderBy`.  Just pass in a function to transform entities into numeric values and all results will be sorted by the function's output in ascending order.  There are some optimizations to avoid unnecessary sorting, especially in the common case of `orderBy(entity => entity.ordinal)`.
 

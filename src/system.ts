@@ -156,18 +156,22 @@ export abstract class System {
   /**
    * Contains helper methods for declaring read-only and read-write singleton components.
    */
-  declare readonly singleton: {
+  declare singleton: {
     /**
      * Declares that the given component type is a singleton and gets a read-only handle to it. This
      * will automatically set the component's storage type to `compact` with a capacity of 1 and
      * create a new entity to hold all singleton components.  It's fine for many systems to request
-     * access to the same singleton component, of course.  Can only be called from the constructor,
-     * typically by initializing an instance property.
+     * access to the same singleton component, of course.
+     *
+     * This method is typically called from the constructor by initializing an instance property.
+     * You can also call it while executing to dynamically acquire a read-only handle to a singleton
+     * previously declared in a different system, but you'll need to explicitly declare a `read`
+     * entitlement for the component type in that case.
      * @example
      * foo = this.singleton.read(ComponentFoo);
      * @param type The component type to declare as a singleton.
-     * @returns A read-only view of the only instance of the component.  This instance will remain
-     *  valid for as long as the world exists.
+     * @returns A read-only view of the only instance of the component.  When used in a declaration,
+     *  the instance will remain valid for as long as the world exists.
      */
     readonly read: <T>(type: ComponentType<T>) => T,
 
@@ -176,14 +180,18 @@ export abstract class System {
      * This will automatically set the component's storage type to `compact` with a capacity of 1
      * and create a new entity to hold all singleton components.  It's fine for many systems to
      * request access to the same singleton component, but at most one can provide initial values
-     * for it.  Can only be called from the constructor, typically by initializing an instance
-     * property.
+     * for it.
+     *
+     * This method is typically called from the constructor by initializing an instance property.
+     * You can also call it while executing to dynamically acquire a read-write handle to a
+     * singleton previously declared in a different system, but you'll need to explicitly declare a
+     * `write` entitlement for the component type in that case.
      * @example
      * foo = this.singleton.write(ComponentFoo, {value: 42});
      * @param type The component type to declare as a singleton.
      * @param initialValues Optional field values to initialize the component with.
-     * @returns A read-write view of the only instance of the component.  This instance will remain
-     *  valid for as long as the world exists.
+     * @returns A read-write view of the only instance of the component.  When used in a
+     *  declaration, the instance will remain valid for as long as the world exists.
      */
     readonly write: <T>(type: ComponentType<T>, initialValues?: Record<string, unknown>) => T
   };
@@ -311,7 +319,7 @@ Object.defineProperty(System.prototype, 'singleton', {
         return placeholder as unknown as T;
       }
     };
-    Object.defineProperty(this, 'singleton', {value: singleton});
+    Object.defineProperty(this, 'singleton', {value: singleton, configurable: true});
     return singleton;
   }
 });
@@ -333,6 +341,7 @@ export class SystemBox {
   declare readonly stats: SystemStats;
   declare readonly attachedSystems: (SystemBox | undefined)[];
   declare readonly singletonComponentDefs: (ComponentType<any> | Record<string, unknown>)[];
+  declare private singletonStandingWrites: ComponentType<any>[];
   declare private propsAssigned: boolean;
   declare lane?: Lane;
   declare stateless: boolean;
@@ -361,6 +370,9 @@ export class SystemBox {
       return placeholder.initialValues ?
         [placeholder.type, placeholder.initialValues] : [placeholder.type];
     });
+    this.singletonStandingWrites = this.system.__singletonPlaceholders!
+      .filter(placeholder => placeholder.access === 'write')
+      .map(placeholder => placeholder.type);
   }
 
   assignProps(props: Record<string, unknown>): void {
@@ -388,6 +400,8 @@ export class SystemBox {
 
   finishConstructing(): void {
     this.writeLogPointer = this.dispatcher.writeLog?.createPointer();
+    this.singletonStandingWrites =
+      this.singletonStandingWrites.filter(type => type.__binding!.trackedWrites);
   }
 
   replacePlaceholders(): void {
@@ -408,6 +422,9 @@ export class SystemBox {
     }
     this.system.__attachPlaceholders = null;
     this.system.__singletonPlaceholders = null;
+    if (this.dispatcher.singleton) {
+      Object.defineProperty(this.system, 'singleton', {value: this.dispatcher.singleton});
+    }
   }
 
   prepare(): Promise<void> {
@@ -417,11 +434,13 @@ export class SystemBox {
   initialize(): void {
     this.dispatcher.registry.executingSystem = this;
     this.system.initialize();
+    this.trackStandingWrites();
   }
 
   finalize(): void {
     this.dispatcher.registry.executingSystem = this;
     this.system.finalize();
+    this.trackStandingWrites();
   }
 
   execute(time: number, delta: number): void {
@@ -436,11 +455,19 @@ export class SystemBox {
     this.system.execute();
     STATS: time3 = now();
     this.system.__supervisor.execute();
+    this.trackStandingWrites();
     STATS: time4 = now();
     STATS: {
       this.stats.lastQueryUpdateDuration = time2 - time1;
       this.stats.lastExecutionDuration = time3 - time2;
       this.stats.lastCoroutinesDuration = time4 - time3;
+    }
+  }
+
+  private trackStandingWrites() {
+    const singleton = this.dispatcher.singleton!;
+    for (const type of this.singletonStandingWrites) {
+      this.dispatcher.registry.trackWrite(singleton.__id, type);
     }
   }
 
