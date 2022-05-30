@@ -180,7 +180,47 @@ entity.delete();
 entity.delete();
 ```
 
-Doing so will remove all components from the entity (triggering relevant [reactive queries](./queries#reactive-queries)) then delete the entity itself.
+Doing so will remove all components from the entity (triggering relevant [reactive queries](./queries#reactive-queries)) then delete the entity itself.  The system deleting an entity will need to hold `write` [entitlements](queries#declaring-entitlements) for all components on the entity.  If it's hard to predict the set of possible component types a common pattern is to delegate the deletion to a dedicated system:
+
+```ts
+@component class ToBeDeleted {}
+
+@system class SystemA extends System {
+  execute() {
+    // Instead of entity.delete(), just tag it:
+    entity.add(ToBeDeleted);
+  }
+}
+
+@system class Deleter extends System {
+  // Note the usingAll.write below, which grants write entitlements on all component types.
+  entities = this.query(q => q.current.with(ToBeDeleted).usingAll.write);
+  execute() {
+    for (const entity of this.entities.current) entity.delete();
+  }
+}
+```
+```js
+class ToBeDeleted {}
+
+class SystemA extends System {
+  execute() {
+    // Instead of entity.delete(), just tag it:
+    entity.add(ToBeDeleted);
+  }
+}
+
+class Deleter extends System {
+  constructor() {
+    // Note the usingAll.write below, which grants write entitlements on all component types.
+    this.entities = this.query(q => q.current.with(ToBeDeleted).usingAll.write);
+  }
+
+  execute() {
+    for (const entity of this.entities.current) entity.delete();
+  }
+}
+```
 
 Deleting an entity that has already been deleted will result in an error.
 
