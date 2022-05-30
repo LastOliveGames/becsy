@@ -3,6 +3,7 @@
 - Added a `withAny` clause for queries that's useful for enums, but also works well with normal component types.
 - Fixed `singleton.write` to track changes in every frame when used in a system's declaration.
 - Allowed `singleton.read` and `singleton.write` to be used inside `execute` to dynamically access a singleton (and only trigger change tracking when needed).
+- Exported `Waitable` to pacify TypeScript when using coroutines, even though it's internal.
 
 ### 0.13.1
 - Improved performance in a few cases by ~10%.

@@ -3,7 +3,11 @@ import type {Entity} from './entity';
 import {CheckError} from './errors';
 import type {System} from './system';
 
-interface Waitable<T> {
+/**
+ * Internal interface meant only to be passed to yield expressions in coroutines.  Do not invoke
+ * any methods from user code!
+ */
+export interface Waitable<T> {
   markAwaited?(): void;
   isReady(): boolean;
   cancel?(): void;

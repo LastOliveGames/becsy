@@ -8,5 +8,5 @@ export {Query} from './query';
 export type {ComponentType} from './component';
 export type {Frame, SystemGroup} from './schedule';
 export {co, CanceledError} from './coroutines';
-export type {Coroutine, CurrentCoroutine} from './coroutines';
+export type {Coroutine, CurrentCoroutine, Waitable} from './coroutines';
 export type {ComponentEnum} from './enums';
