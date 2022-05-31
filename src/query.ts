@@ -59,8 +59,14 @@ export class QueryBox {
         }
       }
     }
-    CHECK: if (this.hasChangedResults && !this.trackMask) {
-      throw new CheckError(`Query for changed entities must track at least one component`);
+    CHECK: {
+      if (this.hasChangedResults && !this.trackMask) {
+        throw new CheckError(`Query for changed entities must track at least one component`);
+      }
+      if (!this.hasChangedResults && this.trackMask) {
+        throw new CheckError(
+          'You can only track components if you have a query for changed entities');
+      }
     }
     if (this.flavors & QueryFlavor.current) {
       this.results.current =

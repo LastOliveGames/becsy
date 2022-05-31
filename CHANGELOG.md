@@ -1,4 +1,5 @@
 ### Upcoming
+- Validate that queries have `track` qualifiers iff they have a `changed` result set (or variant).
 
 ### 0.13.2
 - Added support for enum component types.  You can use them when a set of components is mutually exclusive, and you need to be able to easily find out which (if any) is currently present on an entity.  Enum component types are fully-featured, though they're most often used as tags.
