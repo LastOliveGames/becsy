@@ -144,7 +144,7 @@ this.query(q => q.changed.with(Box).and.with(Transform).track);
 this.query(q => q.changed.with(Box).and.with(Transform).track);
 ```
 
-We express the query as usual, but append `track` to any component types whose changes we want to track.  (You must track at least one component type.)
+We express the query as usual, but append `track` to any component types whose changes we want to track.  (You must track at least one component type.)  Note that when tracking specific enum component types, a write to another component in the same enum can sometimes trigger the query too.
 
 Newly added entities will *not* be included in the `changed` list, even if their fields were written to after the component was added.  Basically, an entity will be in at most one of the `added`, `removed`, and `changed` lists &mdash; they never overlap.  For convenience, you can request a list that combines any of these attributes instead:
 
