@@ -62,16 +62,20 @@ export interface ComponentType<C extends Component> {
 }
 
 export class Binding<C> {
-  declare readonlyInstance: C;
-  declare writableInstance: C;
+  declare readonlyMaster: C;
+  declare writableMaster: C;
+  declare readonlyInstance: C & Component;
+  declare writableInstance: C & Component;
   declare readonly shapeOffset: number;
   declare readonly shapeMask: number;
   declare readonly shapeValue: number;
   declare readonly refFields: Field<Entity | null>[];
   declare trackedWrites: boolean;
   declare internallyIndexed: boolean;
-  declare entityId: EntityId;
-  declare index: number;
+  declare writableEntityId: EntityId;
+  declare writableIndex: number;
+  declare readonlyEntityId: EntityId;
+  declare readonlyIndex: number;
   declare readonly initDefault: (component: any) => void;
   declare readonly init: (component: any, values: any) => void;
 
@@ -80,16 +84,24 @@ export class Binding<C> {
     readonly dispatcher: Dispatcher, public capacity: number, readonly storage: ComponentStorage,
     readonly elastic: boolean
   ) {
-    this.readonlyInstance = new type();  // eslint-disable-line new-cap
-    this.writableInstance = new type();  // eslint-disable-line new-cap
+    this.readonlyMaster = this.readonlyInstance = new type();  // eslint-disable-line new-cap
+    this.writableMaster = this.writableInstance = new type();  // eslint-disable-line new-cap
+    CHECK: {
+      this.readonlyInstance = Object.create(this.readonlyMaster as any);
+      this.readonlyInstance.__invalid = !this.elastic && this.capacity > 1;
+      this.writableInstance = Object.create(this.writableMaster as any);
+      this.writableInstance.__invalid = !this.elastic && this.capacity > 1;
+    }
     this.shapeOffset = shapeSpec.offset;
     this.shapeMask = shapeSpec.mask;
     this.shapeValue = shapeSpec.value;
     this.refFields = fields.filter(field => field.type === Type.ref);
     this.trackedWrites = false;
     this.internallyIndexed = false;
-    this.entityId = 0 as EntityId;
-    this.index = 0;
+    this.writableEntityId = 0 as EntityId;
+    this.writableIndex = 0;
+    this.readonlyEntityId = 0 as EntityId;
+    this.readonlyIndex = 0;
     // eslint-disable-next-line no-new-func
     this.initDefault = new Function(
       'component',
@@ -121,6 +133,34 @@ export class Binding<C> {
         .join('\n')
     ) as (component: any, values: any) => void;
   }
+
+  resetWritableInstance(entityId: EntityId, index: number): C {
+    DEBUG: if (index === -1) {
+      throw new InternalError(`Attempt to bind unacquired entity ${entityId} to ${this.type.name}`);
+    }
+    this.writableEntityId = entityId;
+    this.writableIndex = index;
+    CHECK: if (this.elastic || this.capacity > 1) {
+      this.writableInstance.__invalid = true;
+      this.writableInstance = Object.create(this.writableMaster as any);
+    }
+    return this.writableInstance;
+  }
+
+  resetReadonlyInstance(entityId: EntityId, index: number): C {
+    DEBUG: if (index === -1) {
+      throw new InternalError(`Attempt to bind unacquired entity ${entityId} to ${this.type.name}`);
+    }
+    this.readonlyEntityId = entityId;
+    this.readonlyIndex = index;
+    CHECK: if (this.elastic || this.capacity > 1) {
+      this.readonlyInstance.__invalid = true;
+      this.readonlyInstance = Object.create(this.readonlyMaster as any);
+    }
+    return this.readonlyInstance;
+  }
+
+
 }
 
 
@@ -385,42 +425,17 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
     }
   }
 
-  let readonlyMaster: C, writableMaster: C;
-  CHECK: {
-    readonlyMaster = binding.readonlyInstance;
-    writableMaster = binding.writableInstance;
-    binding.readonlyInstance = Object.create(readonlyMaster);
-    binding.readonlyInstance.__invalid = !binding.elastic && binding.capacity > 1;
-    binding.writableInstance = Object.create(writableMaster);
-    binding.writableInstance.__invalid = !binding.elastic && binding.capacity > 1;
-  }
-
-  function resetComponent(writable: boolean): void {
-    if (!binding.elastic && binding.capacity === 1) return;
-    if (writable) {
-      binding.writableInstance.__invalid = true;
-      binding.writableInstance = Object.create(writableMaster);
-    } else {
-      binding.readonlyInstance.__invalid = true;
-      binding.readonlyInstance = Object.create(readonlyMaster);
-    }
-  }
-
   switch (binding.storage) {
     case 'sparse':
       // Inline the trivial storage manager for performance.
       STATS: binding.dispatcher.stats.forComponent(type).capacity = binding.capacity;  // fixed
       type.__bind = (id: EntityId, writable: boolean): C => {
-        binding.entityId = id;
-        binding.index = id;
-        CHECK: resetComponent(writable);
-        return writable ? binding.writableInstance : binding.readonlyInstance;
+        return writable ?
+          binding.resetWritableInstance(id, id) :
+          binding.resetReadonlyInstance(id, id);
       };
       type.__allocate = (id: EntityId): C => {
-        binding.entityId = id;
-        binding.index = id;
-        CHECK: resetComponent(true);
-        return binding.writableInstance;
+        return binding.resetWritableInstance(id, id);
       };
       break;
 
@@ -428,19 +443,12 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
       const storageManager =
         new PackedStorage(binding.dispatcher.maxEntities, binding, binding.fields);
       type.__bind = (id: EntityId, writable: boolean): C => {
-        binding.entityId = id;
-        binding.index = storageManager.index[id];
-        DEBUG: if (binding.index === -1) {
-          throw new InternalError(`Attempt to bind unacquired entity ${id} to ${type.name}`);
-        }
-        CHECK: resetComponent(writable);
-        return writable ? binding.writableInstance : binding.readonlyInstance;
+        return writable ?
+          binding.resetWritableInstance(id, storageManager.index[id]) :
+          binding.resetReadonlyInstance(id, storageManager.index[id]);
       };
       type.__allocate = (id: EntityId): C => {
-        binding.entityId = id;
-        binding.index = storageManager.acquireIndex(id);
-        CHECK: resetComponent(true);
-        return binding.writableInstance;
+        return binding.resetWritableInstance(id, storageManager.acquireIndex(id));
       };
       type.__free = (id: EntityId): void => {
         storageManager.releaseIndex(id);
@@ -452,19 +460,12 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
       const storageManager = new CompactStorage(
         binding.dispatcher.maxEntities, binding, binding.fields);
       type.__bind = (id: EntityId, writable: boolean): C => {
-        binding.entityId = id;
-        binding.index = storageManager.findIndex(id);
-        DEBUG: if (binding.index === -1) {
-          throw new InternalError(`Attempt to bind unacquired entity ${id} to ${type.name}`);
-        }
-        CHECK: resetComponent(writable);
-        return writable ? binding.writableInstance : binding.readonlyInstance;
+        return writable ?
+          binding.resetWritableInstance(id, storageManager.findIndex(id)) :
+          binding.resetReadonlyInstance(id, storageManager.findIndex(id));
       };
       type.__allocate = (id: EntityId): C => {
-        binding.entityId = id;
-        binding.index = storageManager.acquireIndex(id);
-        CHECK: resetComponent(true);
-        return binding.writableInstance;
+        return binding.resetWritableInstance(id, storageManager.acquireIndex(id));
       };
       type.__free = (id: EntityId): void => {
         storageManager.releaseIndex(id);

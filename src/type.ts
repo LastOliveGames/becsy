@@ -64,23 +64,23 @@ class BooleanType extends Type<boolean> {
     };
     field.updateBuffer();
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): boolean {
         CHECK: checkInvalid(this, binding);
-        return Boolean(data[binding.index]);
+        return Boolean(data[binding.writableIndex]);
       },
       set(this: C, value: boolean): void {
         CHECK: checkInvalid(this, binding);
-        data[binding.index] = value ? 1 : 0;
+        data[binding.writableIndex] = value ? 1 : 0;
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): boolean {
         CHECK: checkInvalid(this, binding);
-        return Boolean(data[binding.index]);
+        return Boolean(data[binding.readonlyIndex]);
       },
       set(this: C, value: boolean): void {
         throwNotWritable(binding);
@@ -92,23 +92,23 @@ class BooleanType extends Type<boolean> {
     const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
     const data = binding.dispatcher.buffers.register(bufferKey, binding.capacity, Uint8Array);
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): boolean {
         CHECK: checkInvalid(this, binding);
-        return Boolean(data[binding.index]);
+        return Boolean(data[binding.writableIndex]);
       },
       set(this: C, value: boolean): void {
         CHECK: checkInvalid(this, binding);
-        data[binding.index] = value ? 1 : 0;
+        data[binding.writableIndex] = value ? 1 : 0;
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): boolean {
         CHECK: checkInvalid(this, binding);
-        return Boolean(data[binding.index]);
+        return Boolean(data[binding.readonlyIndex]);
       },
       set(this: C, value: boolean): void {
         throwNotWritable(binding);
@@ -134,23 +134,23 @@ class NumberType extends Type<number> {
     };
     field.updateBuffer();
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): number {
         CHECK: checkInvalid(this, binding);
-        return data[binding.index];
+        return data[binding.writableIndex];
       },
       set(this: C, value: number): void {
         CHECK: checkInvalid(this, binding);
-        data[binding.index] = value;
+        data[binding.writableIndex] = value;
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): number {
         CHECK: checkInvalid(this, binding);
-        return data[binding.index];
+        return data[binding.readonlyIndex];
       },
       set(this: C, value: number): void {
         throwNotWritable(binding);
@@ -162,23 +162,23 @@ class NumberType extends Type<number> {
     const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
     const data = binding.dispatcher.buffers.register(bufferKey, binding.capacity, this.NumberArray);
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): number {
         CHECK: checkInvalid(this, binding);
-        return data[binding.index];
+        return data[binding.writableIndex];
       },
       set(this: C, value: number): void {
         CHECK: checkInvalid(this, binding);
-        data[binding.index] = value;
+        data[binding.writableIndex] = value;
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): number {
         CHECK: checkInvalid(this, binding);
-        return data[binding.index];
+        return data[binding.readonlyIndex];
       },
       set(this: C, value: number): void {
         throwNotWritable(binding);
@@ -215,11 +215,11 @@ class StaticStringType extends Type<string> {
     };
     field.updateBuffer();
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         CHECK: checkInvalid(this, binding);
-        const index = data[binding.index];
+        const index = data[binding.writableIndex];
         const result = choices[index];
         CHECK: {
           if (result === undefined) throw new CheckError(`Invalid static string index: ${index}`);
@@ -232,15 +232,15 @@ class StaticStringType extends Type<string> {
         CHECK: {
           if (index === undefined) throw new CheckError(`Static string not in set: "${value}"`);
         }
-        data[binding.index] = index;
+        data[binding.writableIndex] = index;
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         CHECK: checkInvalid(this, binding);
-        const index = data[binding.index];
+        const index = data[binding.readonlyIndex];
         const result = choices[index];
         CHECK: {
           if (result === undefined) throw new CheckError(`Invalid static string index: ${index}`);
@@ -258,11 +258,11 @@ class StaticStringType extends Type<string> {
     const choices = this.choices, choicesIndex = this.choicesIndex;
     const data = binding.dispatcher.buffers.register(bufferKey, binding.capacity, this.TypedArray);
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         CHECK: checkInvalid(this, binding);
-        const index = data[binding.index];
+        const index = data[binding.writableIndex];
         const result = choices[index];
         CHECK: {
           if (result === undefined) throw new CheckError(`Invalid static string index: ${index}`);
@@ -275,15 +275,15 @@ class StaticStringType extends Type<string> {
         CHECK: {
           if (index === undefined) throw new CheckError(`Static string not in set: "${value}"`);
         }
-        data[binding.index] = index;
+        data[binding.writableIndex] = index;
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         CHECK: checkInvalid(this, binding);
-        const index = data[binding.index];
+        const index = data[binding.readonlyIndex];
         const result = choices[index];
         CHECK: {
           if (result === undefined) throw new CheckError(`Invalid static string index: ${index}`);
@@ -327,13 +327,13 @@ class DynamicStringType extends Type<string> {
     };
     field.updateBuffer();
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         CHECK: checkInvalid(this, binding);
-        const length = lengths[binding.index * lengthsStride];
+        const length = lengths[binding.writableIndex * lengthsStride];
         return decoder.decode(
-          new Uint8Array(bytes.buffer, binding.index * bytesStride + 2, length));
+          new Uint8Array(bytes.buffer, binding.writableIndex * bytesStride + 2, length));
       },
       set(this: C, value: string): void {
         CHECK: checkInvalid(this, binding);
@@ -344,18 +344,18 @@ class DynamicStringType extends Type<string> {
               `Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
           }
         }
-        lengths[binding.index * lengthsStride] = encodedString.byteLength;
-        bytes.set(encodedString, binding.index * bytesStride + 2);
+        lengths[binding.writableIndex * lengthsStride] = encodedString.byteLength;
+        bytes.set(encodedString, binding.writableIndex * bytesStride + 2);
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         CHECK: checkInvalid(this, binding);
-        const length = lengths[binding.index * lengthsStride];
+        const length = lengths[binding.readonlyIndex * lengthsStride];
         return decoder.decode(
-          new Uint8Array(bytes.buffer, binding.index * bytesStride + 2, length));
+          new Uint8Array(bytes.buffer, binding.readonlyIndex * bytesStride + 2, length));
       },
       set(this: C, value: string): void {
         throwNotWritable(binding);
@@ -371,13 +371,13 @@ class DynamicStringType extends Type<string> {
     const bytes = binding.dispatcher.buffers.register(bufferKey, size, Uint8Array);
     const lengths = new Uint16Array(bytes.buffer);
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         CHECK: checkInvalid(this, binding);
-        const length = lengths[binding.index * lengthsStride];
+        const length = lengths[binding.writableIndex * lengthsStride];
         return decoder.decode(
-          new Uint8Array(bytes.buffer, binding.index * bytesStride + 2, length));
+          new Uint8Array(bytes.buffer, binding.writableIndex * bytesStride + 2, length));
       },
       set(this: C, value: string): void {
         CHECK: checkInvalid(this, binding);
@@ -388,18 +388,18 @@ class DynamicStringType extends Type<string> {
               `Dynamic string length > ${maxUtf8Length} after encoding: ${value}`);
           }
         }
-        lengths[binding.index * lengthsStride] = encodedString.byteLength;
-        bytes.set(encodedString, binding.index * bytesStride + 2);
+        lengths[binding.writableIndex * lengthsStride] = encodedString.byteLength;
+        bytes.set(encodedString, binding.writableIndex * bytesStride + 2);
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): string {
         CHECK: checkInvalid(this, binding);
-        const length = lengths[binding.index * lengthsStride];
+        const length = lengths[binding.readonlyIndex * lengthsStride];
         return decoder.decode(
-          new Uint8Array(bytes.buffer, binding.index * bytesStride + 2, length));
+          new Uint8Array(bytes.buffer, binding.readonlyIndex * bytesStride + 2, length));
       },
       set(this: C, value: string): void {
         throwNotWritable(binding);
@@ -432,23 +432,28 @@ class RefType extends Type<Entity | undefined> {
 
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
       DEBUG: if (internalIndex) throw new InternalError('Ref fields have no internal index');
-      if (data[binding.index] === -1) return;
-      const stale = (data[binding.index] & STALE_REF_BIT) !== 0;
+      if (data[binding.writableIndex] === -1) return;
+      const stale = (data[binding.writableIndex] & STALE_REF_BIT) !== 0;
       if (stale && !final) return;
       DEBUG: if (!stale && final) throw new InternalError('Wrong ref stale state');
-      const id = (data[binding.index] & ENTITY_ID_MASK) as EntityId;
+      const id = (data[binding.writableIndex] & ENTITY_ID_MASK) as EntityId;
       const targetIdGiven = targetId !== undefined;
       if (targetIdGiven && id !== targetId) return;
-      if (final) data[binding.index] = -1; else data[binding.index] |= STALE_REF_BIT;
+      if (final) {
+        data[binding.writableIndex] = -1;
+      } else {
+        data[binding.writableIndex] |= STALE_REF_BIT;
+      }
       indexer.trackRefChange(
-        binding.entityId, binding.type, field.seq, undefined, id, -1 as EntityId, !final, final);
+        binding.writableEntityId, binding.type, field.seq, undefined, id, -1 as EntityId, !final,
+        final);
     };
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | undefined {
         CHECK: checkInvalid(this, binding);
-        const id = data[binding.index];
+        const id = data[binding.writableIndex];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
         return pool.borrowTemporarily((id & ENTITY_ID_MASK) as EntityId);
       },
@@ -457,22 +462,22 @@ class RefType extends Type<Entity | undefined> {
         CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
           throw new CheckError('Referencing a deleted entity is not allowed');
         }
-        let oldId = data[binding.index] as EntityId;
+        let oldId = data[binding.writableIndex] as EntityId;
         if (oldId !== -1) oldId = (oldId & ENTITY_ID_MASK) as EntityId;
-        const stale = oldId !== -1 && !!(data[binding.index] & STALE_REF_BIT);
+        const stale = oldId !== -1 && !!(data[binding.writableIndex] & STALE_REF_BIT);
         const newId = (value?.__id ?? -1) as EntityId;
         if (oldId === newId && !stale) return;
-        data[binding.index] = newId;
+        data[binding.writableIndex] = newId;
         indexer.trackRefChange(
-          binding.entityId, binding.type, field.seq, undefined, oldId, newId, !stale, true);
+          binding.writableEntityId, binding.type, field.seq, undefined, oldId, newId, !stale, true);
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | undefined {
         CHECK: checkInvalid(this, binding);
-        const id = data[binding.index];
+        const id = data[binding.readonlyIndex];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
         return pool.borrowTemporarily((id & ENTITY_ID_MASK) as EntityId);
       },
@@ -494,23 +499,28 @@ class RefType extends Type<Entity | undefined> {
 
     field.clearRef = (final: boolean, targetId?: EntityId, internalIndex?: number) => {
       DEBUG: if (internalIndex) throw new InternalError('Ref fields have no internal index');
-      if (data[binding.index] === -1) return;
-      const stale = (data[binding.index] & STALE_REF_BIT) !== 0;
+      if (data[binding.writableIndex] === -1) return;
+      const stale = (data[binding.writableIndex] & STALE_REF_BIT) !== 0;
       if (stale && !final) return;
       DEBUG: if (!stale && final) throw new InternalError('Wrong ref stale state');
-      const id = (data[binding.index] & ENTITY_ID_MASK) as EntityId;
+      const id = (data[binding.writableIndex] & ENTITY_ID_MASK) as EntityId;
       const targetIdGiven = targetId !== undefined;
       if (targetIdGiven && id !== targetId) return;
-      if (final) data[binding.index] = -1; else data[binding.index] |= STALE_REF_BIT;
+      if (final) {
+        data[binding.writableIndex] = -1;
+      } else {
+        data[binding.writableIndex] |= STALE_REF_BIT;
+      }
       indexer.trackRefChange(
-        binding.entityId, binding.type, field.seq, undefined, id, -1 as EntityId, !final, final);
+        binding.writableEntityId, binding.type, field.seq, undefined, id, -1 as EntityId, !final,
+        final);
     };
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | undefined {
         CHECK: checkInvalid(this, binding);
-        const id = data[binding.index];
+        const id = data[binding.writableIndex];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
         return pool.borrowTemporarily((id & ENTITY_ID_MASK) as EntityId);
       },
@@ -519,22 +529,22 @@ class RefType extends Type<Entity | undefined> {
         CHECK: if (value && !registry.hasShape(value.__id, registry.Alive, false)) {
           throw new CheckError('Referencing a deleted entity is not allowed');
         }
-        let oldId = data[binding.index] as EntityId;
+        let oldId = data[binding.writableIndex] as EntityId;
         if (oldId !== -1) oldId = (oldId & ENTITY_ID_MASK) as EntityId;
-        const stale = oldId !== -1 && !!(data[binding.index] & STALE_REF_BIT);
+        const stale = oldId !== -1 && !!(data[binding.writableIndex] & STALE_REF_BIT);
         const newId = (value?.__id ?? -1) as EntityId;
         if (oldId === newId && !stale) return;
-        data[binding.index] = newId;
+        data[binding.writableIndex] = newId;
         indexer.trackRefChange(
-          binding.entityId, binding.type, field.seq, undefined, oldId, newId, !stale, true);
+          binding.writableEntityId, binding.type, field.seq, undefined, oldId, newId, !stale, true);
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity | undefined {
         CHECK: checkInvalid(this, binding);
-        const id = data[binding.index];
+        const id = data[binding.readonlyIndex];
         if (id === -1 || (id & STALE_REF_BIT) && !registry.includeRecentlyDeleted) return;
         return pool.borrowTemporarily((id & ENTITY_ID_MASK) as EntityId);
       },
@@ -590,7 +600,7 @@ class BackrefsType extends Type<Entity[]> {
     const selectorId =
       indexer.registerSelector(binding.type, this.type, refField?.seq, this.trackDeletedBackrefs);
 
-    const propertyDefinition = {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): Entity[] {
         CHECK: checkInvalid(this, binding);
@@ -599,7 +609,7 @@ class BackrefsType extends Type<Entity[]> {
             `Backrefs field ${binding.type.name}.${field.name} not configured to track recently ` +
             `deleted refs`);
         }
-        return indexer.getBackrefs(binding.entityId, selectorId);
+        return indexer.getBackrefs(binding.writableEntityId, selectorId);
       },
       set(this: C, value: Entity[]): void {
         CHECK: checkInvalid(this, binding);
@@ -608,10 +618,26 @@ class BackrefsType extends Type<Entity[]> {
             'Backrefs properties are computed automatically, you cannot set them');
         }
       }
-    };
-
-    Object.defineProperty(binding.writableInstance, field.name, propertyDefinition);
-    Object.defineProperty(binding.readonlyInstance, field.name, propertyDefinition);
+    });
+    Object.defineProperty(binding.readonlyMaster, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C): Entity[] {
+        CHECK: checkInvalid(this, binding);
+        CHECK: if (!trackDeletedBackrefs && binding.dispatcher.registry.includeRecentlyDeleted) {
+          throw new CheckError(
+            `Backrefs field ${binding.type.name}.${field.name} not configured to track recently ` +
+            `deleted refs`);
+        }
+        return indexer.getBackrefs(binding.readonlyEntityId, selectorId);
+      },
+      set(this: C, value: Entity[]): void {
+        CHECK: checkInvalid(this, binding);
+        CHECK: if (value !== EMPTY_ARRAY) {
+          throw new CheckError(
+            'Backrefs properties are computed automatically, you cannot set them');
+        }
+      }
+    });
   }
 
   defineFixed(binding: Binding<any>, field: Field<any>): void {
@@ -626,23 +652,23 @@ class ObjectType extends Type<any> {
     const data: any[] = [];
     field.updateBuffer = () => {/* no-op */};
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
         CHECK: checkInvalid(this, binding);
-        return data[binding.index];
+        return data[binding.writableIndex];
       },
       set(this: C, value: any): void {
         CHECK: checkInvalid(this, binding);
-        data[binding.index] = value;
+        data[binding.writableIndex] = value;
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
         CHECK: checkInvalid(this, binding);
-        return data[binding.index];
+        return data[binding.readonlyIndex];
       },
       set(this: C, value: any): void {
         throwNotWritable(binding);
@@ -654,23 +680,23 @@ class ObjectType extends Type<any> {
     const data: any[] = new Array(binding.capacity);
     field.updateBuffer = () => {/* no-op */};
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
         CHECK: checkInvalid(this, binding);
-        return data[binding.index];
+        return data[binding.writableIndex];
       },
       set(this: C, value: any): void {
         CHECK: checkInvalid(this, binding);
-        data[binding.index] = value;
+        data[binding.writableIndex] = value;
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
         CHECK: checkInvalid(this, binding);
-        return data[binding.index];
+        return data[binding.readonlyIndex];
       },
       set(this: C, value: any): void {
         throwNotWritable(binding);
@@ -693,11 +719,11 @@ class WeakObjectType extends Type<any> {
     field.updateBuffer = () => {/* no-op */};
     const finalizers = this.initFinalizers(binding);
 
-    Object.defineProperty(binding.writableInstance, field.name, {
+    Object.defineProperty(binding.writableMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
         CHECK: checkInvalid(this, binding);
-        const value = data[binding.index];
+        const value = data[binding.writableIndex];
         if (value === null || value === undefined) return value;
         return value.deref();
       },
@@ -706,20 +732,22 @@ class WeakObjectType extends Type<any> {
         if (value !== null && value !== undefined) {
           const weakRef = new WeakRef(value);
           finalizers?.register(
-            value,
-            {type: binding.type, data, weakRef, id: binding.entityId, index: binding.index}
+            value, {
+              type: binding.type, data, weakRef, id: binding.writableEntityId,
+              index: binding.writableIndex
+            }
           );
           value = weakRef;
         }
-        data[binding.index] = value;
+        data[binding.writableIndex] = value;
       }
     });
 
-    Object.defineProperty(binding.readonlyInstance, field.name, {
+    Object.defineProperty(binding.readonlyMaster, field.name, {
       enumerable: true, configurable: true,
       get(this: C): any {
         CHECK: checkInvalid(this, binding);
-        const value = data[binding.index];
+        const value = data[binding.readonlyIndex];
         if (value === null || value === undefined) return value;
         return value.deref();
       },
