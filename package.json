@@ -10,6 +10,7 @@
     "flame": "clinic flame -- node --enable-source-maps --es-module-specifier-resolution=node lib/tests/performance.test.js",
     "build": "rollup --config",
     "prepublishOnly": "yarn build",
+    "release": "node build/release.js",
     "lint": "eslint src tests benchmarks",
     "update": "yarn upgrade-interactive --latest",
     "docs:dev": "vitepress dev docs",
