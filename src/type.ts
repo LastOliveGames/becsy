@@ -28,7 +28,9 @@ export abstract class Type<JSType> {
 
   abstract defineElastic(binding: Binding<any>, field: Field<any>): void;
   abstract defineFixed(binding: Binding<any>, field: Field<any>): void;
+  get internallyIndexed(): boolean {return false;}
 
+  /* eslint-disable lines-between-class-members */
   static boolean: Type<boolean>;
   static uint8: Type<number>;
   static int8: Type<number>;
@@ -38,6 +40,8 @@ export abstract class Type<JSType> {
   static int32: Type<number>;
   static float32: Type<number>;
   static float64: Type<number>;
+  static vector:
+    (type: Type<number>, elements: number | string[], Class?: new() => any) => Type<number[]>;
   static staticString: (choices: string[]) => Type<string>;
   static dynamicString: (maxUtf8Length: number) => Type<string>;
   static object: Type<any>;
@@ -46,8 +50,9 @@ export abstract class Type<JSType> {
   static ref: Type<Entity | undefined>;
   static backrefs: (type?: ComponentType<any>, fieldName?: string, trackDeletedBackrefs?: boolean)
     => Type<Entity[]>;
-  // TODO: add array type
   // TODO: add struct type
+  // TODO: add list type
+  /* eslint-enable lines-between-class-members */
 }
 
 class BooleanType extends Type<boolean> {
@@ -119,7 +124,7 @@ class BooleanType extends Type<boolean> {
 
 
 class NumberType extends Type<number> {
-  constructor(private readonly NumberArray: TypedArrayConstructor) {
+  constructor(readonly NumberArray: TypedArrayConstructor) {
     super(0);
   }
 
@@ -181,6 +186,279 @@ class NumberType extends Type<number> {
         return data[binding.readonlyIndex];
       },
       set(this: C, value: number): void {
+        throwNotWritable(binding);
+      }
+    });
+  }
+}
+
+class VectorType extends Type<number[]> {
+  private readonly stride: number;
+  private readonly elementNames: string[] | undefined;
+
+  constructor(
+    private readonly type: NumberType, elements: number | string[],
+    private readonly Class?: new() => any
+  ) {
+    super(new Array(typeof elements === 'number' ? elements : elements.length).fill(0));
+    if (typeof elements === 'number') {
+      this.stride = elements;
+    } else {
+      this.stride = elements.length;
+      this.elementNames = elements;
+    }
+  }
+
+  get internallyIndexed(): boolean {return true;}
+
+  defineElastic<C>(binding: Binding<C>, field: Field<number[]>): void {
+    const stride = this.stride;
+    const elementNames = this.elementNames;
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
+    let data: TypedArray;
+
+    field.updateBuffer = () => {
+      binding.dispatcher.buffers.register(
+        bufferKey, binding.capacity * stride, this.type.NumberArray,
+        (newData: TypedArray) => {data = newData;}
+      );
+    };
+    field.updateBuffer();
+
+    const masterWritableAccessor = this.Class ? new this.Class() : {};
+    const masterReadonlyAccessor = this.Class ? new this.Class() : {};
+    Object.defineProperty(masterWritableAccessor, 'length', {value: stride});
+    Object.defineProperty(masterReadonlyAccessor, 'length', {value: stride});
+    CHECK: {
+      Object.defineProperty(
+        masterWritableAccessor, '__becsyComponent', {value: undefined, writable: true});
+      Object.defineProperty(
+        masterReadonlyAccessor, '__becsyComponent', {value: undefined, writable: true});
+    }
+    let writableAccessor = Object.create(masterWritableAccessor);
+    Object.seal(writableAccessor);
+    let readonlyAccessor = Object.create(masterReadonlyAccessor);
+    Object.seal(readonlyAccessor);
+
+    /* eslint-disable no-loop-func */
+    for (let i = 0; i < this.stride; i++) {
+      Object.defineProperty(masterWritableAccessor, `${i}`, {
+        enumerable: true,
+        get(): number {
+          CHECK: checkInvalid(this.__becsyComponent, binding);
+          return data[binding.writableIndex * stride + i];
+        },
+        set(value: number): void {
+          CHECK: checkInvalid(this.__becsyComponent, binding);
+          data[binding.writableIndex * stride + i] = value;
+        }
+      });
+      Object.defineProperty(masterReadonlyAccessor, `${i}`, {
+        enumerable: true,
+        get(): number {
+          CHECK: checkInvalid(this.__becsyComponent, binding);
+          return data[binding.readonlyIndex * stride + i];
+        },
+        set(value: number): void {
+          throwNotWritable(binding);
+        }
+      });
+      if (this.elementNames?.[i]) {
+        Object.defineProperty(masterWritableAccessor, this.elementNames[i], {
+          enumerable: true,
+          get(): number {
+            CHECK: checkInvalid(this.__becsyComponent, binding);
+            return data[binding.writableIndex * stride + i];
+          },
+          set(value: number): void {
+            CHECK: checkInvalid(this.__becsyComponent, binding);
+            data[binding.writableIndex * stride + i] = value;
+          }
+        });
+        Object.defineProperty(masterReadonlyAccessor, this.elementNames[i], {
+          enumerable: true,
+          get(): number {
+            CHECK: checkInvalid(this.__becsyComponent, binding);
+            return data[binding.readonlyIndex * stride + i];
+          },
+          set(value: number): void {
+            throwNotWritable(binding);
+          }
+        });
+      }
+    }
+    /* eslint-enable no-loop-func */
+
+    Object.defineProperty(binding.writableMaster, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C) {
+        CHECK: {
+          checkInvalid(this, binding);
+          writableAccessor = Object.create(masterWritableAccessor);
+          writableAccessor.__becsyComponent = this;
+          Object.seal(writableAccessor);
+        }
+        return writableAccessor;
+      },
+      set(this: C, value: number[] & Record<string, number>): void {
+        CHECK: checkInvalid(this, binding);
+        if (value.length) {
+          CHECK: if (value.length !== stride) {
+            throw new CheckError(
+              `Value of length ${value.length} doesn't match vector of length ${stride}`);
+          }
+          for (let i = 0; i < stride; i++) data[binding.writableIndex * stride + i] = value[i];
+        } else {
+          CHECK: if (!elementNames) {
+            throw new CheckError(
+              `Value assigned to ${binding.type.name}.${field.name} must be an array`);
+          }
+          for (let i = 0; i < stride; i++) {
+            CHECK: if (typeof value[elementNames[i]] !== 'number') {
+              throw new CheckError(
+                `Value assigned to ${binding.type.name}.${field.name} is missing element ` +
+                `"${elementNames[i]}`);
+            }
+            data[binding.writableIndex * stride + i] = value[elementNames[i]];
+          }
+        }
+      }
+    });
+
+    Object.defineProperty(binding.readonlyMaster, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C) {
+        CHECK: {
+          checkInvalid(this, binding);
+          readonlyAccessor = Object.create(masterReadonlyAccessor);
+          readonlyAccessor.__becsyComponent = this;
+          Object.seal(readonlyAccessor);
+        }
+        return readonlyAccessor;
+      },
+      set(this: C, value: number[]): void {
+        throwNotWritable(binding);
+      }
+    });
+  }
+
+  defineFixed<C>(binding: Binding<C>, field: Field<number[]>): void {
+    const stride = this.stride;
+    const elementNames = this.elementNames;
+    const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
+    const data = binding.dispatcher.buffers.register(
+      bufferKey, binding.capacity * stride, this.type.NumberArray);
+
+    const masterWritableAccessor = this.Class ? new this.Class() : {};
+    const masterReadonlyAccessor = this.Class ? new this.Class() : {};
+    Object.defineProperty(masterWritableAccessor, 'length', {value: stride});
+    Object.defineProperty(masterReadonlyAccessor, 'length', {value: stride});
+    CHECK: {
+      Object.defineProperty(
+        masterWritableAccessor, '__becsyComponent', {value: undefined, writable: true});
+      Object.defineProperty(
+        masterReadonlyAccessor, '__becsyComponent', {value: undefined, writable: true});
+    }
+    let writableAccessor = Object.create(masterWritableAccessor);
+    Object.seal(writableAccessor);
+    let readonlyAccessor = Object.create(masterReadonlyAccessor);
+    Object.seal(readonlyAccessor);
+
+    for (let i = 0; i < this.stride; i++) {
+      Object.defineProperty(masterWritableAccessor, `${i}`, {
+        enumerable: true,
+        get(): number {
+          CHECK: checkInvalid(this.__becsyComponent, binding);
+          return data[binding.writableIndex * stride + i];
+        },
+        set(value: number): void {
+          CHECK: checkInvalid(this.__becsyComponent, binding);
+          data[binding.writableIndex * stride + i] = value;
+        }
+      });
+      Object.defineProperty(masterReadonlyAccessor, `${i}`, {
+        enumerable: true,
+        get(): number {
+          CHECK: checkInvalid(this.__becsyComponent, binding);
+          return data[binding.readonlyIndex * stride + i];
+        },
+        set(value: number): void {
+          throwNotWritable(binding);
+        }
+      });
+      if (this.elementNames?.[i]) {
+        Object.defineProperty(masterWritableAccessor, this.elementNames[i], {
+          enumerable: true,
+          get(): number {
+            CHECK: checkInvalid(this.__becsyComponent, binding);
+            return data[binding.writableIndex * stride + i];
+          },
+          set(value: number): void {
+            CHECK: checkInvalid(this.__becsyComponent, binding);
+            data[binding.writableIndex * stride + i] = value;
+          }
+        });
+        Object.defineProperty(masterReadonlyAccessor, this.elementNames[i], {
+          enumerable: true,
+          get(): number {
+            CHECK: checkInvalid(this.__becsyComponent, binding);
+            return data[binding.readonlyIndex * stride + i];
+          },
+          set(value: number): void {
+            throwNotWritable(binding);
+          }
+        });
+      }
+    }
+
+    Object.defineProperty(binding.writableMaster, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C) {
+        CHECK: {
+          checkInvalid(this, binding);
+          writableAccessor = Object.create(masterWritableAccessor);
+          writableAccessor.__becsyComponent = this;
+          Object.seal(writableAccessor);
+        }
+        return writableAccessor;
+      },
+      set(this: C, value: number[] & Record<string, number>): void {
+        CHECK: checkInvalid(this, binding);
+        if (value.length) {
+          CHECK: if (value.length !== stride) {
+            throw new CheckError(
+              `Value of length ${value.length} doesn't match vector of length ${stride}`);
+          }
+          for (let i = 0; i < stride; i++) data[binding.writableIndex * stride + i] = value[i];
+        } else {
+          CHECK: if (!elementNames) {
+            throw new CheckError(
+              `Value assigned to ${binding.type.name}.${field.name} must be an array`);
+          }
+          for (let i = 0; i < stride; i++) {
+            CHECK: if (typeof value[elementNames[i]] !== 'number') {
+              throw new CheckError(
+                `Value assigned to ${binding.type.name}.${field.name} is missing element ` +
+                `"${elementNames[i]}`);
+            }
+            data[binding.writableIndex * stride + i] = value[elementNames[i]];
+          }
+        }
+      }
+    });
+
+    Object.defineProperty(binding.readonlyMaster, field.name, {
+      enumerable: true, configurable: true,
+      get(this: C) {
+        CHECK: {
+          checkInvalid(this, binding);
+          readonlyAccessor = Object.create(masterReadonlyAccessor);
+          readonlyAccessor.__becsyComponent = this;
+          Object.seal(readonlyAccessor);
+        }
+        return readonlyAccessor;
+      },
+      set(this: C, value: number[]): void {
         throwNotWritable(binding);
       }
     });
@@ -785,6 +1063,8 @@ Type.uint32 = new NumberType(Uint32Array);
 Type.int32 = new NumberType(Int32Array);
 Type.float32 = new NumberType(Float32Array);
 Type.float64 = new NumberType(Float64Array);
+Type.vector = (type: Type<number>, elements: number | string[], Class?: new() => any) =>
+  new VectorType(type as NumberType, elements, Class);
 Type.staticString = (choices: string[]) => new StaticStringType(choices);
 Type.dynamicString = (maxUtf8Length: number) => new DynamicStringType(maxUtf8Length);
 Type.ref = new RefType();

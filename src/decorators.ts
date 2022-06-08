@@ -25,6 +25,22 @@ export function field(
   };
 }
 
+type VectorDecorator = {
+  (target: any, name: string): void;
+  vector: (
+    elements: number | string[], Class?: new() => any) => (target: any, name: string
+  ) => void;
+};
+
+function makeVectorDecorator(type: Type<number>) {
+  const fn: VectorDecorator = addFieldSchema.bind(null, {type}) as VectorDecorator;
+  fn.vector =
+    (elements: number | string[], Class?: new() => any) => (target: any, name: string) => {
+      addFieldSchema({type: Type.vector(type, elements, Class)}, target, name);
+    };
+  return fn;
+}
+
 // eslint-disable-next-line @typescript-eslint/ban-types
 type NotFunction<T> = T extends Function ? never : T;
 function backrefs(type?: ComponentType<any>, fieldName?: string, trackDeletedBackrefs?: boolean):
@@ -40,14 +56,14 @@ function backrefs(
 }
 
 field.boolean = addFieldSchema.bind(null, {type: Type.boolean});
-field.uint8 = addFieldSchema.bind(null, {type: Type.uint8});
-field.int8 = addFieldSchema.bind(null, {type: Type.int8});
-field.uint16 = addFieldSchema.bind(null, {type: Type.uint16});
-field.int16 = addFieldSchema.bind(null, {type: Type.int16});
-field.uint32 = addFieldSchema.bind(null, {type: Type.uint32});
-field.int32 = addFieldSchema.bind(null, {type: Type.int32});
-field.float32 = addFieldSchema.bind(null, {type: Type.float32});
-field.float64 = addFieldSchema.bind(null, {type: Type.float64});
+field.uint8 = makeVectorDecorator(Type.uint8);
+field.int8 = makeVectorDecorator(Type.int8);
+field.uint16 = makeVectorDecorator(Type.uint16);
+field.int16 = makeVectorDecorator(Type.int16);
+field.uint32 = makeVectorDecorator(Type.uint32);
+field.int32 = makeVectorDecorator(Type.int32);
+field.float32 = makeVectorDecorator(Type.float32);
+field.float64 = makeVectorDecorator(Type.float64);
 field.staticString = function(choices: string[]) {
   return addFieldSchema.bind(null, {type: Type.staticString(choices)});
 };

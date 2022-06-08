@@ -1,8 +1,23 @@
-import {field, component, World, Entity} from '../src';
+/* eslint-disable lines-between-class-members */
+import {field, component, World, Entity, Type} from '../src';
 
 class Stuff {
   value: number;
 }
+
+class Vector3 {
+  x: number;
+  y: number;
+  z: number;
+
+  add(that: Vector3): void {
+    this.x += that.x;
+    this.y += that.y;
+    this.z += that.z;
+  }
+}
+
+const v3Type = Type.vector(Type.int8, ['x', 'y', 'z'], Vector3);
 
 @component class Big {
   @field.boolean declare boolean: boolean;
@@ -14,6 +29,11 @@ class Stuff {
   @field.int32 declare int32: number;
   @field.float32 declare float32: number;
   @field.float64 declare float64: number;
+  @field.int32.vector(3) declare vectorWithLength: [number, number, number];
+  @field.float64.vector(['x', 'y', 'z']) declare vectorWithProps:
+    [number, number, number] & {x: number, y: number, z: number};
+  @field.int16.vector(['x', 'y', 'z'], Vector3) declare vectorWithClass: Vector3;
+  @field(v3Type) declare vectorWithPredefined: Vector3;
   @field.staticString(['foo', 'bar', 'baz']) declare staticString: string;
   @field.dynamicString(14) declare dynamicString: string;
   @field.dynamicString(1) declare shortDynamicString: string;
@@ -22,23 +42,56 @@ class Stuff {
   @field.weakObject declare weakObject: Stuff;
 }
 
-async function testReadWrite(prop: string, values: any[]): Promise<void> {
+async function testReadWrite(
+  prop: string | number | (string | number)[], values: any[]
+): Promise<void> {
   const world = await World.create();
   world.build(system => {
     const entity = system.createEntity(Big);
     for (const value of values) {
-      (entity.write(Big) as any)[prop] = value;
-      expect((entity.read(Big) as any)[prop]).toBe(value);
+      setProp(entity.write(Big), prop, value);
+      compare(entity.read(Big), prop, value);
+      compare(entity.write(Big), prop, value);
     }
     // Check that non-zero offsets work too.
     const entity2 = system.createEntity(Big);
     for (const value of values) {
-      (entity2.write(Big) as any)[prop] = value;
-      expect((entity2.read(Big) as any)[prop]).toBe(value);
+      setProp(entity2.write(Big), prop, value);
+      compare(entity2.read(Big), prop, value);
+      compare(entity2.write(Big), prop, value);
     }
   });
 }
 
+function setProp(object: any, prop: string | number | (string | number)[], value: any): void {
+  if (!Array.isArray(prop)) prop = [prop];
+  for (let i = 0; i < prop.length - 1; i++) object = object[prop[i]];
+  object[prop[prop.length - 1]] = value;
+}
+
+function getProp(object: any, prop: string | number | (string | number)[]): any {
+  if (!Array.isArray(prop)) prop = [prop];
+  for (let i = 0; i < prop.length; i++) object = object[prop[i]];
+  return object;
+}
+
+function compare(object: any, prop: string | number | (string | number)[], value: any): void {
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      expect(getProp(object, [prop, i].flat())).toBe(value[i]);
+      expect(getProp(object, [prop, i].flat())).toBe(value[i]);
+    }
+  } else if (typeof value === 'object' && value !== null) {
+    for (const key in value) {
+      expect(getProp(object, [prop, key].flat())).toBe(value[key]);
+      expect(getProp(object, [prop, key].flat())).toBe(value[key]);
+    }
+  } else {
+    expect(getProp(object, prop)).toBe(value);
+    expect(getProp(object, prop)).toBe(value);
+  }
+
+}
 
 describe('getting and setting fields of various types', () => {
 
@@ -76,6 +129,35 @@ describe('getting and setting fields of various types', () => {
 
   test('float64', async () => {
     await testReadWrite('float64', [0, 2 ** 53, -(2 ** 53), 0.5, -0.5]);
+  });
+
+  test('vectorWithLength', async () => {
+    await testReadWrite(['vectorWithLength', 0], [0, 42, -10]);
+    await testReadWrite(['vectorWithLength', 2], [0, 42, -10]);
+    await testReadWrite('vectorWithLength', [[0, -1, 2]]);
+  });
+
+  test('vectorWithProps', async () => {
+    await testReadWrite(['vectorWithProps', 0], [0, 42, -10]);
+    await testReadWrite(['vectorWithProps', 'x'], [0, 42, -10]);
+    await testReadWrite(['vectorWithProps', 'z'], [0, 42, -10]);
+    await testReadWrite('vectorWithProps', [[0, -1, 2]]);
+    await testReadWrite('vectorWithProps', [{x: 0, y: -1, z: 2}]);
+  });
+
+  test('vectorWithClass', async () => {
+    await testReadWrite(['vectorWithClass', 0], [0, 42, -10]);
+    await testReadWrite(['vectorWithClass', 'x'], [0, 42, -10]);
+    await testReadWrite(['vectorWithClass', 'z'], [0, 42, -10]);
+    await testReadWrite('vectorWithClass', [[0, -1, 2]]);
+    await testReadWrite('vectorWithClass', [{x: 0, y: -1, z: 2}]);
+    const world = await World.create();
+    world.build(system => {
+      const entity = system.createEntity(Big, {vectorWithClass: {x: 1, y: 2, z: 3}});
+      const entity2 = system.createEntity(Big, {vectorWithClass: {x: 5, y: 9, z: -2}});
+      entity.write(Big).vectorWithClass.add(entity2.read(Big).vectorWithClass);
+      compare(entity.read(Big), 'vectorWithClass', {x: 6, y: 11, z: 1});
+    });
   });
 
   test('staticString', async () => {

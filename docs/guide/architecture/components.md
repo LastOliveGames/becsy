@@ -11,7 +11,7 @@ import {Type} from '@lastolivegames/becsy';
 
 class ComponentA {
   static schema = {
-    booleanValue: {type: Type.boolean},
+    booleanValue: Type.boolean,
     integerValue: {type: Type.uint32, default: 10},
     stringValue: {type: Type.dynamicString(32)}
   };
@@ -66,12 +66,165 @@ Unless otherwise stated, the types are strict and don't accept `null` or `undefi
 | **`boolean`** <span style="float:right">(`false`, `boolean`)</span> <br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>A simple boolean type that accepts only `true` and `false` values. Each value occupies a full byte, though. |
 | **`int8`, `uint8`, `int16`, `uint16`, `int32`, `uint32`** <span style="float:right; font-weight: normal;">(`0`, `number`)</span> <br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>Integer types of various bit sizes, both signed and unsigned (the latter with a `u` prefix). |
 | **`float32`, `float64`** <span style="float:right; font-weight: normal;">(`0`, `number`)</span> <br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>Single and double precision floating point number types.  `float64` is equivalent to JavaScript's `number` type. |
+| **`vector(type, elements, class?)`** <span style="float:right; font-weight: normal;">(`[0, 0, ...]`, `Array`)</span><br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>Fixed-length array of one of the numeric types above; see [below](#numeric-vectors) for details. |
 | **`dynamicString(maxUtf8Length: number)`** <span style="float:right; font-weight: normal;">(`''`, `string`)</span> <br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>A string type that accepts any string value as long as it doesn't exceed the given maximum length when encoded with UTF-8. Useful for unpredictable strings such as usernames. |
 | **`staticString(choices: string[])`** <span style="float:right; font-weight: normal;">(first choice, `string`)</span> <br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>A string type that can only be set to values from a preselected array of strings.  The value is stored as an integer index into the string array so it's very efficient, but you cannot add new string values at runtime. Useful for message strings built into your application. |
 | **`object`** <span style="float:right; font-weight: normal;">( `undefined`, any)</span> <br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>A type that can accept any JavaScript object as value, including `undefined` and `null`.  This should only be used for interfacing with other libraries as it can't be shared between threads and doesn't perform as well as the primitive types even on a single thread. |
 | **`weakObject`** <span style="float:right; font-weight: normal;">(`undefined`, any)</span> <br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>A weak reference to a JavaScript object that won't prevent it from being garbage collected.  It suffers from the same disadvantages as `object` above.  Values default to `undefined`, and automatically become `undefined` when the object is garbage collected. |
-| **`ref`** <span style="float:right; font-weight: normal;">(`null`, `Entity`)</span> <br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>A unidirectional reference to a single entity or `null`; see [below](#references) for details. |
-| **`backrefs(type?, fieldName?, trackDeletedBackrefs?)`** <span style="float:right; font-weight: normal;">(`[]`, `Entity[]`)</span> <br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>An automatically populated list of references to the entity that contains a component with this field; see [below](#references) for details.  Fields with this type cannot be set by your application. |
+| **`ref`** <span style="float:right; font-weight: normal;">(`null`, `Entity`)</span> <br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>A unidirectional reference to a single entity or `null`; see [below](#referencing-entities) for details. |
+| **`backrefs(type?, fieldName?, trackDeletedBackrefs?)`** <span style="float:right; font-weight: normal;">(`[]`, `Entity[]`)</span> <br><span style="display: inline-block; margin-top: 0.5em;">&#8203;</span>An automatically populated list of references to the entity that contains a component with this field; see [below](#referencing-entities) for details.  Fields with this type cannot be set by your application. |
+
+## Numeric vectors
+
+When you need a component to hold some numeric values of the same type, you can of course declare them as separate fields.  However, it often makes sense to treat them as a single, composite value, whether for better organization, for increased performance due to cache locality, or to fit in with a third party API.  In that case you can declare a vector field instead:
+
+```ts
+@component class MovingEntity {
+  @field.float64.vector(3) declare position: [number, number, number];
+  @field.float64.vector(3) declare velocity: [number, number, number];
+}
+
+world.build(sys => {
+  const player = sys.createEntity(
+    MovingEntity, {position: [10, 0, 10], velocity: [1.5, 0.2, 0.1]}
+  );
+  const mover = player.write(MovingEntity);
+  for (let i = 0; i < move.position.length; i++) {
+    move.position[i] += mover.velocity[i];
+  }
+});
+```
+```js
+class MovingEntity {
+  static schema = {
+    position: Type.vector(Type.float64, 3),
+    velocity: Type.vector(Type.float64, 3)
+  };
+}
+
+world.build(sys => {
+  const player = sys.createEntity(
+    MovingEntity, {position: [10, 0, 10], velocity: [1.5, 0.2, 0.1]}
+  );
+  const mover = player.write(MovingEntity);
+  for (let i = 0; i < mover.position.length; i++) {
+    move.position[i] += mover.velocity[i];
+  }
+});
+```
+
+This declares two fields, each a vector of exactly three `float64` numbers.  A vector's number elements will be stored together compactly by Becsy, and the vector will appear as an array-like object with a `length` property and indexed accessors for its properties.  You can access the elements individually, and you can also assign an array of the correct length to the field, which will get its elements copied into the component.
+
+::: warning
+While a vector appears array-like, it is not an actual JavaScript array:  it has a fixed length, and lacks any of the usual `Array` methods.
+:::
+
+For better readability, you can also name the vector's elements and access them that way:
+```ts
+@component class MovingEntity {
+  @field.float64.vector(['x', 'y', 'z'])
+  declare position: [number, number, number] & {x: number, y: number, z: number};
+  @field.float64.vector(['x', 'y', 'z'])
+  declare velocity: [number, number, number] & {x: number, y: number, z: number};
+}
+
+world.build(sys => {
+  const player = sys.createEntity(
+    MovingEntity, {position: [10, 0, 10], velocity: {x: 1.5, y: 0.2, z: 0.1}}
+  );
+  const mover = player.write(MovingEntity);
+  mover.position[0] += mover.velocity.x;
+  mover.position.x += mover.velocity[1];
+  mover.position.z += mover.velocity.z;
+});
+```
+```js
+class MovingEntity {
+  static schema = {
+    position: Type.vector(Type.float64, ['x', 'y', 'z']),
+    velocity: Type.vector(Type.float64, ['x', 'y', 'z'])
+  };
+}
+
+world.build(sys => {
+  const player = sys.createEntity(
+    MovingEntity, {position: [10, 0, 10], velocity: {x: 1.5, y: 0.2, z: 0.1}}
+  );
+  const mover = player.write(MovingEntity);
+  mover.position[0] += mover.velocity.x;
+  mover.position.x += mover.velocity[1];
+  mover.position.z += mover.velocity.z;
+});
+```
+
+You can then access the elements interchangeably either by index or by name, and assign either an array or an object to the field, whichever's more convenient.
+
+Finally, you can specify a custom class to use for the array-like value.  This can be useful if you're using a library that provides a vector-like abstract data type with useful methods that you'd like to be able to use directly on your Becsy data.  It differs from using `Type.object` because the data is still stored by Becsy in a multithreading-compatible fashion, and fungible instances of the custom class are used as a thin veneer on top.  To achieve this, the vector's array-like and named element properties are used to override the class's ones, which works well for simple ADTs but can break the host class in more complex cases &mdash; you won't know until you try.
+
+::: tip
+For convenience, you might also want to declare the field type once for reuse throughout your components.
+:::
+
+Here's a made-up example that incorporates all of the above:
+
+```ts
+class Vector3 {
+  x: number;
+  y: number;
+  z: number;
+
+  add(that: Vector3): void {
+    this.x += that.x;
+    this.y += that.y;
+    this.z += that.z;
+  }
+}
+
+const v3Type = Type.vector(Type.float64, ['x', 'y', 'z'], Vector3);
+
+@component class MovingEntity {
+  @field(v3Type) declare position: Vector3;
+  @field(v3Type) declare velocity: Vector3;
+}
+
+world.build(sys => {
+  const player = sys.createEntity(
+    MovingEntity, {position: [10, 0, 10], velocity: [1.5, 0.2, 0.1]}
+  );
+  const mover = player.write(MovingEntity);
+  mover.position.add(mover.velocity);
+});
+```
+```js
+class Vector3 {
+  x: number;
+  y: number;
+  z: number;
+
+  add(that: Vector3): void {
+    this.x += that.x;
+    this.y += that.y;
+    this.z += that.z;
+  }
+}
+
+const v3Type = Type.vector(Type.float64, ['x', 'y', 'z'], Vector3);
+
+class MovingEntity {
+  static schema = {
+    position: v3Type,
+    velocity: v3Type
+  };
+}
+
+world.build(sys => {
+  const player = sys.createEntity(
+    MovingEntity, {position: [10, 0, 10], velocity: [1.5, 0.2, 0.1]}
+  );
+  const mover = player.write(MovingEntity);
+  mover.position.add(mover.velocity);
+});
+```
 
 ## Referencing entities
 

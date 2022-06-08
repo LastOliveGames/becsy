@@ -43,9 +43,10 @@ class Tracker {
   ) {
     const binding = selector.sourceType?.__binding;
     const precise =
-      selector.matchType &&
-      (selector.matchSeq || binding!.refFields.length === 1) &&
-      !binding!.internallyIndexed;
+      selector.matchType && (
+        selector.matchSeq && !binding!.fields[selector.sourceSeq!].type.internallyIndexed ||
+        binding!.refFields.length === 1 && !binding!.refFields[0].type.internallyIndexed
+      );
     if (!precise) this.tags = [];
     this.registry = dispatcher.registry;
   }
@@ -247,7 +248,7 @@ export class RefIndexer {
       this.refLogStatsPointer = this.refLog.createPointer();
     }
     const selectorSourceKey = sourceType ?
-      (typeof sourceFieldSeq === 'undefined' ?
+      (sourceFieldSeq === undefined ?
         -2 - sourceType.id! : sourceType.id! | (sourceFieldSeq << COMPONENT_ID_BITS)
       ) : -1;
     let selectorId = this.selectorIdsBySourceKey.get(selectorSourceKey);
@@ -256,7 +257,7 @@ export class RefIndexer {
       if (!this.selectors.length) trackStale = true;
       const selector = {
         id: this.selectors.length, targetTypes: targetType ? [targetType] : [], sourceType,
-        matchType: !!sourceType, matchSeq: typeof sourceFieldSeq !== 'undefined',
+        matchType: !!sourceType, matchSeq: sourceFieldSeq !== undefined,
         sourceTypeId: sourceType?.id, sourceSeq: sourceFieldSeq, trackStale
       };
       this.selectors.push(selector);
@@ -314,8 +315,10 @@ export class RefIndexer {
     sourceInternalIndex: number | undefined, targetId: EntityId, action: Action,
   ): void {
     const internallyIndexed = typeof sourceInternalIndex !== 'undefined';
-    DEBUG: if (internallyIndexed !== sourceType.__binding!.internallyIndexed) {
-      throw new InternalError('Inconsistent internally indexed flag');
+    DEBUG: {
+      if (internallyIndexed && !sourceType.__binding!.fields[sourceSeq].type.internallyIndexed) {
+        throw new InternalError('Inconsistent internally indexed flag');
+      }
     }
     this.refLog!.push(sourceId | (sourceType.id! << ENTITY_ID_BITS));
     this.refLog!.push(

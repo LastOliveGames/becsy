@@ -71,7 +71,6 @@ export class Binding<C> {
   declare readonly shapeValue: number;
   declare readonly refFields: Field<Entity | null>[];
   declare trackedWrites: boolean;
-  declare internallyIndexed: boolean;
   declare writableEntityId: EntityId;
   declare writableIndex: number;
   declare readonlyEntityId: EntityId;
@@ -97,7 +96,6 @@ export class Binding<C> {
     this.shapeValue = shapeSpec.value;
     this.refFields = fields.filter(field => field.type === Type.ref);
     this.trackedWrites = false;
-    this.internallyIndexed = false;
     this.writableEntityId = 0 as EntityId;
     this.writableIndex = 0;
     this.readonlyEntityId = 0 as EntityId;
