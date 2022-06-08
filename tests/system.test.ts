@@ -111,7 +111,7 @@ describe('system setup', () => {
         }
       },
       class TrackingSystem extends System {
-        entities = this.query(q => q.changed.with(Foo).track);
+        entities = this.query(q => q.changed.with(Foo).trackWrites);
         execute() {
           for (const entity of this.entities.changed) {
             message = `foo ${entity.read(Foo).speed}`;
@@ -137,7 +137,7 @@ describe('system setup', () => {
         },
         class TrackingSystem extends System {
           foo = this.singleton.read(Foo);
-          entities = this.query(q => q.changed.with(Foo).track);
+          entities = this.query(q => q.changed.with(Foo).trackWrites);
           execute() {
             for (const entity of this.entities.changed) {
               message = `foo ${entity.read(Foo).speed}`;

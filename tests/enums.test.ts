@@ -207,7 +207,7 @@ describe('testing enum components', () => {
     const world = await World.create({
       defs: [
         class Finder extends System {
-          entities = this.query(q => q.changed.with(Start).track);
+          entities = this.query(q => q.changed.with(Start).trackWrites);
           execute() {
             message = `${this.entities.changed.length}`;
           }

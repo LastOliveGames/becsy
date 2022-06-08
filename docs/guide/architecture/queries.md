@@ -137,24 +137,24 @@ Another common use case is to detect when a component's field values have been c
 
 ```ts
 // Get entities with Box and Transform, where Transform fields changed since last time.
-this.query(q => q.changed.with(Box).and.with(Transform).track);
+this.query(q => q.changed.with(Box).and.with(Transform).trackWrites);
 ```
 ```js
 // Get entities with Box and Transform, where Transform fields changed since last time.
-this.query(q => q.changed.with(Box).and.with(Transform).track);
+this.query(q => q.changed.with(Box).and.with(Transform).trackWrites);
 ```
 
-We express the query as usual, but append `track` to any component types whose changes we want to track.  (You must track at least one component type.)  Note that when tracking specific enum component types, a write to another component in the same enum can sometimes trigger the query too.
+We express the query as usual, but append `trackWrites` to any component types whose changes we want to track.  (You must track at least one component type.)  Note that when tracking specific enum component types, a write to another component in the same enum can sometimes trigger the query too.
 
 Newly added entities will *not* be included in the `changed` list, even if their fields were written to after the component was added.  Basically, an entity will be in at most one of the `added`, `removed`, and `changed` lists &mdash; they never overlap.  For convenience, you can request a list that combines any of these attributes instead:
 
 ```ts
 // Get entities that became a Box with Transform, or whose Transform was changed.
-this.query(q => q.addedOrChanged.with(Box).and.with(Transform).track);
+this.query(q => q.addedOrChanged.with(Box).and.with(Transform).trackWrites);
 ```
 ```js
 // Get entities that became a Box with Transform, or whose Transform was changed.
-this.query(q => q.addedOrChanged.with(Box).and.with(Transform).track);
+this.query(q => q.addedOrChanged.with(Box).and.with(Transform).trackWrites);
 ```
 
 Finally, not that a single query can include any or all of the various lists (each of which will be iterable separately), and that this is more efficient than creating separate queries for them.

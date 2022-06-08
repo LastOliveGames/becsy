@@ -1,7 +1,8 @@
 ### Upcoming
 - Added the `vector` data type, for fixed-length arrays of numbers, optionally with named elements and backed by a rich class of your choosing.  See the [docs](https://lastolivegames.github.io/becsy/guide/architecture/components.html#numeric-vectors) for details.
-- Improved the separation between read-only and writable component instances.  You can now safely use `read` and `write` instances of the same component type at the same time, whereas before you would've silently targeted the wrong entity on one of the instances.  This change happened to improve dev mode performance by 10% to 20%, but reduced perf mode performance by up to 10% for `packed` storage (though not for `sparse` storage).
-- Validated that queries have `track` qualifiers iff they have a `changed` result set (or variant).
+- Improved the separation between read-only and writable component instances.  You can now safely use `read` and `write` instances of the same component type at the same time, whereas before it would've silently targeted the wrong entity on one of the instances.  This change happened to improve dev mode performance by 10% to 20%, but reduced perf mode performance by up to 10% for `packed` storage (though not for `sparse` storage).
+- Renamed the `track` modifier to `trackWrites`.  You'll need to update any queries that used it.
+- Validated that queries have `trackWrites` qualifiers iff they have a `changed` result set (or variant).
 
 ### 0.13.2
 - Added support for enum component types.  You can use them when a set of components is mutually exclusive, and you need to be able to easily find out which (if any) is currently present on an entity.  Enum component types are fully-featured, though they're most often used as tags.

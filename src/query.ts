@@ -262,7 +262,7 @@ export class QueryBuilder {
   /**
    * Requests that a list of all entities that were recently written to and satisfy the query be
    * made available each frame.  You must additionally specify which components the write detection
-   * should be sensitive to using `track`.
+   * should be sensitive to using `trackWrites`.
    */
   get changed(): this {
     this.__query.flavors |= QueryFlavor.changed;
@@ -387,7 +387,7 @@ export class QueryBuilder {
   /**
    * Marks the most recently mentioned component types as trackable for `changed` query flavors.
    */
-  get track(): this {
+  get trackWrites(): this {
     this.set('trackMask');
     for (const type of this.__lastTypes) {
       if (typeof type === 'function') {

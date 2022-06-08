@@ -35,7 +35,7 @@ class IncrementBWithRemovedA extends System {
 
 class IncrementBWithChangedA extends System {
   sked = this.schedule(s => s.before(IncrementAddedALate));
-  entities = this.query(q => q.changed.with(A).read.track.and.with(B).write);
+  entities = this.query(q => q.changed.with(A).read.trackWrites.and.with(B).write);
   execute() {
     for (const entity of this.entities.changed) entity.write(B).value += 1;
   }
