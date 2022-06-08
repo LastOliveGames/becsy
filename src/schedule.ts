@@ -18,8 +18,8 @@ export const now = typeof window !== 'undefined' && typeof window.performance !=
  * 1. A system was explicitly placed `before` or `after` another.
  * 2. A system was explicitly left unordered with respect to another using `inAnyOrderWith`.
  * 3. A system was implicitly placed before or after another system based on the components the
- *    other system reads or writes, using `beforeReadsFrom`, `afterReadsFrom`, `beforeWritesTo` or
- *    `afterWritesTo`.
+ *    other system reads or writes, using `beforeReadersOf`, `afterReadersOf`, `beforeWritersOf` or
+ *    `afterWritersOf`.
  * 4. A system was implicitly placed after another because it reads a component that the other
  *    system writes.
  *
@@ -157,7 +157,7 @@ export class ScheduleBuilder {
    * @param componentTypes The component types whose readers this system should precede.
    * @returns The builder for chaining calls.
    */
-  beforeReadsFrom(...componentTypes: ComponentType<any>[]): this {
+  beforeReadersOf(...componentTypes: ComponentType<any>[]): this {
     for (const componentType of componentTypes) {
       for (const other of this.__dispatcher.planner.readers!.get(componentType)!) {
         for (const system of this.__systems) {
@@ -174,7 +174,7 @@ export class ScheduleBuilder {
    * @param componentTypes The component types whose readers this system should follow.
    * @returns The builder for chaining calls.
    */
-  afterReadsFrom(...componentTypes: ComponentType<any>[]): this {
+  afterReadersOf(...componentTypes: ComponentType<any>[]): this {
     for (const componentType of componentTypes) {
       for (const other of this.__dispatcher.planner.readers!.get(componentType)!) {
         for (const system of this.__systems) {
@@ -191,7 +191,7 @@ export class ScheduleBuilder {
    * @param componentTypes The component types whose writers this system should precede.
    * @returns The builder for chaining calls.
    */
-  beforeWritesTo(...componentTypes: ComponentType<any>[]): this {
+  beforeWritersOf(...componentTypes: ComponentType<any>[]): this {
     for (const componentType of componentTypes) {
       for (const other of this.__dispatcher.planner.writers!.get(componentType)!) {
         for (const system of this.__systems) {
@@ -208,7 +208,7 @@ export class ScheduleBuilder {
    * @param componentTypes The component types whose writers this system should follow.
    * @returns The builder for chaining calls.
    */
-  afterWritesTo(...componentTypes: ComponentType<any>[]): this {
+  afterWritersOf(...componentTypes: ComponentType<any>[]): this {
     for (const componentType of componentTypes) {
       for (const other of this.__dispatcher.planner.writers!.get(componentType)!) {
         for (const system of this.__systems) {

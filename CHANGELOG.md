@@ -1,6 +1,7 @@
 ### Upcoming
 - Added the `vector` data type, for fixed-length arrays of numbers, optionally with named elements and backed by a rich class of your choosing.  See the [docs](https://lastolivegames.github.io/becsy/guide/architecture/components.html#numeric-vectors) for details.
 - Improved the separation between read-only and writable component instances.  You can now safely use `read` and `write` instances of the same component type at the same time, whereas before it would've silently targeted the wrong entity on one of the instances.  This change happened to improve dev mode performance by 10% to 20%, but reduced perf mode performance by up to 10% for `packed` storage (though not for `sparse` storage).
+- Renamed `beforeReadsFrom`, `afterReadsFrom`, `beforeWritesTo`, and `afterWritesTo` scheduling clauses to `beforeReadersOf`, `afterReadersOf`, `beforeWritersOf`, and `afterWritersOf` to better reflect their true meaning.
 - Renamed the `track` modifier to `trackWrites`.  You'll need to update any queries that used it.
 - Validated that queries have `trackWrites` qualifiers iff they have a `changed` result set (or variant).
 

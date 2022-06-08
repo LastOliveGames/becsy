@@ -25,7 +25,7 @@ for (let i = 0; i < 30; i++) {
 
 
 class IncrementA extends System {
-  sked = this.schedule(s => s.afterWritesTo(A));
+  sked = this.schedule(s => s.afterWritersOf(A));
   entities = this.query(q => q.current.with(A).write);
   execute() {
     for (const entity of this.entities.current) entity.write(A).value += 1;
@@ -33,7 +33,7 @@ class IncrementA extends System {
 }
 
 class IncrementC extends System {
-  sked = this.schedule(s => s.afterWritesTo(C));
+  sked = this.schedule(s => s.afterWritersOf(C));
   entities = this.query(q => q.current.with(C).write);
   execute() {
     for (const entity of this.entities.current) entity.write(C).value += 1;
@@ -41,7 +41,7 @@ class IncrementC extends System {
 }
 
 class IncrementAC extends System {
-  sked = this.schedule(s => s.afterWritesTo(A, C));
+  sked = this.schedule(s => s.afterWritersOf(A, C));
   entities = this.query(q => q.current.with(A, C).write);
   execute() {
     for (const entity of this.entities.current) {
@@ -52,7 +52,7 @@ class IncrementAC extends System {
 }
 
 class IncrementAOrC extends System {
-  sked = this.schedule(s => s.afterWritesTo(A, C));
+  sked = this.schedule(s => s.afterWritersOf(A, C));
   entities = this.query(q => q.current.withAny(A, C).write);
   execute() {
     for (const entity of this.entities.current) {
@@ -63,7 +63,7 @@ class IncrementAOrC extends System {
 }
 
 class IncrementANotC extends System {
-  sked = this.schedule(s => s.afterWritesTo(A));
+  sked = this.schedule(s => s.afterWritersOf(A));
   entities = this.query(q => q.current.with(A).write.but.without(C));
   execute() {
     for (const entity of this.entities.current) {
@@ -73,7 +73,7 @@ class IncrementANotC extends System {
 }
 
 class IncrementAWithD extends System {
-  sked = this.schedule(s => s.afterWritesTo(A));
+  sked = this.schedule(s => s.afterWritersOf(A));
   entities = this.query(q => q.current.with(A).write.with(D));
   execute() {
     for (const entity of this.entities.current) {

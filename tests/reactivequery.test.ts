@@ -11,7 +11,7 @@ import {component, ComponentType, field, Query, System, SystemType, World} from 
 
 
 class IncrementAddedAEarly extends System {
-  sked = this.schedule(s => s.beforeWritesTo(A));
+  sked = this.schedule(s => s.beforeWritersOf(A));
   entities = this.query(q => q.added.with(A).write);
   execute() {
     for (const entity of this.entities.added) entity.write(A).value += 1;
@@ -19,7 +19,7 @@ class IncrementAddedAEarly extends System {
 }
 
 class IncrementAddedALate extends System {
-  sked = this.schedule(s => s.afterWritesTo(A));
+  sked = this.schedule(s => s.afterWritersOf(A));
   entities = this.query(q => q.added.with(A).write);
   execute() {
     for (const entity of this.entities.added) entity.write(A).value += 1;

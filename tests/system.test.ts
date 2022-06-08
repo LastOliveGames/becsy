@@ -158,8 +158,8 @@ describe('system setup', () => {
     await World.create({defs: [
       Foo, Bar,
       group1.schedule(s => s.after(group2)),
-      group2.schedule(s => s.beforeWritesTo(Foo)),
-      group3.schedule(s => s.beforeReadsFrom(Foo).after(group1))
+      group2.schedule(s => s.beforeWritersOf(Foo)),
+      group3.schedule(s => s.beforeReadersOf(Foo).after(group1))
     ]});
     expect(initOrder.join(' ')).toBe('SystemC SystemA SystemD');
   });
