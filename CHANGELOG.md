@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.14.0
 - Added the `vector` data type, for fixed-length arrays of numbers, optionally with named elements and backed by a rich class of your choosing.  See the [docs](https://lastolivegames.github.io/becsy/guide/architecture/components.html#numeric-vectors) for details.
 - Improved the separation between read-only and writable component instances.  You can now safely use `read` and `write` instances of the same component type at the same time, whereas before it would've silently targeted the wrong entity on one of the instances.  This change happened to improve dev mode performance by 10% to 20%, but reduced perf mode performance by up to 10% for `packed` storage (though not for `sparse` storage).
 - Added `inAnyOrderWithReadersOf` and `inAnyOrderWithWritersOf` scheduling clauses, to explicitly cancel the automatic order induced by a system's queries' entitlements.  All other scheduling clauses trump these ones, though.
