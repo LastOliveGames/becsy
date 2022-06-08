@@ -161,7 +161,7 @@ class SystemCD extends System {
 }
 
 class SystemCE extends System {
-  sked = this.schedule(s => s.inAnyOrderWith(SystemCD));
+  sked = this.schedule(s => s.inAnyOrderWithWritersOf(C));
   entities = this.query(q => q.current.with(C).write.with(E).write);
 
   execute() {

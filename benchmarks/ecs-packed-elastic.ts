@@ -168,7 +168,7 @@ export default (becsy: Becsy): {[key: string]: () => Promise<any>} => {
   }
 
   class SystemCE extends becsy.System {
-    sked = this.schedule(s => s.inAnyOrderWith(SystemCD));
+    sked = this.schedule(s => s.inAnyOrderWithWritersOf(C));
     entities = this.query(q => q.current.with(C).write.with(E).write);
 
     execute() {

@@ -144,6 +144,7 @@ The scheduling constraints apply pairwise to the subject system and all other sy
 | `before`, `after` | Forces the system to execute any time (not necessarily immediately) before or after the given systems.  This is the strongest constraint. |
 | `inAnyOrderWith` | Negates all less specific constraints, allowing the system to execute in any order with the given ones.  Doesn't affect ordering between the given systems, though. |
 | `beforeReadersOf`, `afterReadersOf`, `beforeWritersOf`, `afterWritersOf` | Specifies that the system should execute before or after all other systems that read or write components of the given types. |
+| `inAnyOrderWithReadersOf`, `inAnyOrderWithWritersOf` | Negates all automatically formed constraints, allowing the system to execute in any order with systems that read or write components of the given types. This is useful for resolving spurious ordering conflicts caused by overlapping entitlements. |
 | system entitlements | [System entitlements](./queries#declaring-entitlements) to read or write certain component types are used to automatically form a basic layer of constraints, such that all systems that read a component execute after all systems that write it. |
 
 To give a concrete example, consider the following schedule and entitlement declarations:

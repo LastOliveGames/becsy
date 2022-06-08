@@ -20,7 +20,9 @@ export const now = typeof window !== 'undefined' && typeof window.performance !=
  * 3. A system was implicitly placed before or after another system based on the components the
  *    other system reads or writes, using `beforeReadersOf`, `afterReadersOf`, `beforeWritersOf` or
  *    `afterWritersOf`.
- * 4. A system was implicitly placed after another because it reads a component that the other
+ * 4. A system was explicitly left unordered with respect to another using `inAnyOrderWithReadersOf`
+ *    or `inAnyOrderWithWritersOf`.
+ * 5. A system was implicitly placed after another because it reads a component that the other
  *    system writes.
  *
  * If there are multiple constraints at the same priority level they will conflict and create a
@@ -109,7 +111,7 @@ export class ScheduleBuilder {
       for (const other of this.__dispatcher.getSystems(type)) {
         if (thisSet.has(other)) continue;
         for (const system of this.__systems) {
-          this.__dispatcher.planner.graph.addEdge(system, other, 4);
+          this.__dispatcher.planner.graph.addEdge(system, other, 5);
         }
       }
     }
@@ -128,7 +130,7 @@ export class ScheduleBuilder {
       for (const other of this.__dispatcher.getSystems(type)) {
         if (thisSet.has(other)) continue;
         for (const system of this.__systems) {
-          this.__dispatcher.planner.graph.addEdge(other, system, 4);
+          this.__dispatcher.planner.graph.addEdge(other, system, 5);
         }
       }
     }
@@ -144,7 +146,7 @@ export class ScheduleBuilder {
     for (const type of systemTypes) {
       for (const other of this.__dispatcher.getSystems(type)) {
         for (const system of this.__systems) {
-          this.__dispatcher.planner.graph.denyEdge(system, other, 3);
+          this.__dispatcher.planner.graph.denyEdge(system, other, 4);
         }
       }
     }
@@ -161,7 +163,7 @@ export class ScheduleBuilder {
     for (const componentType of componentTypes) {
       for (const other of this.__dispatcher.planner.readers!.get(componentType)!) {
         for (const system of this.__systems) {
-          this.__dispatcher.planner.graph.addEdge(system, other, 2);
+          this.__dispatcher.planner.graph.addEdge(system, other, 3);
         }
       }
     }
@@ -178,7 +180,7 @@ export class ScheduleBuilder {
     for (const componentType of componentTypes) {
       for (const other of this.__dispatcher.planner.readers!.get(componentType)!) {
         for (const system of this.__systems) {
-          this.__dispatcher.planner.graph.addEdge(other, system, 2);
+          this.__dispatcher.planner.graph.addEdge(other, system, 3);
         }
       }
     }
@@ -195,7 +197,7 @@ export class ScheduleBuilder {
     for (const componentType of componentTypes) {
       for (const other of this.__dispatcher.planner.writers!.get(componentType)!) {
         for (const system of this.__systems) {
-          this.__dispatcher.planner.graph.addEdge(system, other, 2);
+          this.__dispatcher.planner.graph.addEdge(system, other, 3);
         }
       }
     }
@@ -212,7 +214,43 @@ export class ScheduleBuilder {
     for (const componentType of componentTypes) {
       for (const other of this.__dispatcher.planner.writers!.get(componentType)!) {
         for (const system of this.__systems) {
-          this.__dispatcher.planner.graph.addEdge(other, system, 2);
+          this.__dispatcher.planner.graph.addEdge(other, system, 3);
+        }
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Schedules this system in any order relative to systems that declared a read dependency on the
+   * given component types (low priority).
+   * @param componentTypes The component types whose readers' order doesn't matter relative to this
+   *  one.
+   * @returns The builder for chaining calls.
+   */
+  inAnyOrderWithReadersOf(...componentTypes: ComponentType<any>[]): this {
+    for (const componentType of componentTypes) {
+      for (const other of this.__dispatcher.planner.readers!.get(componentType)!) {
+        for (const system of this.__systems) {
+          this.__dispatcher.planner.graph.denyEdge(other, system, 2);
+        }
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Schedules this system in any order relative to systems that declared a write dependency on the
+   * given component types (low priority).
+   * @param componentTypes The component types whose writers' order doesn't matter relative to this
+   *  one.
+   * @returns The builder for chaining calls.
+   */
+  inAnyOrderWithWritersOf(...componentTypes: ComponentType<any>[]): this {
+    for (const componentType of componentTypes) {
+      for (const other of this.__dispatcher.planner.writers!.get(componentType)!) {
+        for (const system of this.__systems) {
+          this.__dispatcher.planner.graph.denyEdge(other, system, 2);
         }
       }
     }
