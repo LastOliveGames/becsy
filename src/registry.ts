@@ -145,13 +145,13 @@ export class Registry {
         };
         for (const type of enumeration.__types) {
           assimilateComponentType(typeId++ as ComponentId, type, shapeSpec, this.dispatcher);
-          if (type.validate) this.validators.push(type);
+          CHECK: if (type.validate) this.validators.push(type);
           shapeSpec.value += 1 << shift;
         }
       } else {
         const type = item.typeOrEnum;
         assimilateComponentType(typeId++ as ComponentId, type, shapeSpec, this.dispatcher);
-        if (type.validate) this.validators.push(type);
+        CHECK: if (type.validate) this.validators.push(type);
       }
     }
 

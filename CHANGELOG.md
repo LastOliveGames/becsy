@@ -1,4 +1,5 @@
 ### Upcoming
+- Fixed perf build when validators are used.
 
 ### 0.14.0
 - Added the `vector` data type, for fixed-length arrays of numbers, optionally with named elements and backed by a rich class of your choosing.  See the [docs](https://lastolivegames.github.io/becsy/guide/architecture/components.html#numeric-vectors) for details.
