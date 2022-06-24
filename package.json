@@ -1,7 +1,7 @@
 {
   "name": "@lastolivegames/becsy",
   "type": "module",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "scripts": {
     "test": "jest --config jestconfig.json --detectOpenHandles",
     "test:watch": "jest --watch --config jestconfig.json --detectOpenHandles",
