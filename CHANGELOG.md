@@ -3,6 +3,8 @@
 ### 0.14.1
 
 ### 0.14.1
+
+### 0.14.1
 - Fixed perf build when validators are used.
 
 ### 0.14.0
