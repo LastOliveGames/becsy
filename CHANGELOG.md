@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.14.2
 - Improve internal error messages for component storage.
 
 ### 0.14.1
