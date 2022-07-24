@@ -272,7 +272,7 @@ export class Dispatcher {
     const systemTypes: (SystemType<System> | Record<string, unknown>)[] = [];
     const systemGroups: SystemGroupImpl[] = [];
     let lastDefWasSystem = false;
-    for (const def of defs.flat(Infinity) as DefElement[]) {
+    for (const def of (defs as any).flat(Infinity) as DefElement[]) {
       if (def instanceof SystemGroupImpl) {
         systemGroups.push(def);
         const {
