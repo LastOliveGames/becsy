@@ -201,7 +201,9 @@ class PackedStorage implements Storage {
               `raise its capacity above ${this.binding.capacity}`);
           }
           DEBUG: if (this.binding.capacity === this.maxEntities) {
-            throw new InternalError('Trying to grow storage index beyond maxEntities');
+            throw new InternalError(
+              `Trying to grow storage index for component ${this.binding.type.name} beyond ` +
+              `maxEntities`);
           }
           this.binding.capacity = Math.min(this.maxEntities, this.binding.capacity * 2);
           this.growCapacity();
@@ -215,7 +217,8 @@ class PackedStorage implements Storage {
 
   releaseIndex(id: number): void {
     DEBUG: if (this.index[id] === -1) {
-      throw new InternalError(`Index for entity ${id} not allocated`);
+      throw new InternalError(
+        `Index for entity ${id} in component ${this.binding.type.name} not allocated`);
     }
     if (this.spares[3] === this.spares.length - 4) this.growSpares();
     this.spares[this.spares[3]++ + 4] = this.index[id];
@@ -296,7 +299,9 @@ class CompactStorage implements Storage {
           `raise its capacity above ${this.binding.capacity}`);
       }
       DEBUG: if (this.binding.capacity === this.maxEntities) {
-        throw new InternalError('Trying to grow storage index beyond maxEntities');
+        throw new InternalError(
+          `Trying to grow storage index for component ${this.binding.type.name} beyond ` +
+          `maxEntities`);
       }
       firstEmpty = this.index.length;
       this.binding.capacity = Math.min(this.maxEntities, this.binding.capacity * 2);
@@ -313,7 +318,8 @@ class CompactStorage implements Storage {
         return;
       }
     }
-    DEBUG: throw new InternalError(`Index for entity ${id} not allocated`);
+    DEBUG: throw new InternalError(
+      `Index for entity ${id} in component ${this.binding.type.name} not allocated`);
   }
 
   private growCapacity(): void {
