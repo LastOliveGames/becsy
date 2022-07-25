@@ -17,6 +17,6 @@ execSync(`yarn version --new-version ${version} --no-git-tag-version`);
 execSync(`git commit -m "Release ${version}" package.json CHANGELOG.md`);
 execSync(`git tag -a v${version} -m v${version}`);
 execSync(`git push`);
-execSync(`yarn publish --new-version version`);
+execSync(`yarn publish . --tag v${version}`);
 
 console.log('Released!');
