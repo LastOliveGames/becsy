@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.14.3
 - Fixed crash when a component was added and removed multiple times within one frame.
 
 ### 0.14.2
