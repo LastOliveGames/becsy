@@ -1,7 +1,8 @@
 ### Upcoming
+- Fixed crash when a component was added and removed multiple times within one frame.
 
 ### 0.14.2
-- Improve internal error messages for component storage.
+- Improved internal error messages for component storage.
 
 ### 0.14.1
 - Fixed perf build when validators are used.

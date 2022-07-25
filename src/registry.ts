@@ -330,6 +330,7 @@ export class Registry {
             this.clearRefs(entityId, type, true);
           }
           type.__free?.(entityId);
+          this.removedShapes.set(entityId, type);
         }
       }
     }
