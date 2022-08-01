@@ -39,7 +39,7 @@ class Tracker {
 
   constructor(
     private readonly targetEntityId: EntityId, private readonly selector: Selector,
-    private readonly dispatcher: Dispatcher
+    private readonly trackStale: boolean, private readonly dispatcher: Dispatcher
   ) {
     const binding = selector.sourceType?.__binding;
     const precise =
@@ -86,7 +86,7 @@ class Tracker {
     DEBUG: if (this.clearing) {
       throw new InternalError('Cannot track a new reference while clearing tracker');
     }
-    CHECK: if (trackChanges) this.checkWriteMask();
+    CHECK: if (trackChanges) this.checkUpdateMask();
     let index = this.getEntityIndex(entityId);
     if (index === undefined) index = this.addEntity(entityId, trackChanges);
     this.addTag(index, this.makeTag(typeId, fieldSeq, internalIndex));
@@ -97,7 +97,7 @@ class Tracker {
     trackChanges: boolean
   ): void {
     if (this.clearing) return;
-    CHECK: if (trackChanges) this.checkWriteMask();
+    CHECK: if (trackChanges) this.checkUpdateMask();
     const index = this.getEntityIndex(entityId);
     DEBUG: if (index === undefined) throw new InternalError('Entity backref not tracked');
     const empty = this.removeTag(index, this.makeTag(typeId, fieldSeq, internalIndex));
@@ -202,10 +202,12 @@ class Tracker {
     }
   }
 
-  private checkWriteMask(): void {
+  private checkUpdateMask(): void {
     const system = this.registry.executingSystem;
     for (const targetType of this.selector.targetTypes) {
-      checkMask(targetType, system, 'write');
+      if (this.registry.hasShape(this.targetEntityId, targetType, this.trackStale)) {
+        checkMask(targetType, system, 'update');
+      }
     }
   }
 }
@@ -336,10 +338,10 @@ export class RefIndexer {
       throw new InternalError('Selector not configured for stale tracking');
     }
     let staleTracker: Tracker;
-    tracker = new Tracker(targetId, selector, this.dispatcher);
+    tracker = new Tracker(targetId, selector, false, this.dispatcher);
     this.trackers.set(targetId | (selector.id << ENTITY_ID_BITS), tracker);
     if (selector.trackStale) {
-      staleTracker = new Tracker(targetId, selector, this.dispatcher);
+      staleTracker = new Tracker(targetId, selector, true,this.dispatcher);
       this.trackers.set(targetId | (selector.id << ENTITY_ID_BITS) | 2 ** 31, staleTracker);
     }
     return stale ? staleTracker! : tracker;

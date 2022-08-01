@@ -353,7 +353,7 @@ export class SystemBox {
 
   constructor(private readonly system: System, readonly dispatcher: Dispatcher) {
     system.__dispatcher = dispatcher;
-    this.accessMasks = {read: [], create: [], write: [], check: []};
+    this.accessMasks = {read: [], update: [], create: [], write: [], check: []};
     this.shapeQueries = [];
     this.shapeQueriesByComponent = [];
     this.writeQueries = [];

@@ -136,7 +136,6 @@ export class Lane {
 export class Planner {
   readonly graph: Graph<SystemBox>;
   readers? = new Map<ComponentType<Component>, Set<SystemBox>>();
-  creators? = new Map<ComponentType<Component>, Set<SystemBox>>();
   writers? = new Map<ComponentType<Component>, Set<SystemBox>>();
   lanes: Lane[] = [];
   replicatedLane?: Lane;
@@ -149,7 +148,6 @@ export class Planner {
     this.graph = new Graph(systems);
     for (const componentType of dispatcher.registry.types) {
       this.readers!.set(componentType, new Set());
-      this.creators!.set(componentType, new Set());
       this.writers!.set(componentType, new Set());
     }
     if (dispatcher.threaded) {
@@ -179,7 +177,6 @@ export class Planner {
     if (this.dispatcher.threaded) this.assignSystemsToLanes();
     STATS: for (const system of this.systems) system.stats.worker = system.lane?.id ?? 0;
     delete this.readers;
-    delete this.creators;
     delete this.writers;
     for (const group of this.groups) {
       group.__plan =
@@ -192,9 +189,6 @@ export class Planner {
       for (const reader of systems) {
         for (const writer of this.writers!.get(componentType)!) {
           this.graph.addEdge(writer, reader, 1);
-        }
-        for (const creator of this.creators!.get(componentType)!) {
-          this.graph.addEdge(creator, reader, 1);
         }
       }
     }
@@ -219,13 +213,13 @@ export class Planner {
     for (const componentType of this.dispatcher.registry.types) {
       if (componentType.__binding!.fields.every(field => field.type.shared)) continue;
       const readers = this.readers!.get(componentType);
-      const creators = this.creators!.get(componentType);
-      if (!readers && !creators) continue;
+      const writers = this.writers!.get(componentType);
+      if (!readers && !writers) continue;
       let lane = componentType.options?.restrictedToMainThread ? this.mainLane! : this.createLane();
       readers?.forEach(system => {
         lane = lane.merge(system.lane!);
       });
-      creators?.forEach(system => {
+      writers?.forEach(system => {
         lane = lane.merge(system.lane!);
       });
     }

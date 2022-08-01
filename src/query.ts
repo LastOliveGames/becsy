@@ -411,7 +411,8 @@ export class QueryBuilder {
   /**
    * Marks the most recently mentioned component types as created (and only created!) by the system.
    * This means that the component types will only be used in `createEntity` calls; they cannot be
-   * otherwise read, check for (`has` methods), or written.
+   * otherwise read, checked for (`has` methods), or written.  It can run concurrently with other
+   * `create` entitlements but counts as a `write` for purposes of system ordering.
    */
   get create(): this {
     this.set(this.__system.accessMasks.create);
@@ -419,15 +420,28 @@ export class QueryBuilder {
   }
 
   /**
-   * Marks the most recently mentioned component types as read and written by the system.  This
-   * declaration is enforced: you will only be able to read and write to component of types thus
-   * declared. You should try to declare the minimum writable set that your system will need to
-   * improve ordering and concurrency.
+   * Marks the most recently mentioned component types as indirectly updated by the system.  This
+   * covers automatic change propagation to non-writable fields such as updates of `backrefs`
+   * properties; however, it doesn't cover automatic clearing of refs to a deleted entity.  It can
+   * run concurrently with other `read` and `update` entitlements but counts as a `write` for
+   * purposes of system ordering.
+   */
+  get update(): this {
+    this.set(this.__system.accessMasks.update);
+    return this;
+  }
+
+  /**
+   * Marks the most recently mentioned component types as read, written, created and/or updated by
+   * the system.  This declaration is enforced: you will only be able to read and write to component
+   * of types thus declared. You should try to declare the minimum writable set that your system
+   * will need to improve ordering and concurrency.
    */
   get write(): this {
     this.set(this.__system.accessMasks.write);
     this.set(this.__system.accessMasks.read);
     this.set(this.__system.accessMasks.create);
+    this.set(this.__system.accessMasks.update);
     return this;
   }
 
@@ -443,6 +457,7 @@ export class QueryBuilder {
       mask = this.__query[mask]!;
     }
     const readMask = mask === this.__system.accessMasks.read;
+    const updateMask = mask === this.__system.accessMasks.update;
     const createMask = mask === this.__system.accessMasks.create;
     const writeMask = mask === this.__system.accessMasks.write;
     const withMask = mask === this.__query.withMask;
@@ -453,8 +468,8 @@ export class QueryBuilder {
     const trackMask = mask === this.__query.trackMask;
     const map =
       readMask ? this.__system.dispatcher.planner.readers! :
-        createMask ? this.__system.dispatcher.planner.creators! :
-          writeMask ? this.__system.dispatcher.planner.writers! : undefined;
+        writeMask || createMask || updateMask ? this.__system.dispatcher.planner.writers! :
+          undefined;
     for (const type of types) {
       CHECK: {
         if (!isMaskFlagSet(this.__system.accessMasks.write!, type) && (

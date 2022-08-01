@@ -54,11 +54,11 @@ Queries are only updated between system executions so you don't need to worry ab
 
 ## Declaring entitlements
 
-Query definitions also have a secondary function:  they declare what component types the system will be reading, writing and creating.  These declarations are not query-specific &mdash; the entitlements from all of a system's queries are combined together and applied to the system &mdash; but it's a convenient place to express them as you'll often need to read and write the component types that your queries are constrained on.
+Query definitions also have a secondary function:  they declare what component types the system will be reading, writing, creating and updating.  These declarations are not query-specific &mdash; the entitlements from all of a system's queries are combined together and applied to the system &mdash; but it's a convenient place to express them as you'll often need to read and write the component types that your queries are constrained on.
 
-You can only read, write and create component types for which you declared entitlements, otherwise you'll get an error.  Becsy also uses the entitlements to help [order system execution](./systems#execution-order) and determine which systems can safely run concurrently.
+You can only read, write, create and update component types for which you declared entitlements, otherwise you'll get an error.  Becsy also uses the entitlements to help [order system execution](./systems#execution-order) and determine which systems can safely run concurrently.
 
-You declare entitlements by following any clause that mentions component types with a `read`, `write`, or `create`:
+You declare entitlements by following any clause that mentions component types with a `read`, `write`, `create` or `update`:
 
 ```ts{4}
 @system class Namer extends System {
@@ -95,7 +95,7 @@ class Namer extends System {
 Above, we declared that we'll be writing the `Name` component; adding and removing count as writing, as does calling `Entity.write`.  Any `with` or `without` component types are automatically marked as `read` so you don't need to say it explicitly (but it's allowed).  If you want to declare an entitlement for a component type not used as a query constraint you can employ the `using` clause, which doesn't affect the query in any way, only supplies component types for entitlement suffixes:  `this.query(q => q.using(RandomComponent).write)`.
 
 ::: tip
-`write` implicitly includes `read` and `create`, so you don't need to declare those separately.  `read` and `write` also grant you access to the `has` family of methods, but `create` does not, as a trade-off for being able to run concurrently.
+`write` implicitly includes `read`, `create` and `update`, so you don't need to declare those separately.  `read` and `write` also grant you access to the `has` family of methods, but `create` and `update` do not, as a trade-off for being able to run concurrently.
 :::
 
 ## Reactive queries

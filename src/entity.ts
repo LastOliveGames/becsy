@@ -6,7 +6,9 @@ import type {SystemBox} from './system';
 
 
 export type EntityId = number & {__entityIdBrand: symbol};
-export type AccessMasks = {read?: number[], create?: number[], write?: number[], check?: number[]};
+export type AccessMasks = {
+  read?: number[], update?: number[], create?: number[], write?: number[], check?: number[]
+};
 
 
 /**

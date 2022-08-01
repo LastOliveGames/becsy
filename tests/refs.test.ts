@@ -88,6 +88,17 @@ class IncrementTargeters extends System {
   }
 }
 
+class UpdateTargets extends System {
+  originEntities = this.query(q => q.current.with(Origin).write.using(GlobalDest).update);
+  destinations = this.query(q => q.current.with(GlobalDest));
+
+  execute() {
+    for (const entity of this.originEntities.current) {
+      entity.write(Origin).target = this.destinations.current[0];
+    }
+  }
+}
+
 
 let total: {[key: string]: number};
 
@@ -251,6 +262,23 @@ describe('follow backward references', () => {
     const world = await createWorld();
     world.build(sys => {
       sys.createEntity(GlobalDest, {value: 42});
+    });
+  });
+});
+
+describe('update backrefs', () => {
+
+  test('set refs with backrefs update entitlement', async () => {
+    const world = await createWorld(UpdateTargets);
+    let o1: Entity, o2: Entity, dest: Entity;
+    world.build(sys => {
+      dest = sys.createEntity(GlobalDest).hold();
+      o1 = sys.createEntity(Origin).hold();
+      o2 = sys.createEntity(Origin).hold();
+    });
+    await world.execute();
+    world.build(sys => {
+      expect(dest.read(GlobalDest).targeters).toEqual([o1, o2]);
     });
   });
 });
