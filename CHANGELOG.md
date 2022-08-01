@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.14.4
 - Added `update` entitlement to allow implicit `backrefs` updates concurrently with reads and updates on the same components.
 - When writing refs that affect backrefs fields, constrained entitlement checks to the actual component types affected by the backrefs update, rather than arbitrarily checking other ones that happened to get internally binned together.
 
