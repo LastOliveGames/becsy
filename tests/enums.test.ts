@@ -4,8 +4,6 @@ import {CheckError} from '../src/errors';
 let message: string;
 
 const state = World.defineEnum();
-// or:
-// const state = World.defineEnum(Start, Middle, End);
 
 @component(state) class Start {
   @field.int32 declare value: number;
@@ -17,6 +15,9 @@ const state = World.defineEnum();
   @field.float64 declare answer: number;
 }
 
+@component class A {}
+@component class B {}
+const state2 = World.defineEnum(A, B);
 
 describe('testing enum components', () => {
 
@@ -31,6 +32,16 @@ describe('testing enum components', () => {
     expect((End as any).__binding.shapeOffset).toBe(0);
     expect((End as any).__binding.shapeMask).toBe(6);
     expect((End as any).__binding.shapeValue).toBe(6);
+  });
+
+  test('manual enum bitfield packing', async () => {
+    await World.create({defs: [state, state2]});
+    expect((A as any).__binding.shapeOffset).toBe(0);
+    expect((A as any).__binding.shapeMask).toBe(24);
+    expect((A as any).__binding.shapeValue).toBe(8);
+    expect((B as any).__binding.shapeOffset).toBe(0);
+    expect((B as any).__binding.shapeMask).toBe(24);
+    expect((B as any).__binding.shapeValue).toBe(16);
   });
 
   test('add and remove enum component', async () => {
@@ -203,7 +214,7 @@ describe('testing enum components', () => {
     expect(message).toBe('0,1');
   });
 
-  test('query for changed enum component', async () => {
+  test('query for written enum component', async () => {
     const world = await World.create({
       defs: [
         class Finder extends System {
@@ -211,7 +222,8 @@ describe('testing enum components', () => {
           execute() {
             message = `${this.entities.changed.length}`;
           }
-        }
+        },
+        state2
       ]
     });
     let e1: Entity;
@@ -226,6 +238,71 @@ describe('testing enum components', () => {
     });
     world.execute();
     expect(message).toBe('1');
+  });
+
+  test('query for match changed enum component', async () => {
+    const world = await World.create({
+      defs: [
+        class Finder extends System {
+          entities = this.query(q => q.changed.withAny(state).trackMatches);
+          execute() {
+            message = `${this.entities.changed.length}`;
+          }
+        }
+      ]
+    });
+    let e1: Entity;
+    world.build(sys => {
+      e1 = sys.createEntity(Start, {value: 1}).hold();
+      sys.createEntity(Middle);
+    });
+    await world.execute();
+    expect(message).toBe('0');
+    world.build(sys => {
+      e1.add(Middle);
+    });
+    await world.execute();
+    expect(message).toBe('1');
+    await world.execute();
+    expect(message).toBe('0');
+  });
+
+  test('query for match changed multiple enum components', async () => {
+    const world = await World.create({
+      defs: [
+        class Finder extends System {
+          entities =
+            this.query(q => q.changed.withAny(state).trackMatches.and.withAny(state2).trackMatches);
+
+          execute() {
+            message = `${this.entities.changed.length}`;
+          }
+        },
+        state2
+      ]
+    });
+    let e1: Entity;
+    world.build(sys => {
+      e1 = sys.createEntity(Start, {value: 1}, A).hold();
+      sys.createEntity(Middle);
+    });
+    await world.execute();
+    expect(message).toBe('0');
+    world.build(sys => {e1.add(Middle);});
+    await world.execute();
+    expect(message).toBe('1');
+    await world.execute();
+    expect(message).toBe('0');
+    world.build(sys => {e1.add(B);});
+    await world.execute();
+    expect(message).toBe('1');
+    await world.execute();
+    expect(message).toBe('0');
+    world.build(sys => {e1.addAll(End, A);});
+    await world.execute();
+    expect(message).toBe('1');
+    await world.execute();
+    expect(message).toBe('0');
   });
 
   test('enforce mutal exclusion on create', async () => {

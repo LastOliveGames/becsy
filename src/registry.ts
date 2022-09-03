@@ -14,6 +14,7 @@ import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {SystemBox} from './system';
 import {AtomicSharedShapeArray, ShapeArray, UnsharedShapeArray} from './datatypes/shapearray';
 import {CheckError, InternalError} from './errors';
+import type {TrackingMask} from './query';
 
 
 const SYSTEM_ERROR_TYPES = [
@@ -182,7 +183,10 @@ export class Registry {
       CHECK: if (enumeration.__types.length > 2 ** 31) {
         throw new CheckError(`Too many types in enum: ${enumeration.__types.length}`);
       }
-      pool.push({typeOrEnum: enumeration, size: Math.ceil(Math.log2(enumeration.__types.length))});
+      pool.push({
+        // +1 for the implicit null value of every enum
+        typeOrEnum: enumeration, size: Math.ceil(Math.log2(enumeration.__types.length + 1))
+      });
       for (const type of enumeration.__types) {
         CHECK: if (enumTypes.has(type)) {
           throw new CheckError(`Component type ${type.name} is a member of more than one enum`);
@@ -209,6 +213,7 @@ export class Registry {
 
   releaseComponentTypes(): void {
     for (const type of this.types) dissimilateComponentType(type);
+    for (const enumeration of this.enums) delete enumeration.__binding;
   }
 
   createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
@@ -418,18 +423,24 @@ export class Registry {
   }
 
   matchShape(
-    id: EntityId, positiveMask?: number[], positiveValues?: number[], positiveAnyMasks?: number[][],
-    negativeMask?: number[], negativeTypes?: ComponentType<any>[]
+    id: EntityId, positiveMask?: number[], positiveValues?: number[],
+    trackingMasks?: TrackingMask[], negativeMask?: number[], negativeTypes?: ComponentType<any>[]
   ): boolean {
     if (positiveMask && positiveValues && !this.shapes.match(id, positiveMask, positiveValues)) {
       return false;
     }
-    if (positiveAnyMasks) {
-      for (const mask of positiveAnyMasks) if (this.shapes.matchNot(id, mask)) return false;
-    }
     if (negativeMask && !this.shapes.matchNot(id, negativeMask)) return false;
     if (negativeTypes) {
       for (const type of negativeTypes) if (this.shapes.isSet(id, type)) return false;
+    }
+    if (trackingMasks) {
+      for (const trackingMask of trackingMasks) {
+        if (trackingMask.lastMatches) {
+          if (!this.shapes.matchAny(id, trackingMask)) return false;
+        } else if (this.shapes.matchNot(id, trackingMask.mask)) {
+          return false;
+        }
+      }
     }
     return true;
   }

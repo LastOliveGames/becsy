@@ -60,8 +60,9 @@ export class World {
   ): ComponentEnum {
     if (typeof name === 'function') {
       componentTypes.unshift(name);
-      name = '<anonymous>';
+      name = '';
     }
+    name = name || '<anonymous>';
     return new ComponentEnum(name, componentTypes);
   }
 

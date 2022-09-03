@@ -1,12 +1,12 @@
 import {Bitset} from './datatypes/bitset';
-import type {ComponentType} from './component';
+import {checkTypeDefined, ComponentType} from './component';
 import {Entity, EntityId, extendMaskAndSetFlag, isMaskFlagSet} from './entity';
 import type {SystemBox} from './system';
 import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/entitylist';
 import {CheckError, InternalError} from './errors';
 import type {ComponentEnum} from './enums';
 
-type MaskKind = 'withMask' | 'withoutMask' | 'trackMask';
+type MaskKind = 'withMask' | 'withoutMask' | 'trackWritesMask';
 
 enum QueryFlavor {
   current = 1, added = 2, removed = 4, changed = 8, addedOrChanged = 16, changedOrRemoved = 32,
@@ -23,6 +23,15 @@ const transientFlavorsMask =
 const changedFlavorsMask =
   QueryFlavor.changed | QueryFlavor.addedOrChanged | QueryFlavor.changedOrRemoved |
   QueryFlavor.addedChangedOrRemoved;
+const shapeFlavorsMask =
+  QueryFlavor.added | QueryFlavor.removed | QueryFlavor.addedOrChanged |
+  QueryFlavor.changedOrRemoved | QueryFlavor.addedChangedOrRemoved;
+
+export interface TrackingMask {
+  mask: number[];  // the withAny mask itself
+  lastMatches: number[][] | undefined;  // don't track matches if undefined
+  changed: boolean;  // side-channel to return value from matchAny; overwritten for each entity
+}
 
 
 export class QueryBox {
@@ -30,13 +39,15 @@ export class QueryBox {
   flavors = 0;
   withMask: number[] | undefined;
   withValues: number[] | undefined;
-  withAnyMasks: number[][] | undefined;
+  withAnyRecords: TrackingMask[] | undefined;
   withoutMask: number[] | undefined;
   withoutEnumTypes: ComponentType<any>[];
-  trackMask: number[] | undefined;
+  trackWritesMask: number[] | undefined;
   orderBy: (entity: Entity) => number;
   hasTransientResults: boolean;
   hasChangedResults: boolean;
+  hasShapeResults: boolean;
+  hasMatchTracking: boolean;
   private currentEntities: Bitset | undefined;
   private processedEntities: Bitset;
   private changedEntities: Bitset | undefined;
@@ -50,20 +61,35 @@ export class QueryBox {
     const dispatcher = this.system.dispatcher;
     this.hasTransientResults = Boolean(this.flavors & transientFlavorsMask);
     this.hasChangedResults = Boolean(this.flavors & changedFlavorsMask);
-    CHECK: if (this.withMask && this.withoutMask) {
-      const minLength = Math.min(this.withMask.length, this.withoutMask.length);
-      for (let i = 0; i < minLength; i++) {
-        if ((this.withMask[i] & this.withoutMask[i]) !== 0) {
-          throw new CheckError(
-            'Query must not list a component type in both `with` and `without` clauses');
+    this.hasShapeResults = Boolean(this.flavors & shapeFlavorsMask);
+    this.hasMatchTracking = Boolean(this.withAnyRecords?.some(record => record.lastMatches));
+    CHECK: {
+      if (this.withMask && this.withoutMask) {
+        const minLength = Math.min(this.withMask.length, this.withoutMask.length);
+        for (let i = 0; i < minLength; i++) {
+          if ((this.withMask[i] & this.withoutMask[i]) !== 0) {
+            throw new CheckError(
+              'Query must not list a component type in both `with` and `without` clauses');
+          }
         }
       }
-    }
-    CHECK: {
-      if (this.hasChangedResults && !this.trackMask) {
+      if (this.withAnyRecords && this.withoutMask) {
+        for (const {mask} of this.withAnyRecords) {
+          const minLength = Math.min(mask.length, this.withoutMask.length);
+          for (let i = 0; i < minLength; i++) {
+            if ((mask[i] & this.withoutMask[i]) !== 0) {
+              throw new CheckError(
+                'Query must not list a component type in both `withAny` and `without` clauses');
+            }
+          }
+        }
+      }
+      const hasTrackers =
+        !!this.trackWritesMask || this.withAnyRecords?.some(item => item.lastMatches);
+      if (this.hasChangedResults && !hasTrackers) {
         throw new CheckError(`Query for changed entities must track at least one component`);
       }
-      if (!this.hasChangedResults && this.trackMask) {
+      if (!this.hasChangedResults && hasTrackers) {
         throw new CheckError(
           'You can only track components if you have a query for changed entities');
       }
@@ -125,7 +151,7 @@ export class QueryBox {
     const registry = this.system.dispatcher.registry;
     const oldMatch = this.results.current?.has(id) ?? this.currentEntities!.get(id);
     const newMatch = registry.matchShape(
-      id, this.withMask, this.withValues, this.withAnyMasks, this.withoutMask,
+      id, this.withMask, this.withValues, this.withAnyRecords, this.withoutMask,
       this.withoutEnumTypes);
     if (newMatch && !oldMatch) {
       this.currentEntities?.set(id);
@@ -141,16 +167,30 @@ export class QueryBox {
       this.results.removed?.add(id);
       this.results.changedOrRemoved?.add(id);
       this.results.addedChangedOrRemoved?.add(id);
+    } else if (newMatch && oldMatch && this.hasMatchTracking) {
+      for (const record of this.withAnyRecords!) {
+        if (record.changed) {
+          this.changedEntities!.set(id);
+          this.results.changed?.add(id);
+          this.results.addedOrChanged?.add(id);
+          this.results.changedOrRemoved?.add(id);
+          this.results.addedChangedOrRemoved?.add(id);
+          break;
+        }
+      }
     }
   }
 
   handleWrite(id: EntityId, componentFlagOffset: number, componentFlagMask: number): void {
     if (
       !this.changedEntities!.get(id) &&
-      this.system.dispatcher.registry.matchShape(
-        id, this.withMask, this.withValues, this.withAnyMasks, this.withoutMask,
-        this.withoutEnumTypes) &&
-      (this.trackMask![componentFlagOffset] ?? 0) & componentFlagMask
+      (this.hasShapeResults ?
+        (this.results.current?.has(id) ?? this.currentEntities!.get(id)) :
+        this.system.dispatcher.registry.matchShape(
+          id, this.withMask, this.withValues, this.withAnyRecords, this.withoutMask,
+          this.withoutEnumTypes)
+      ) &&
+      (this.trackWritesMask![componentFlagOffset] ?? 0) & componentFlagMask
     ) {
       this.changedEntities!.set(id);
       this.results.changed?.add(id);
@@ -190,6 +230,7 @@ export class QueryBuilder {
   private __query: QueryBox;
   private __system: SystemBox;
   protected __lastTypes: (ComponentType<any> | ComponentEnum)[];
+  private __lastWasWithAny: boolean;
 
   constructor(
     private readonly __callback: (q: QueryBuilder) => void,
@@ -340,9 +381,9 @@ export class QueryBuilder {
       }
     }
     this.set(this.__system.accessMasks.read, types);
-    if (!this.__query.withAnyMasks) this.__query.withAnyMasks = [];
+    if (!this.__query.withAnyRecords) this.__query.withAnyRecords = [];
     const mask: number[] = [];
-    this.__query.withAnyMasks.push(mask);
+    this.__query.withAnyRecords.push({mask, lastMatches: undefined, changed: false});
     this.set(mask);
     return this;
   }
@@ -385,10 +426,12 @@ export class QueryBuilder {
   }
 
   /**
-   * Marks the most recently mentioned component types as trackable for `changed` query flavors.
+   * Marks writes to the most recently mentioned component types as trackable for `changed` query
+   * flavors.  An entity will be considered changed if any system called `write` on one of those
+   * components since the last frame.
    */
   get trackWrites(): this {
-    this.set('trackMask');
+    this.set('trackWritesMask');
     for (const type of this.__lastTypes) {
       if (typeof type === 'function') {
         type.__binding!.trackedWrites = true;
@@ -396,6 +439,23 @@ export class QueryBuilder {
         for (const enumType of type.__types) enumType.__binding!.trackedWrites = true;
       }
     }
+    return this;
+  }
+
+  /**
+   * Marks changes in the matching set of the immediately preceding `withAny` component types as
+   * trackable for `changed` query flavors.  An entity will be considered changed if it matched the
+   * query in the last frame and still matches it in the current frame, but satisfied the `withAny`
+   * constraint with a different set of components.
+   *
+   * This tracking is particularly useful for detecting changing enum states, but can be applied to
+   * any set of components.
+   */
+  get trackMatches(): this {
+    if (!this.__lastWasWithAny) {
+      throw new Error('You can only apply trackMatches to a withAny clause');
+    }
+    this.__query.withAnyRecords![this.__query.withAnyRecords!.length - 1].lastMatches = [];
     return this;
   }
 
@@ -449,6 +509,9 @@ export class QueryBuilder {
     mask: MaskKind | number[] | undefined, types?: (ComponentType<any> | ComponentEnum)[]
   ): void {
     if (!mask) return;
+    CHECK: if (types) {
+      for (const type of types) checkTypeDefined(type);
+    }
     if (!types) types = this.__lastTypes;
     DEBUG: if (!types) throw new InternalError('No component type to apply query modifier to');
     this.__lastTypes = types;
@@ -456,6 +519,7 @@ export class QueryBuilder {
       if (!this.__query[mask]) this.__query[mask] = [];
       mask = this.__query[mask]!;
     }
+    this.__lastWasWithAny = this.__query.withAnyRecords?.some(item => item.mask === mask) ?? false;
     const readMask = mask === this.__system.accessMasks.read;
     const updateMask = mask === this.__system.accessMasks.update;
     const createMask = mask === this.__system.accessMasks.create;
@@ -463,9 +527,8 @@ export class QueryBuilder {
     const withMask = mask === this.__query.withMask;
     const withoutMask = mask === this.__query.withoutMask;
     const shapeMask =
-      mask === this.__query.withMask || mask === this.__query.withoutMask ||
-      this.__query.withAnyMasks?.includes(mask);
-    const trackMask = mask === this.__query.trackMask;
+      mask === this.__query.withMask || mask === this.__query.withoutMask || this.__lastWasWithAny;
+    const trackMask = mask === this.__query.trackWritesMask;
     const map =
       readMask ? this.__system.dispatcher.planner.readers! :
         writeMask || createMask || updateMask ? this.__system.dispatcher.planner.writers! :

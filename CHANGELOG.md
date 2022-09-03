@@ -1,4 +1,8 @@
 ### Upcoming
+- Added `trackMatches` modifier to track changes to the components that match a `withAny` clause.  This is particularly useful to trigger a handler whenever an entity's enum state changes but works with any set of components.  It can be mixed and matched with `trackWrites` but there's no way to tell which tracker caused an entity to be added to the `changed` set.
+- Fixed enums to work correctly when the number of elements is a power of 2.
+- Checked a bit more thoroughly to ensure that types and enums used in queries are defined in the world.
+- Released enum bindings when a world is terminated.
 
 ### 0.14.4
 - Added `update` entitlement to allow implicit `backrefs` updates concurrently with reads and updates on the same components.

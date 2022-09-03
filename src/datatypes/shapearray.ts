@@ -3,6 +3,7 @@ import type {Buffers} from '../buffers';
 import type {ComponentType} from '../component';
 import type {ComponentEnum} from '../enums';
 import {InternalError} from '../errors';
+import type {TrackingMask} from 'src/query';
 
 export interface ShapeArray {
   syncThreads(): void;
@@ -13,6 +14,7 @@ export interface ShapeArray {
   clear(): void;
   match(entityId: EntityId, positiveMask: number[], positiveValues: number[]): boolean;
   matchNot(entityId: EntityId, negativeMask: number[]): boolean;
+  matchAny(entityId: EntityId, trackingMask: TrackingMask): boolean;
 }
 
 
@@ -55,7 +57,7 @@ export class UnsharedShapeArray implements ShapeArray {
   }
 
   get(entityId: number, enumeration: ComponentEnum): number {
-    const binding = enumeration.__binding;
+    const binding = enumeration.__binding!;
     const index = entityId * this.stride + binding.shapeOffset;
     const mask = binding.shapeMask;
     return (this.array[index] & mask) >>> binding.shapeShift;
@@ -85,6 +87,24 @@ export class UnsharedShapeArray implements ShapeArray {
       if ((array[index + i] & negativeMask[i]) !== 0) return false;
     }
     return true;
+  }
+
+  matchAny(entityId: EntityId, trackingMask: TrackingMask): boolean {
+    trackingMask.changed = false;
+    const mask = trackingMask.mask;
+    const lastMatch =
+      trackingMask.lastMatches![entityId] = trackingMask.lastMatches![entityId] || [];
+    const array = this.array;
+    const index = entityId * this.stride;
+    let ok = false;
+    for (let i = 0; i < mask.length; i++) {
+      const masked = array[index + i] & mask[i];
+      if (masked !== 0) ok = true;
+      if (masked !== lastMatch[i]) trackingMask.changed = true;
+      lastMatch[i] = masked;
+    }
+    if (!ok) delete trackingMask.lastMatches![entityId];
+    return ok;
   }
 }
 
@@ -131,7 +151,7 @@ export class AtomicSharedShapeArray implements ShapeArray {
   }
 
   get(entityId: number, enumeration: ComponentEnum): number {
-    const binding = enumeration.__binding;
+    const binding = enumeration.__binding!;
     const index = entityId * this.stride + binding.shapeOffset;
     const mask = binding.shapeMask;
     return (this.array[index] & mask) >>> binding.shapeShift;
@@ -159,6 +179,25 @@ export class AtomicSharedShapeArray implements ShapeArray {
     const index = entityId * this.stride;
     for (let i = 0; i < negativeMask.length; i++) {
       if ((array[index + i] & negativeMask[i]) !== 0) return false;
+    }
+    return true;
+  }
+
+  matchAny(entityId: EntityId, trackingMask: TrackingMask): boolean {
+    trackingMask.changed = false;
+    const mask = trackingMask.mask;
+    const lastMatch =
+      trackingMask.lastMatches![entityId] = trackingMask.lastMatches![entityId] || [];
+    const array = this.array;
+    const index = entityId * this.stride;
+    for (let i = 0; i < mask.length; i++) {
+      const masked = array[index + i] & mask[i];
+      if (masked === 0) {
+        delete trackingMask.lastMatches![entityId];
+        return false;
+      }
+      if (masked !== lastMatch[i]) trackingMask.changed = true;
+      lastMatch[i] = masked;
     }
     return true;
   }

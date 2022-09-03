@@ -3,7 +3,7 @@ import type {Component, ComponentType} from './component';
 
 export class ComponentEnum {
   readonly __types: ComponentType<Component>[];
-  __binding: {
+  __binding?: {
     shapeOffset: number;
     shapeMask: number;
     shapeShift: number;

@@ -100,7 +100,15 @@ Above, we declared that we'll be writing the `Name` component; adding and removi
 
 ## Reactive queries
 
-Using reactive queries make it possible to react to changes on entities and its components.  One common use case is to detect whenever an entity has been added or removed from a query:
+Using reactive queries make it possible to react to changes on entities and its components.
+
+::: tip
+A single query can include any or all of the various lists described below (each of which will be iterable separately), and this is more efficient than creating separate queries for them.
+:::
+
+### Added and removed entities
+
+One common use case is to detect whenever an entity has been added or removed from a query:
 
 ```ts
 @system class SystemA extends System {
@@ -133,6 +141,8 @@ The `added` and `removed` lists are computed just before the system executes, an
 If an entity was both added and then removed between system executions, it will *not* be included in the `added` list.  (And similarly for the `removed` list.)  There's currently no way to query for such ephemeral entities in Becsy.
 :::
 
+### Changed entities
+
 Another common use case is to detect when a component's field values have been changed, whether due to a call to `Entity.write` or because the field's value was [automatically updated](./components#referencing-entities):
 
 ```ts
@@ -146,6 +156,19 @@ this.query(q => q.changed.with(Box).and.with(Transform).trackWrites);
 
 We express the query as usual, but append `trackWrites` to any component types whose changes we want to track.  (You must track at least one component type.)  Note that when tracking specific enum component types, a write to another component in the same enum can sometimes trigger the query too.
 
+Not all state changes are expressed by writes to a component's fields: sometimes, the combination of components matching a query encodes an implicit state instead.  This is especially common when using [component enums](./components#component-enums) but works with normal components too.  You mark `withAny` clauses with `trackMatches`, and they'll add entities to the `changed` list whenever set the set of components matching the `withAny` clause changes:
+
+```ts
+// Get entities with Menu, where their open/closed state changed since last time.
+this.query(q => q.changed.with(Menu).and.withAny(Open, Closed).trackMatches);
+```
+```js
+// Get entities with Menu, where their open/closed state changed since last time.
+this.query(q => q.changed.with(Menu).and.withAny(Open, Closed).trackMatches);
+```
+
+You can mix `trackWrites` and `trackMatches` within a query but there's no way to tell which one caused an entity to become `changed`.
+
 Newly added entities will *not* be included in the `changed` list, even if their fields were written to after the component was added.  Basically, an entity will be in at most one of the `added`, `removed`, and `changed` lists &mdash; they never overlap.  For convenience, you can request a list that combines any of these attributes instead:
 
 ```ts
@@ -156,8 +179,6 @@ this.query(q => q.addedOrChanged.with(Box).and.with(Transform).trackWrites);
 // Get entities that became a Box with Transform, or whose Transform was changed.
 this.query(q => q.addedOrChanged.with(Box).and.with(Transform).trackWrites);
 ```
-
-Finally, not that a single query can include any or all of the various lists (each of which will be iterable separately), and that this is more efficient than creating separate queries for them.
 
 ## Ordering query results
 
