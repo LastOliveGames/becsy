@@ -1,5 +1,5 @@
 import type {TypedArray, TypedArrayConstructor} from './buffers';
-import type {Binding, Component, ComponentType, Field} from './component';
+import type {Binding, ComponentType, Field} from './component';
 import {ENTITY_ID_MASK} from './consts';
 import type {Entity, EntityId} from './entity';
 import {CheckError, InternalError} from './errors';
@@ -14,7 +14,7 @@ function throwNotWritable(binding: Binding<any>) {
     `use entity.write(${binding.type.name}) to acquire a writable version`);
 }
 
-function checkInvalid(component: Component, binding: Binding<any>) {
+function checkInvalid(component: any, binding: Binding<any>) {
   if (component.__invalid) {
     throw new CheckError(
       `Component instance for ${binding.type.name} is no longer valid, as you already bound it ` +

@@ -31,23 +31,23 @@
   "author": "Piotr Kaminski <piotr@lastolive.games>",
   "license": "MIT",
   "devDependencies": {
-    "@types/jest": "^27.0.2",
+    "@types/jest": "^28.0.0",
     "@types/ms": "^0.7.31",
-    "@types/node": "^16.11.4",
+    "@types/node": "^12.0.0",
     "@typescript-eslint/eslint-plugin": "^5.1.0",
     "@typescript-eslint/parser": "^5.1.0",
-    "@wessberg/rollup-plugin-ts": "^1.3.11",
-    "chalk": "^4.1.0",
+    "chalk": "^4.1.2",
     "eslint": "^8.1.0",
     "eslint-plugin-disable": "^2.0.1",
     "eslint-plugin-import": "^2.25.2",
-    "jest": "^27.3.1",
+    "jest": "^28.0.0",
     "markdown-it-container": "^3.0.0",
     "rollup": "^2.58.0",
     "rollup-plugin-terser": "^7.0.2",
-    "ts-jest": "^27.0.7",
-    "tsc-watch": "^4.2.9",
+    "rollup-plugin-ts": "^3.0.0",
+    "ts-jest": "^28.0.8",
+    "tsc-watch": "^5.0.3",
     "typescript": "^4.4.4",
-    "vitepress": "^0.22.2"
+    "vitepress": "^0.22.4"
   }
 }

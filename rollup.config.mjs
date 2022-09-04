@@ -1,4 +1,4 @@
-import buildTS from '@wessberg/rollup-plugin-ts';
+import buildTS from 'rollup-plugin-ts';
 import {terser} from 'rollup-plugin-terser';
 import ts from 'typescript';
 

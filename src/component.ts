@@ -41,7 +41,7 @@ export interface Component {
 
 type ShapeSpec = {offset: number, mask: number, value: number};
 
-export interface ComponentType<C extends Component> {
+export interface ComponentType<C> {
   new(): C;
   schema?: Schema;
   options?: ComponentOptions;
@@ -64,8 +64,8 @@ export interface ComponentType<C extends Component> {
 export class Binding<C> {
   declare readonlyMaster: C;
   declare writableMaster: C;
-  declare readonlyInstance: C & Component;
-  declare writableInstance: C & Component;
+  declare readonlyInstance: C;
+  declare writableInstance: C;
   declare readonly shapeOffset: number;
   declare readonly shapeMask: number;
   declare readonly shapeValue: number;
@@ -87,9 +87,9 @@ export class Binding<C> {
     this.writableMaster = this.writableInstance = new type();  // eslint-disable-line new-cap
     CHECK: {
       this.readonlyInstance = Object.create(this.readonlyMaster as any);
-      this.readonlyInstance.__invalid = !this.elastic && this.capacity > 1;
+      (this.readonlyInstance as Component).__invalid = !this.elastic && this.capacity > 1;
       this.writableInstance = Object.create(this.writableMaster as any);
-      this.writableInstance.__invalid = !this.elastic && this.capacity > 1;
+      (this.writableInstance as Component).__invalid = !this.elastic && this.capacity > 1;
     }
     this.shapeOffset = shapeSpec.offset;
     this.shapeMask = shapeSpec.mask;
@@ -139,7 +139,7 @@ export class Binding<C> {
     this.writableEntityId = entityId;
     this.writableIndex = index;
     CHECK: if (this.elastic || this.capacity > 1) {
-      this.writableInstance.__invalid = true;
+      (this.writableInstance as Component).__invalid = true;
       this.writableInstance = Object.create(this.writableMaster as any);
     }
     return this.writableInstance;
@@ -152,7 +152,7 @@ export class Binding<C> {
     this.readonlyEntityId = entityId;
     this.readonlyIndex = index;
     CHECK: if (this.elastic || this.capacity > 1) {
-      this.readonlyInstance.__invalid = true;
+      (this.readonlyInstance as Component).__invalid = true;
       this.readonlyInstance = Object.create(this.readonlyMaster as any);
     }
     return this.readonlyInstance;
