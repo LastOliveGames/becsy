@@ -71,6 +71,7 @@ export interface ControlOptions {
 }
 
 class Build extends System {
+  static __internal = true;
   __callback: (system: System) => void;
 
   start<CoFn extends CoroutineFunction>(coroutineFn: CoFn, ...args: Parameters<CoFn>): Coroutine {
@@ -83,6 +84,7 @@ class Build extends System {
 }
 
 class Validate extends System {
+  static __internal = true;
 }
 
 export enum State {
@@ -178,10 +180,24 @@ export class Dispatcher {
   ): SystemBox[] {
     const systems = [];
     const systemClasses = [];
+    const typeNames = new Set<string>();
+    let anonymousTypeCounter = 0;
     for (let i = 0; i < systemTypes.length; i++) {
       const SystemClass = systemTypes[i] as SystemType<System>;
       let box = this.systemsByClass.get(SystemClass);
       if (!box) {
+        if (!SystemClass.name) {
+          Object.defineProperty(
+            SystemClass, 'name', {value: `Anonymous_${anonymousTypeCounter++}`});
+        }
+        CHECK: if (!SystemClass.__internal) {
+          if (typeNames.has(SystemClass.name)) {
+            throw new CheckError(
+              `Multiple component types named ${SystemClass.name}; names must be unique`);
+          }
+          typeNames.add(SystemClass.name);
+        }
+        STATS: this.stats.forSystem(SystemClass);
         systemClasses.push(SystemClass);
         const system = new SystemClass();
         system.id = (i + 2) as SystemId;  // 0 and 1 are reserved for internal systems

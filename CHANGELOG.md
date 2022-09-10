@@ -1,4 +1,6 @@
 ### Upcoming
+- Started enforcing unique system and component type names as it's needed to keep correct stats.  Anonymous types will get an automatically generated name.
+- Made component and system types available in `world.stats.components` and `world.stats.systems`, so you can easily get a list of all component and system types for debugging purposes (and to plug as input into other Becsy APIs).
 
 ### 0.14.5
 - Added `trackMatches` modifier to track changes to the components that match a `withAny` clause.  This is particularly useful to trigger a handler whenever an entity's enum state changes but works with any set of components.  It can be mixed and matched with `trackWrites` but there's no way to tell which tracker caused an entity to be added to the `changed` set.

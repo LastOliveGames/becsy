@@ -17,6 +17,7 @@ import {component, ComponentType, Entity, field, Query, System, SystemType, Worl
 
 for (let i = 0; i < 30; i++) {
   @component class Foo { }  // eslint-disable-line @typescript-eslint/no-unused-vars
+  Object.defineProperty(Foo, 'name', {value: `Foo${i}`});
 }
 
 @component class E {

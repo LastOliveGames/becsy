@@ -18,6 +18,7 @@ import {CheckError, InternalError} from './errors';
 export interface SystemType<S extends System> {
   __system: true;
   __staticScheduler?: (s: ScheduleBuilder) => ScheduleBuilder;
+  __internal?: boolean;
   new(): S;
 }
 

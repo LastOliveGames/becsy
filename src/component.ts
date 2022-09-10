@@ -59,6 +59,7 @@ export interface ComponentType<C> {
   __bind?(id: EntityId, writable: boolean): C;
   __allocate?(id: EntityId): C;
   __free?(id: EntityId): void;
+  __internal?: boolean;
 }
 
 export class Binding<C> {

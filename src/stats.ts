@@ -1,5 +1,5 @@
 import type {ComponentType} from './component';
-import type {SystemType} from './system';
+import type {System, SystemType} from './system';
 
 const ALPHA = 0.05;
 function computeMovingAverage(average: number, value: number): number {
@@ -10,6 +10,8 @@ export class ComponentStats {
   private _numEntities = 0;
   maxEntities = 0;
   capacity = 0;
+
+  constructor(readonly type: ComponentType<any>) {}
 
   get numEntities(): number {
     return this._numEntities;
@@ -35,6 +37,8 @@ export class SystemStats {
   averageExecutionDuration = 0;
   private _lastCoroutinesDuration = 0;
   averageCoroutinesDuration = 0;
+
+  constructor(readonly type: SystemType<System>) {}
 
   get lastQueryUpdateDuration(): number {
     return this._lastQueryUpdateDuration;
@@ -64,8 +68,6 @@ export class SystemStats {
   }
 }
 
-const internalComponentStats = new ComponentStats();
-const internalSystemStats = new SystemStats();
 
 export class Stats {
   frames = 0;
@@ -124,13 +126,15 @@ export class Stats {
   }
 
   forComponent(type: ComponentType<any>): ComponentStats {
-    if (type.id === 0) return internalComponentStats;
-    return this.components[type.name] = this.components[type.name] ?? new ComponentStats();
+    const componentStats = this.components[type.name] ?? new ComponentStats(type);
+    if (!type.__internal) this.components[type.name] = componentStats;
+    return componentStats;
   }
 
   forSystem(type: SystemType<any>): SystemStats {
-    if (type.name === 'CallbackSystem') return internalSystemStats;
-    return this.systems[type.name] = this.systems[type.name] ?? new SystemStats();
+    const systemStats = this.systems[type.name] ?? new SystemStats(type);
+    if (!type.__internal) this.systems[type.name] = systemStats;
+    return systemStats;
   }
 
   toString(): string {

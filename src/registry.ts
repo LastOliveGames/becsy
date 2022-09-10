@@ -96,7 +96,7 @@ export class Registry {
   private readonly removalLog: Log;
   private readonly prevRemovalPointer: LogPointer;
   private readonly oldRemovalPointer: LogPointer;
-  readonly Alive: ComponentType<any> = class Alive {};
+  readonly Alive: ComponentType<any> = class Alive {static __internal = true;};
 
   constructor(
     maxEntities: number, maxLimboComponents: number, readonly types: ComponentType<any>[],
@@ -170,7 +170,18 @@ export class Registry {
   private prepareComponentTypesAndEnums(): AllocationItem[] {
     const pool: AllocationItem[] = [];
     const enumTypes = new Set<ComponentType<Component>>();
+    const typeNames = new Set<string>();
+    let anonymousTypeCounter = 0;
     for (const type of this.types) {
+      if (!type.name) {
+        Object.defineProperty(type, 'name', {value: `Anonymous_${anonymousTypeCounter++}`});
+      }
+      CHECK: if (!type.__internal) {
+        if (typeNames.has(type.name)) {
+          throw new CheckError(`Multiple component types named ${type.name}; names must be unique`);
+        }
+        typeNames.add(type.name);
+      }
       if (type.enum) {
         CHECK: if (!this.enums.includes(type.enum)) {
           throw new CheckError(
@@ -178,6 +189,7 @@ export class Registry {
         }
         if (!type.enum.__types.includes(type)) type.enum.__types.push(type);
       }
+      STATS: this.dispatcher.stats.forComponent(type);
     }
     for (const enumeration of this.enums) {
       CHECK: if (enumeration.__types.length > 2 ** 31) {
