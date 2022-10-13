@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.15.1
 - Relax concurrency requirements for the `update` entitlement, so it can run in parallel with any other entitlement.
 - Improve internal error messages for logs.
 
