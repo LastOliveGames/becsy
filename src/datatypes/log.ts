@@ -78,7 +78,8 @@ export class Log {
 
   commit(pointer?: LogPointer): boolean {
     DEBUG: if (!pointer && this.options.localProcessingAllowed) {
-      throw new InternalError('Cannot use blind commit when log local processing is allowed');
+      throw new InternalError(
+        `Cannot use blind commit when local processing is allowed in log ${this.configParamName}`);
     }
     if (!this.corral[0]) return true;
     if (pointer && !(
@@ -235,7 +236,7 @@ export class Log {
   countSince(startPointer: LogPointer, endPointer?: LogPointer): number {
     CHECK: this.checkPointers(startPointer, endPointer);
     DEBUG: if (this.corral[0]) {
-      throw new InternalError(`Should commit log before counting`);
+      throw new InternalError(`Should commit log ${this.configParamName} before counting`);
     }
     const startIndex = startPointer.index;
     const startGeneration = startPointer.generation;
@@ -255,7 +256,8 @@ export class Log {
       DEBUG: {
         if (startPointer.index > endPointer.index &&
             startPointer.generation >= endPointer.generation) {
-          throw new InternalError(`Start pointer exceeds end pointer`);
+          throw new InternalError(
+            `Start pointer exceeds end pointer in log ${this.configParamName}`);
         }
       }
     }
@@ -272,10 +274,11 @@ export class Log {
     }
     DEBUG: {
       if (pointer.corralGeneration > this.corral[1]) {
-        throw new InternalError('Pointer corral generation older than corral');
+        throw new InternalError(
+          `Pointer corral generation older than corral in log ${this.configParamName}`);
       }
       if (pointer.corralGeneration === this.corral[1] && pointer.corralIndex > this.corral[0]) {
-        throw new InternalError('Pointer past end of log corral area');
+        throw new InternalError(`Pointer past end of corral area in log ${this.configParamName}`);
       }
     }
   }

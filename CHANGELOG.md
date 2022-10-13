@@ -1,5 +1,6 @@
 ### Upcoming
 - Relax concurrency requirements for the `update` entitlement, so it can run in parallel with any other entitlement.
+- Improve internal error messages for logs.
 
 ### 0.15.0
 - Started enforcing unique system and component type names as it's needed to keep correct stats.  Anonymous types will get an automatically generated name.
