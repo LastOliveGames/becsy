@@ -483,8 +483,8 @@ export class QueryBuilder {
    * Marks the most recently mentioned component types as indirectly updated by the system.  This
    * covers automatic change propagation to non-writable fields such as updates of `backrefs`
    * properties; however, it doesn't cover automatic clearing of refs to a deleted entity.  It can
-   * run concurrently with other `read` and `update` entitlements but counts as a `write` for
-   * purposes of system ordering.
+   * run concurrently with any other entitlements and counts as a `write` for purposes of system
+   * ordering.
    */
   get update(): this {
     this.set(this.__system.accessMasks.update);
