@@ -236,7 +236,7 @@ describe('testing enum components', () => {
     world.build(sys => {
       e1.write(Start).value = 2;
     });
-    world.execute();
+    await world.execute();
     expect(message).toBe('1');
   });
 

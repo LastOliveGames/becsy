@@ -102,6 +102,7 @@ export class Dispatcher {
   private default: {group: SystemGroup, frame: Frame};
   lastTime: number;
   executing: boolean;
+  private executingSyncFrame: boolean;
   state = State.init;
   readonly shapeLog: Log;
   readonly writeLog?: Log;
@@ -114,7 +115,6 @@ export class Dispatcher {
   readonly buffers: Buffers;
   readonly singleton?: Entity;
   private buildSystem: Build;
-  private callback: {group: SystemGroup, frame: Frame};
   private readonly deferredControls = new Map<SystemBox, RunState>();
 
   constructor({
@@ -226,7 +226,6 @@ export class Dispatcher {
     box.accessMasks.check = undefined;
     this.systems.push(box);
     this.systemsByClass.set(Build, box);
-    this.callback = this.createSingleGroupFrame([Build]);
   }
 
   private createValidateSystem(componentTypes: ComponentType<any>[]): SystemBox {
@@ -339,34 +338,38 @@ export class Dispatcher {
   }
 
   async initialize(): Promise<void> {
-    this.default.frame.begin();
+    await this.default.frame.begin();
     this.state = State.setup;
     await this.default.group.__plan.initialize();
-    this.default.frame.end();
+    await this.default.frame.end();
     STATS: this.stats.frames -= 1;
   }
 
   private async finalize(): Promise<void> {
-    this.default.frame.begin();
+    await this.default.frame.begin();
     this.state = State.done;
     await this.default.group.__plan.finalize();
-    this.default.frame.end();
+    await this.default.frame.end();
     STATS: this.stats.frames -= 1;
     this.registry.releaseComponentTypes();
   }
 
   async execute(time?: number, delta?: number): Promise<void> {
-    this.default.frame.begin();
+    await this.default.frame.begin();
     await this.default.frame.execute(this.default.group, time, delta);
-    this.default.frame.end();
+    await this.default.frame.end();
   }
 
   executeFunction(fn: (system: System) => void): void {
-    this.callback.frame.begin();
+    // This inlines the code for Frame begin/execute/end to make it synchronous.
+    this.startFrame(this.lastTime);
+    CHECK: this.executingSyncFrame = true;
     this.buildSystem.__callback = fn;
-    // We know this execution will always be synchronous.
-    this.callback.frame.execute(this.callback.group, 0, 0);
-    this.callback.frame.end();
+    this.systemsByClass.get(Build)!.execute(this.lastTime, 0);
+    this.flush();
+    this.completeCycle();
+    this.completeFrame();  // async only if termination pending, but it's forbidden in this context
+    CHECK: this.executingSyncFrame = false;
     // This is not really a frame, so back out the count.
     STATS: this.stats.frames -= 1;
   }
@@ -388,12 +391,13 @@ export class Dispatcher {
     this.lastTime = time;
   }
 
-  async completeFrame(): Promise<void> {
+  completeFrame(): Promise<void> {
     DEBUG: if (!this.executing) throw new InternalError('No frame executing');
     this.executing = false;
     STATS: this.gatherFrameStats();
     this.processDeferredControls();
-    if (this.state === State.finish) await this.finalize();
+    if (this.state === State.finish) return this.finalize();
+    return Promise.resolve();
   }
 
   gatherFrameStats(): void {
@@ -413,6 +417,9 @@ export class Dispatcher {
     CHECK: {
       if (this.state !== State.setup && this.state !== State.run) {
         throw new CheckError('World terminated');
+      }
+      if (this.executingSyncFrame) {
+        throw new CheckError('Cannot terminate world from within build callback');
       }
     }
     this.state = State.finish;

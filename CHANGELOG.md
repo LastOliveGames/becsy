@@ -1,4 +1,5 @@
 ### Upcoming
+- Properly block on internal async function calls when executing a frame, even though the functions are effectively synchronous when running single-threaded, to ensure that some exceptions aren't accidentally discarded.
 
 ### 0.15.1
 - Relax concurrency requirements for the `update` entitlement, so it can run in parallel with any other entitlement.
