@@ -341,7 +341,7 @@ export class RefIndexer {
     tracker = new Tracker(targetId, selector, false, this.dispatcher);
     this.trackers.set(targetId | (selector.id << ENTITY_ID_BITS), tracker);
     if (selector.trackStale) {
-      staleTracker = new Tracker(targetId, selector, true,this.dispatcher);
+      staleTracker = new Tracker(targetId, selector, true, this.dispatcher);
       this.trackers.set(targetId | (selector.id << ENTITY_ID_BITS) | 2 ** 31, staleTracker);
     }
     return stale ? staleTracker! : tracker;

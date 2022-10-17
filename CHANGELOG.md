@@ -1,4 +1,5 @@
 ### Upcoming
+- Prevent an internal error when deleting an entity that has refs to it while tracking writes.
 
 ### 0.15.2
 - Properly block on internal async function calls when executing a frame, even though the functions are effectively synchronous when running single-threaded, to ensure that some exceptions aren't accidentally discarded.

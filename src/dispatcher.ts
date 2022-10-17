@@ -375,8 +375,9 @@ export class Dispatcher {
   }
 
   completeCycle(): void {
-    this.registry.completeCycle();
+    this.registry.completeCycle();  // may update writeLog
     this.indexer.completeCycle();
+    this.writeLog?.commit();
   }
 
   startFrame(time: number): void {
