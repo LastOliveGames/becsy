@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.15.2
 - Properly block on internal async function calls when executing a frame, even though the functions are effectively synchronous when running single-threaded, to ensure that some exceptions aren't accidentally discarded.
 
 ### 0.15.1
