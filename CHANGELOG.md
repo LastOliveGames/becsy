@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.15.3
 - Prevent an internal error when deleting an entity that has refs to it while tracking writes.
 
 ### 0.15.2
