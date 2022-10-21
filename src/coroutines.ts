@@ -139,13 +139,11 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
   ) {}
 
   __checkCancelation(): void {
-    if (this.__firstRun) this.__supervisor.cancelMatching(this, this.__scope, this.__fn);
-    if (!this.__done) {
-      for (const canceller of this.__cancellers) {
-        if (canceller()) {
-          this.cancel();
-          break;
-        }
+    if (this.__done) return;
+    for (const canceller of this.__cancellers) {
+      if (canceller()) {
+        this.cancel();
+        break;
       }
     }
   }
