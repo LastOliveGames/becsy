@@ -139,10 +139,7 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
   ) {}
 
   __checkCancelation(): void {
-    if (this.__firstRun) {
-      this.__firstRun = false;
-      this.__supervisor.cancelMatching(this, this.__scope, this.__fn);
-    }
+    if (this.__firstRun) this.__supervisor.cancelMatching(this, this.__scope, this.__fn);
     if (!this.__done) {
       for (const canceller of this.__cancellers) {
         if (canceller()) {
@@ -154,7 +151,7 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
   }
 
   __step(): void {
-    currentCoroutine = this;
+    currentCoroutine = this;  // eslint-disable-line @typescript-eslint/no-this-alias
     try {
       if (!this.__done && (this.__blocker?.isReady() ?? true)) {
         try {
@@ -163,6 +160,10 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
             next = this.__generator.throw(this.__blocker.error);
           } else {
             next = this.__generator.next(this.__blocker?.value);
+          }
+          if (this.__firstRun) {
+            this.__firstRun = false;
+            this.__supervisor.cancelMatching(this, this.__scope, this.__fn);
           }
           if (next.done) {
             this.__done = true;

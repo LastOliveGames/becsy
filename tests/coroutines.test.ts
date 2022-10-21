@@ -17,6 +17,16 @@ class StartCoroutine extends System {
   }
 }
 
+class StartCoroutineTwice extends System {
+  turn = 0;
+
+  execute() {
+    switch (this.turn++) {
+      case 0: case 1: coroutineHandle = this.start(coroutine); break;
+    }
+  }
+}
+
 class StartNestedCoroutine extends System {
   initialize(): void {
     wrapperHandle = this.wrap();
@@ -357,14 +367,34 @@ describe('test cancelling', () => {
     expect(counter).toBe(1);
   });
 
-  it('cancels a coroutine if another coroutine starts', async () => {
+  it('cancels a coroutine if started again', async () => {
     let entity: Entity;
+    coroutine = function*() {
+      co.scope(entity);
+      co.cancelIfCoroutineStarted();
+      while (true) {
+        counter += 1;
+        yield;
+      }
+    };
+    const world = await createWorld(StartCoroutineTwice);
+    world.build(sys => {
+      entity = sys.createEntity().hold();  // eslint-disable-line @typescript-eslint/no-unused-vars
+    });
+    await world.execute();
+    expect(counter).toBe(1);
+    await world.execute();
+    expect(counter).toBe(2);
+    await world.execute();
+    expect(counter).toBe(3);
+    await world.execute();
+    expect(counter).toBe(4);
+  });
+
+  it('cancels a coroutine if another coroutine starts', async () => {
     const world = await createWorld(StartTwoCoroutines, {
       deco1: (co1: Coroutine) => co1.cancelIfCoroutineStarted(),
       deco2: (co2: Coroutine) => co2
-    });
-    world.build(sys => {
-      entity = sys.createEntity().hold();  // eslint-disable-line @typescript-eslint/no-unused-vars
     });
     await world.execute();
     expect(counter).toBe(1);
@@ -409,13 +439,9 @@ describe('test cancelling', () => {
   });
 
   it('cancels a coroutine if the given coroutine starts', async () => {
-    let entity: Entity;
     const world = await createWorld(StartTwoCoroutines, {
       deco1: (co1: Coroutine) => co1.cancelIfCoroutineStarted(StartTwoCoroutines.prototype.fn2),
       deco2: (co2: Coroutine) => co2
-    });
-    world.build(sys => {
-      entity = sys.createEntity().hold();  // eslint-disable-line @typescript-eslint/no-unused-vars
     });
     await world.execute();
     expect(counter).toBe(1);
@@ -426,13 +452,9 @@ describe('test cancelling', () => {
   });
 
   it('does not cancel a coroutine if a coroutine other than given starts', async () => {
-    let entity: Entity;
     const world = await createWorld(StartTwoCoroutines, {
       deco1: (co1: Coroutine) => co1.cancelIfCoroutineStarted(StartTwoCoroutines.prototype.fn1),
       deco2: (co2: Coroutine) => co2
-    });
-    world.build(sys => {
-      entity = sys.createEntity().hold();  // eslint-disable-line @typescript-eslint/no-unused-vars
     });
     await world.execute();
     expect(counter).toBe(1);
@@ -443,13 +465,9 @@ describe('test cancelling', () => {
   });
 
   it('does not cancel itself', async () => {
-    let entity: Entity;
     const world = await createWorld(StartTwoCoroutines, {
       deco1: (co1: Coroutine) => co1.cancelIfCoroutineStarted(),
       deco2: (co2: Coroutine) => co2.cancelIfCoroutineStarted()
-    });
-    world.build(sys => {
-      entity = sys.createEntity().hold();  // eslint-disable-line @typescript-eslint/no-unused-vars
     });
     await world.execute();
     expect(counter).toBe(1);

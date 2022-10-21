@@ -1,4 +1,5 @@
 ### Upcoming
+- Correctly cancel mutually exclusive scoped coroutines that declare their scope from *inside* the coroutine.
 
 ### 0.15.3
 - Prevent an internal error when deleting an entity that has refs to it while tracking writes.
