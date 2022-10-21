@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.15.4
 - Correctly cancel mutually exclusive scoped coroutines that declare their scope from *inside* the coroutine.
 
 ### 0.15.3
