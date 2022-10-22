@@ -156,12 +156,15 @@ class CoroutineImpl<T> implements Coroutine, Waitable<T>, CoroutineGenerator {
           let next;
           if (this.__blocker?.error) {
             next = this.__generator.throw(this.__blocker.error);
+          } else if (this.__firstRun) {
+            try {
+              next = this.__generator.next(this.__blocker?.value);
+            } finally {
+              this.__firstRun = false;
+              this.__supervisor.cancelMatching(this, this.__scope, this.__fn);
+            }
           } else {
             next = this.__generator.next(this.__blocker?.value);
-          }
-          if (this.__firstRun) {
-            this.__firstRun = false;
-            this.__supervisor.cancelMatching(this, this.__scope, this.__fn);
           }
           if (next.done) {
             this.__done = true;

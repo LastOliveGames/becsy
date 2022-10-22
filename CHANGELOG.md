@@ -1,4 +1,5 @@
 ### Upcoming
+- Ensure `cancelIfCoroutineStarted` is respected even if coroutine throws an exception when invoked.
 
 ### 0.15.4
 - Correctly cancel mutually exclusive scoped coroutines that declare their scope from *inside* the coroutine.
