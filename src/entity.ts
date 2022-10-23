@@ -67,7 +67,7 @@ export class EntityImpl {
     }
     this.__registry.setShape(this.__id, type);
     STATS: this.__registry.dispatcher.stats.forComponent(type).numEntities += 1;
-    initComponent(type, this.__id, values);
+    initComponent(type, this.__id, values, false);
   }
 
   /**

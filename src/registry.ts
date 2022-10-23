@@ -6,7 +6,7 @@ import {
   Component
 } from './component';
 import {ComponentEnum} from './enums';
-import {Log, LogPointer} from './datatypes/log';
+import type {Log, LogPointer} from './datatypes/log';
 import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/intpool';
 import type {Dispatcher} from './dispatcher';
 import {Entity, EntityId, EntityImpl} from './entity';
@@ -93,14 +93,13 @@ export class Registry {
   hasNegativeQueries = false;
   nextEntityOrdinal = 0;
   entityOrdinals: Uint32Array;
-  private readonly removalLog: Log;
   private readonly prevRemovalPointer: LogPointer;
   private readonly oldRemovalPointer: LogPointer;
   readonly Alive: ComponentType<any> = class Alive {static __internal = true;};
 
   constructor(
-    maxEntities: number, maxLimboComponents: number, readonly types: ComponentType<any>[],
-    readonly enums: ComponentEnum[], readonly dispatcher: Dispatcher
+    maxEntities: number, readonly types: ComponentType<any>[], readonly enums: ComponentEnum[],
+    private readonly removalLog: Log, readonly dispatcher: Dispatcher
   ) {
     this.allocationItems = this.prepareComponentTypesAndEnums();
     for (const item of this.allocationItems) this.numShapeBits += item.size;
@@ -120,7 +119,6 @@ export class Registry {
     this.pool = new EntityPool(this, maxEntities);
     CHECK: this.heldEntities = [];
     CHECK: this.validators = [];
-    this.removalLog = new Log(maxLimboComponents, 'maxLimboComponents', dispatcher.buffers);
     this.prevRemovalPointer = this.removalLog.createPointer();
     this.oldRemovalPointer = this.removalLog.createPointer();
   }
@@ -275,17 +273,31 @@ export class Registry {
       if (typeof value === 'function') value = undefined; else i++;
       this.setShape(id, type);
       STATS: this.dispatcher.stats.forComponent(type).numEntities += 1;
-      initComponent(type, id, value);
+      if (this.dispatcher.threaded &&
+          this.executingSystem?.safeCreateComponentTypes.get(type.id!)) {
+        if (!initComponent(type, id, value, true)) {
+          // TODO: punt component creation back to the director
+        }
+      } else {
+        initComponent(type, id, value, false);
+      }
     }
   }
 
   flush(): void {
-    const lastExecutingSystem = this.executingSystem;
+    this.flushLaborer();
+    this.removalLog.commit();
+  }
+
+  flushLaborer(): void {
     this.includeRecentlyDeleted = false;
-    CHECK: this.validateShapes(lastExecutingSystem);
+    CHECK: this.validateShapes();
     this.executingSystem = undefined;
     this.pool.returnTemporaryBorrows();
-    this.removalLog.commit();
+  }
+
+  flushDirector(laneId: number): void {
+    this.removalLog.commit(laneId);
   }
 
   completeCycle(): void {
@@ -293,7 +305,12 @@ export class Registry {
     CHECK: this.invalidateDeletedHeldEntities();
   }
 
-  private validateShapes(system: SystemBox | undefined): void {
+  updateNextEntityOrdinal(value: number | undefined): void {
+    if (value !== undefined) this.nextEntityOrdinal = Math.max(this.nextEntityOrdinal, value);
+  }
+
+  private validateShapes(): void {
+    const system = this.executingSystem;
     this.executingSystem = this.validateSystem;
     for (const entityId of this.reshapedEntityIds) {
       for (const componentType of this.validators) {
@@ -319,7 +336,6 @@ export class Registry {
 
   private processRemovalLog(): void {
     const indexer = this.dispatcher.indexer;
-    this.removalLog.commit();
     this.entityIdPool.mark();
     let numDeletedEntities = 0;
     let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;

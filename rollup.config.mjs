@@ -31,7 +31,7 @@ export default [
         sourcemap: true,
       },
     ],
-    external: ['util'],
+    external: ['util', 'worker_threads'],
     plugins: [
       buildTS(),
     ]
@@ -52,7 +52,7 @@ export default [
         sourcemap: true,
       },
     ],
-    external: ['util'],
+    external: ['util', 'worker_threads'],
     plugins: [
       buildTS({transformers: {before: [labeledBlockRemover(['CHECK', 'DEBUG', 'STATS'])]}}),
     ]
@@ -73,7 +73,7 @@ export default [
         sourcemap: true,
       },
     ],
-    external: ['util'],
+    external: ['util', 'worker_threads'],
     plugins: [
       buildTS(), terser()
     ]
@@ -94,7 +94,7 @@ export default [
         sourcemap: true,
       },
     ],
-    external: ['util'],
+    external: ['util', 'worker_threads'],
     plugins: [
       buildTS({transformers: {before: [labeledBlockRemover(['CHECK', 'DEBUG', 'STATS'])]}}),
       terser()

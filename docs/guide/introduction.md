@@ -37,6 +37,7 @@ From bitecs we take:<br>
 
 Then we add:<br>
 :white_check_mark: a native TypeScript implementation<br>
+:white_check_mark: multithreaded system execution<br>
 :white_check_mark: selectable component storage strategies<br>
 :white_check_mark: bidirectional entity references with strong referential integrity<br>
 :white_check_mark: declarative system ordering based on data dependencies<br>

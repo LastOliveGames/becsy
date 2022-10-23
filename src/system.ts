@@ -13,6 +13,7 @@ import type {SystemStats} from './stats';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import {co, Coroutine, CoroutineFunction, Supervisor} from './coroutines';
 import {CheckError, InternalError} from './errors';
+import {Bitset} from './datatypes/bitset';
 
 
 export interface SystemType<S extends System> {
@@ -336,6 +337,11 @@ export class SystemBox {
   declare hasWriteQueries: boolean;
   declare private hasTransientQueries: boolean;
   declare private ranQueriesLastFrame: boolean;
+  declare readonly safeCreateComponentTypes: Bitset;
+  declare readonly hasCustomPrepare: boolean;
+  declare readonly hasCustomInitialize: boolean;
+  declare readonly hasCustomExecute: boolean;
+  declare readonly hasCustomFinalize: boolean;
   declare private shapeLogPointer: LogPointer;
   declare private writeLogPointer?: LogPointer;
   declare private state: RunState;
@@ -345,10 +351,12 @@ export class SystemBox {
   declare private singletonStandingWrites: ComponentType<any>[];
   declare private propsAssigned: boolean;
   declare lane?: Lane;
+  declare readonly excludedSystemIds: SystemId[];
+  declare completionLaneImpacts: number[];
   declare stateless: boolean;
   declare weight: number;
 
-  get id(): number {return this.system.id;}
+  get id(): SystemId {return this.system.id;}
   get name(): string {return this.system.name;}
   toString(): string {return this.name;}
 
@@ -361,8 +369,14 @@ export class SystemBox {
     this.writeQueriesByComponent = [];
     this.state = RunState.RUNNING;
     this.propsAssigned = false;
+    this.excludedSystemIds = [];
     this.stateless = false;
     this.weight = 1;
+    this.safeCreateComponentTypes = new Bitset(dispatcher.registry.types.length);
+    this.hasCustomPrepare = system.prepare !== System.prototype.prepare;
+    this.hasCustomInitialize = system.initialize !== System.prototype.initialize;
+    this.hasCustomExecute = system.execute !== System.prototype.execute;
+    this.hasCustomFinalize = system.finalize !== System.prototype.finalize;
     this.shapeLogPointer = dispatcher.shapeLog.createPointer();
     STATS: this.stats = dispatcher.stats.forSystem(system.constructor as SystemType<any>);
     this.attachedSystems = this.system.__attachPlaceholders!.map(

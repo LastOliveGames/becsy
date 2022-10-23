@@ -703,7 +703,8 @@ class RefType extends Type<Entity | undefined> {
 
     field.updateBuffer = () => {
       binding.dispatcher.buffers.register(
-        bufferKey, binding.capacity, Int32Array, (newData: Int32Array) => {data = newData;}, -1
+        bufferKey, binding.capacity, Int32Array, (newData: Int32Array) => {data = newData;},
+        {filler: -1}
       );
     };
     field.updateBuffer();
@@ -768,7 +769,7 @@ class RefType extends Type<Entity | undefined> {
   defineFixed<C>(binding: Binding<C>, field: Field<Entity | undefined>): void {
     const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
     const data = binding.dispatcher.buffers.register(
-      bufferKey, binding.capacity, Int32Array, undefined, -1
+      bufferKey, binding.capacity, Int32Array, undefined, {filler: -1}
     );
     const indexer = binding.dispatcher.indexer;
     const registry = binding.dispatcher.registry;

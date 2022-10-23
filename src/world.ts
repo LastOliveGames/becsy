@@ -1,10 +1,11 @@
 import type {Component, ComponentType} from './component';
-import {ControlOptions, Dispatcher, State, WorldOptions} from './dispatcher';
+import {ControlOptions, DispatcherCore, State, WorldOptions} from './dispatcher';
 import {ComponentEnum} from './enums';
 import {CheckError} from './errors';
-import {Frame, FrameImpl, SystemGroup} from './schedule';
+import type {Frame, SystemGroup} from './schedule';
 import type {Stats} from './stats';
 import type {System} from './system';
+import {bootstrapThread} from './workers';
 
 const MAGIC_COOKIE = {};
 
@@ -14,7 +15,7 @@ const MAGIC_COOKIE = {};
  * Normally you'll create just one world for your game or app.
  */
 export class World {
-  private readonly __dispatcher: Dispatcher;
+  private __dispatcher?: DispatcherCore;
 
   /**
    * Creates a world that contains entities, components and systems.  All systems will be
@@ -29,8 +30,9 @@ export class World {
    * @returns A promise of a new world to do with as you please.
    */
   static async create(options: WorldOptions = {}): Promise<World> {
-    const world = new World(options, MAGIC_COOKIE);
-    await world.__dispatcher.initialize();
+    const world = new World(MAGIC_COOKIE);
+    world.__dispatcher = await bootstrapThread(options);
+    await world.__dispatcher?.initialize();
     return world;
   }
 
@@ -69,13 +71,12 @@ export class World {
   /**
    * This is a private constructor, please use the World.create() method instead.
    */
-  private constructor(options: WorldOptions, magicCookie: any) {
+  private constructor(magicCookie: any) {
     CHECK: {
       if (magicCookie !== MAGIC_COOKIE) {
         throw new CheckError(`Don't call World constructor directly; use World.create instead`);
       }
     }
-    this.__dispatcher = new Dispatcher(options);
   }
 
   /**
@@ -91,12 +92,13 @@ export class World {
    */
   build(callback: (system: System) => void): void {
     CHECK: {
-      if (this.__dispatcher.state !== State.setup &&
+      this.__checkOnMainThread();
+      if (this.__dispatcher!.state !== State.setup &&
           (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
         throw new CheckError('This method cannot be called after the world has started executing');
       }
     }
-    this.__dispatcher.executeFunction(callback);
+    this.__dispatcher!.executeFunction(callback);
   }
 
   /**
@@ -108,12 +110,13 @@ export class World {
    */
   createEntity(...initialComponents: (ComponentType<any> | Record<string, unknown>)[]): void {
     CHECK: {
-      if (this.__dispatcher.state !== State.setup &&
+      this.__checkOnMainThread();
+      if (this.__dispatcher!.state !== State.setup &&
         (typeof process === 'undefined' || process.env.NODE_ENV !== 'test')) {
         throw new CheckError('This method cannot be called after the world has started executing');
       }
     }
-    this.__dispatcher.createEntity(initialComponents);
+    this.__dispatcher!.createEntity(initialComponents);
   }
 
   /**
@@ -130,7 +133,8 @@ export class World {
    * used internally so you can pass in any numeric value that's expected by your systems.
    */
   execute(time?: number, delta?: number): Promise<void> {
-    return this.__dispatcher.execute(time, delta);
+    CHECK: this.__checkOnMainThread();
+    return this.__dispatcher!.execute(time, delta);
   }
 
   /**
@@ -146,7 +150,8 @@ export class World {
    * @param options The control instructions.
    */
   control(options: ControlOptions): void {
-    this.__dispatcher.control(options);
+    CHECK: this.__checkOnMainThread();
+    this.__dispatcher!.control(options);
   }
 
   /**
@@ -169,7 +174,8 @@ export class World {
    * @returns A frame executor that lets you manually run system groups within a frame.
    */
   createCustomExecutor(...groups: SystemGroup[]): Frame {
-    return new FrameImpl(this.__dispatcher, groups);
+    CHECK: this.__checkOnMainThread();
+    return this.__dispatcher!.createCustomExecutor(groups);
   }
 
   /**
@@ -177,11 +183,26 @@ export class World {
    * terminated and no further executions will be allowed.
    */
   async terminate(): Promise<void> {
-    await this.__dispatcher.terminate();
+    CHECK: {
+      this.__checkOnMainThread();
+      if (this.__dispatcher!.state !== State.setup && this.__dispatcher!.state !== State.run) {
+        throw new Error('World terminated');
+      }
+    }
+    await this.__dispatcher!.terminate();
   }
 
   get stats(): Stats {
-    return this.__dispatcher.stats;
+    CHECK: this.__checkOnMainThread();
+    return this.__dispatcher!.stats;
+  }
+
+  get onMainThread(): boolean {
+    return !!this.__dispatcher;
+  }
+
+  private __checkOnMainThread(): void {
+    if (!this.onMainThread) throw new Error('You can only call World methods on the main thread');
   }
 
   /**
@@ -189,7 +210,7 @@ export class World {
    * (false).
    */
   get alive(): boolean {
-    return this.__dispatcher.state !== State.done;
+    return this.__dispatcher!.state !== State.done;
   }
 }
 

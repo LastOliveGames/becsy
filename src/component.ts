@@ -58,6 +58,7 @@ export interface ComponentType<C> {
   __binding?: Binding<C>;
   __bind?(id: EntityId, writable: boolean): C;
   __allocate?(id: EntityId): C;
+  __allocateForCreate?(id: EntityId): C | undefined;
   __free?(id: EntityId): void;
   __internal?: boolean;
 }
@@ -165,6 +166,7 @@ export class Binding<C> {
 
 interface Storage {
   acquireIndex(id: EntityId): number;
+  acquireSafeNewIndex(id: EntityId): number;
   releaseIndex(id: EntityId): void;
 }
 
@@ -216,6 +218,35 @@ class PackedStorage implements Storage {
     return index;
   }
 
+  acquireSafeNewIndex(id: number): number {
+    let index: number;
+    const spareIndex = Atomics.sub(this.spares, 3, 1);
+    if (spareIndex >= 0) {
+      index = this.spares[spareIndex + 4];
+    } else {
+      Atomics.store(this.spares, 3, 0);
+      const capacity = this.spares[2];
+      const nextIndex = Atomics.add(this.spares, 1, 1);
+      if (nextIndex < capacity) {
+        index = nextIndex;
+      } else {
+        Atomics.store(this.spares, 1, capacity);
+        CHECK: if (!this.binding.elastic) {
+          throw new CheckError(
+            `Storage exhausted for component ${this.binding.type.name}; ` +
+            `raise its capacity above ${this.binding.capacity}`);
+        }
+        DEBUG: if (this.binding.capacity === this.maxEntities) {
+          throw new InternalError('Trying to grow storage index beyond maxEntities');
+        }
+        // Return -1 to indicate that we can't safely allocate an index.
+        return -1;
+      }
+    }
+    Atomics.store(this.index, index, id);
+    return index;
+  }
+
   releaseIndex(id: number): void {
     DEBUG: if (this.index[id] === -1) {
       throw new InternalError(
@@ -234,7 +265,7 @@ class PackedStorage implements Storage {
     if (!this.index || elementSizeChanged) {
       this.binding.dispatcher.buffers.register(
         `component.${this.binding.type.id!}.storage.index`, this.maxEntities, ArrayType,
-        (index: any) => {this.index = index;}, -1
+        (index: any) => {this.index = index;}, {filler: -1}
       );
     }
     if (elementSizeChanged) {
@@ -312,6 +343,25 @@ class CompactStorage implements Storage {
     return firstEmpty;
   }
 
+  acquireSafeNewIndex(id: EntityId): number {
+    for (let i = 0; i < this.index.length; i++) {
+      const currentId = Atomics.compareExchange(this.index, i, -1, id);
+      if (currentId === -1) {
+        Atomics.store(this.index, i, id);
+        return i;
+      }
+    }
+    CHECK: if (!this.binding.elastic) {
+      throw new CheckError(
+        `Storage exhausted for component ${this.binding.type.name}; ` +
+        `raise its capacity above ${this.binding.capacity}`);
+    }
+    DEBUG: if (this.binding.capacity === this.maxEntities) {
+      throw new InternalError('Trying to grow storage index beyond maxEntities');
+    }
+    return -1;
+  }
+
   releaseIndex(id: number): void {
     for (let i = 0; i < this.index.length; i++) {
       if (this.index[i] === id) {
@@ -328,7 +378,7 @@ class CompactStorage implements Storage {
     STATS: this.binding.dispatcher.stats.forComponent(this.binding.type).capacity = capacity;
     this.binding.dispatcher.buffers.register(
       `component.${this.binding.type.id!}.storage.index`, capacity, Int32Array,
-      this.updateIndex.bind(this), -1
+      this.updateIndex.bind(this), {filler: -1}
     );
     if (this.binding.elastic) for (const field of this.fields) field.updateBuffer!();
   }
@@ -340,7 +390,13 @@ class CompactStorage implements Storage {
 }
 
 
-export function initComponent(type: ComponentType<any>, id: EntityId, values: any): void {
+export function initComponent(
+  type: ComponentType<any>, id: EntityId, values: any, safeCreate: false): true;
+export function initComponent(
+  type: ComponentType<any>, id: EntityId, values: any, safeCreate: true): boolean;
+export function initComponent(
+  type: ComponentType<any>, id: EntityId, values: any, safeCreate: boolean
+): boolean {
   CHECK: {
     checkTypeDefined(type);
     if (values !== undefined) {
@@ -351,12 +407,14 @@ export function initComponent(type: ComponentType<any>, id: EntityId, values: an
       }
     }
   }
-  const component = type.__allocate!(id);
+  const component = safeCreate ? type.__allocateForCreate!(id) : type.__allocate!(id);
+  if (!component) return false;
   if (values) {
     type.__binding!.init(component, values);
   } else {
     type.__binding!.initDefault(component);
   }
+  return true;
 }
 
 
@@ -442,6 +500,7 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
       type.__allocate = (id: EntityId): C => {
         return binding.resetWritableInstance(id, id);
       };
+      type.__allocateForCreate = type.__allocate;
       break;
 
     case 'packed': {
@@ -454,6 +513,9 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
       };
       type.__allocate = (id: EntityId): C => {
         return binding.resetWritableInstance(id, storageManager.acquireIndex(id));
+      };
+      type.__allocateForCreate = (id: EntityId): C | undefined => {
+        return binding.resetWritableInstance(id, storageManager.acquireSafeNewIndex(id));
       };
       type.__free = (id: EntityId): void => {
         storageManager.releaseIndex(id);
@@ -472,6 +534,9 @@ export function defineAndAllocateComponentType<C extends Component>(type: Compon
       type.__allocate = (id: EntityId): C => {
         return binding.resetWritableInstance(id, storageManager.acquireIndex(id));
       };
+      type.__allocateForCreate = (id: EntityId): C | undefined => {
+        return binding.resetWritableInstance(id, storageManager.acquireSafeNewIndex(id));
+      };
       type.__free = (id: EntityId): void => {
         storageManager.releaseIndex(id);
       };
@@ -489,6 +554,7 @@ export function dissimilateComponentType(type: ComponentType<any>): void {
   delete type.__binding;
   delete type.__bind;
   delete type.__allocate;
+  delete type.__allocateForCreate;
   delete type.__free;
 }
 

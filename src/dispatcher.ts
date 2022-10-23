@@ -1,12 +1,12 @@
 import type {ComponentStorage, ComponentType} from './component';
-import {Entity, extendMaskAndSetFlag} from './entity';
-import {MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './consts';
+import {Entity, EntityId, extendMaskAndSetFlag} from './entity';
+import {MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES, MAX_NUM_LANES} from './consts';
 import {Log, LogPointer} from './datatypes/log';
 import {RunState, System, SystemBox, SystemId, SystemType} from './system';
 import {Registry} from './registry';
 import {Stats} from './stats';
 import {RefIndexer} from './refindexer';
-import {Buffers} from './buffers';
+import {Buffers, Patch} from './buffers';
 import {
   componentTypes as decoratedComponentTypes, systemTypes as decoratedSystemTypes
 } from './decorators';
@@ -14,6 +14,7 @@ import {Frame, FrameImpl, SystemGroup, SystemGroupImpl} from './schedule';
 import {Planner} from './planner';
 import type {Coroutine, CoroutineFunction} from './coroutines';
 import {CheckError, InternalError} from './errors';
+import type {Director} from './workers';
 import {ComponentEnum} from './enums';
 
 
@@ -42,7 +43,44 @@ export interface WorldOptions {
    * decorated with @component or @system will be included automatically.
    */
   defs?: DefsArray;
+
+  /**
+   * The maximum number of threads to use simultaneously when executing systems.  If set to 0 or
+   * below, it's interpreted as an offset from the browser's reported number of available cores. (So
+   * `-1` would request the use of all but one core.)  The number defaults to 1, i.e. the thread
+   * where you created the world.
+   *
+   * If the number of threads is more than 1, one of the threads will be the browser's main (window)
+   * thread.  Only systems that must run on the main thread will be allocated to it; if that's not
+   * enough to keep the thread busy then it'll stay idle and the cores may be under-utilized.  If
+   * you know this is the case for your systems you can always request one more thread than there
+   * are cores.
+   *
+   * If more than one thread is requested, creating the world will automatically allocate multiple
+   * workers.  You must specify the {@link WorldOptions.workerPath}.
+   *
+   * If you requested more than one thread then you need to explicitly {@link World.terminate} the
+   * world to deallocate the workers (unless you just exit the process / page).
+   */
   threads?: number;
+
+  /**
+   * The path from which to load the code for workers.  On Node, you can use the `__filename` of
+   * your main module to load the same code as the main thread. In a browser you must provide a path
+   * that points to a script of the appropriate type based on {@link workerModule}.
+   *
+   * It is crucial that the code referenced by this path initialize the world with *exactly* the
+   * same options.  Ideally, you'd load the same code as in the main thread and use
+   * {@link World.onMainThread} to limit your world setup and execution code to the main thread
+   * only.
+   */
+  workerPath?: string;
+
+  /**
+   * Whether the {@link workerPath} points to a modern module, or to a classic non-module script.
+   */
+  workerModule?: boolean;
+
   maxEntities?: number;
   maxLimboComponents?: number;
   maxRefChangesPerFrame?: number;
@@ -50,6 +88,33 @@ export interface WorldOptions {
   maxWritesPerFrame?: number;
   defaultComponentStorage?: ComponentStorage;
 }
+
+
+export interface DispatcherOptions {
+  isDirector?: boolean;
+  isLaborer?: boolean;
+  director?: Director;
+  assignedSystemIds?: Set<SystemId>;
+  singletonId?: EntityId;
+  buffersPatch?: Patch;
+  laneId?: number;
+  hasNegativeQueries?: boolean;
+  hasWriteQueries?: boolean;
+}
+
+
+export interface DispatcherCore {
+  state: State;
+  stats: Stats;
+  initialize(): Promise<void>;
+  execute(time?: number, delta?: number): Promise<void>;
+  executeFunction(fn: (system: System) => void): void;
+  createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity;
+  terminate(): void;
+  control(options: ControlOptions): void;
+  createCustomExecutor(groups: SystemGroup[]): Frame;
+}
+
 
 /**
  * Instructions for the `control` method.
@@ -96,8 +161,9 @@ export class Dispatcher {
   readonly maxEntities;
   readonly defaultComponentStorage;
   readonly registry;
-  private readonly systems: SystemBox[];
+  readonly systems: SystemBox[];
   readonly systemsByClass = new Map<SystemType<System>, SystemBox>();
+  readonly systemsById: SystemBox[] = [];
   readonly systemGroups: SystemGroup[];
   private default: {group: SystemGroup, frame: Frame};
   lastTime: number;
@@ -114,60 +180,103 @@ export class Dispatcher {
   readonly threads: number;
   readonly buffers: Buffers;
   readonly singleton?: Entity;
+  readonly hasWriteQueries: boolean;
   private buildSystem: Build;
   private readonly deferredControls = new Map<SystemBox, RunState>();
 
-  constructor({
-    defs,
-    threads = 1,
-    maxEntities = 10000,
-    maxLimboComponents = Math.ceil(maxEntities / 5),
-    maxShapeChangesPerFrame = maxEntities * 2,
-    maxWritesPerFrame = maxEntities * 4,
-    maxRefChangesPerFrame = maxEntities,
-    defaultComponentStorage = 'packed'
-  }: WorldOptions) {
-    if (threads < 1) throw new CheckError('Minimum of one thread');
-    if (threads > 1) throw new CheckError('Multithreading not yet implemented');
-    if (maxEntities > MAX_NUM_ENTITIES) {
-      throw new CheckError(`maxEntities too high, the limit is ${MAX_NUM_ENTITIES}`);
+  constructor(
+    {
+      defs,
+      threads = 1,
+      maxEntities = 10000,
+      maxLimboComponents = Math.ceil(maxEntities / 5),
+      maxShapeChangesPerFrame = maxEntities * 2,
+      maxWritesPerFrame = maxEntities * 4,
+      maxRefChangesPerFrame = maxEntities,
+      defaultComponentStorage = 'packed'
+    }: WorldOptions, {
+      isDirector,
+      isLaborer,
+      director,
+      assignedSystemIds,
+      singletonId,
+      laneId,
+      hasNegativeQueries,
+      hasWriteQueries,
+      buffersPatch
+    }: DispatcherOptions
+  ) {
+    CHECK: {
+      if (threads < 1) throw new Error('Minimum of one thread');
+      if (threads > MAX_NUM_LANES) {
+        throw new Error(`Too many threads: ${threads} > ${MAX_NUM_LANES}`);
+      }
+      if (maxEntities > MAX_NUM_ENTITIES) {
+        throw new Error(`maxEntities too high, the limit is ${MAX_NUM_ENTITIES}`);
+      }
+    }
+    DEBUG: {
+      if (!isDirector && !isLaborer || (threads === 1) !== (isDirector && isLaborer)) {
+        throw new InternalError(`Invalid dispatcher configuration`);
+      }
     }
     const {componentTypes, componentEnums, systemTypes, systemGroups} =
       this.splitDefs([defs ?? [], decoratedComponentTypes, decoratedSystemTypes]);
-    if (componentTypes.length > MAX_NUM_COMPONENTS) {
-      throw new CheckError(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
+    CHECK: {
+      if (componentTypes.length > MAX_NUM_COMPONENTS) {
+        throw new Error(`Too many component types, the limit is ${MAX_NUM_COMPONENTS}`);
+      }
     }
     STATS: this.stats = new Stats();
     this.threads = threads;
-    this.buffers = new Buffers(threads > 1);
+    this.buffers = new Buffers(isDirector ? (isLaborer ? 0 : threads) : 1, laneId);
+    if (buffersPatch) this.buffers.applyPatch(buffersPatch, false);
     this.maxEntities = maxEntities;
     this.defaultComponentStorage = defaultComponentStorage;
-    this.registry =
-      new Registry(maxEntities, maxLimboComponents, componentTypes, componentEnums, this);
-    this.indexer = new RefIndexer(this, maxRefChangesPerFrame);
-    this.shapeLog = new Log(
-      maxShapeChangesPerFrame, 'maxShapeChangesPerFrame', this.buffers,
-      {sortedByComponentType: true, numComponentTypes: this.registry.types.length}
-    );
+    const removalLog = new Log(
+      maxLimboComponents, 'maxLimboComponents', this.buffers, {writesAllowed: isLaborer});
+    this.registry = new Registry(maxEntities, componentTypes, componentEnums, removalLog, this);
+    this.indexer = new RefIndexer(this, maxRefChangesPerFrame, !(isDirector && isLaborer), laneId);
+    this.shapeLog = new Log(maxShapeChangesPerFrame, 'maxShapeChangesPerFrame', this.buffers, {
+      writesAllowed: isLaborer, sortedByComponentType: true,
+      numComponentTypes: this.registry.types.length
+    });
     this.shapeLogFramePointer = this.shapeLog.createPointer();
     this.systemGroups = systemGroups;
-    this.systems = this.createSystems(systemTypes);
-    this.createBuildSystem();
+    this.systems = this.createSystems(systemTypes, assignedSystemIds);
+    if (laneId === 0) this.createBuildSystem();
     this.registry.initializeComponentTypes();
     this.registry.validateSystem = this.createValidateSystem(componentTypes);
-    this.singleton = this.createSingletons();
-    for (const box of this.systems) box.replacePlaceholders();
-    this.planner = new Planner(this, this.systems, this.systemGroups);
-    this.planner.organize();
-    this.registry.hasNegativeQueries = this.systems.some(system => system.hasNegativeQueries);
-    if (this.systems.some(system => system.hasWriteQueries)) {
-      this.writeLog = new Log(
-        maxWritesPerFrame, 'maxWritesPerFrame', this.buffers,
-        {sortedByComponentType: true, numComponentTypes: this.registry.types.length}
-      );
+    if (isDirector) {
+      this.singleton = this.createSingletons();
+    } else if (singletonId) {
+      this.singleton = this.registry.holdEntity(singletonId);
+    }
+    if (isLaborer) {
+      for (const box of this.systems) box.replacePlaceholders();
+    }
+    if (isDirector) {
+      this.planner = new Planner(this, this.systems, this.systemGroups, director);
+      this.planner.organize();
+    }
+    if (hasNegativeQueries === undefined) {
+      hasNegativeQueries = this.systems.some(system => system.hasNegativeQueries);
+    }
+    this.registry.hasNegativeQueries = hasNegativeQueries;
+    if (hasWriteQueries === undefined) {
+      hasWriteQueries = this.systems.some(system => system.hasWriteQueries);
+    }
+    this.hasWriteQueries = hasWriteQueries;
+    if (hasWriteQueries) {
+      this.writeLog = new Log(maxWritesPerFrame, 'maxWritesPerFrame', this.buffers, {
+        writesAllowed: isLaborer, sortedByComponentType: true,
+        numComponentTypes: this.registry.types.length
+      });
       this.writeLogFramePointer = this.writeLog.createPointer();
     }
-    for (const box of this.systems) box.finishConstructing();
+    if (isLaborer) {
+      for (const box of this.systems) box.finishConstructing();
+    }
     this.state = State.setup;
   }
 
@@ -176,13 +285,15 @@ export class Dispatcher {
   get defaultGroup(): SystemGroup {return this.default.group;}
 
   private createSystems(
-    systemTypes: (SystemType<System> | Record<string, unknown>)[]
+    systemTypes: (SystemType<System> | Record<string, unknown>)[],
+    assignedSystemIds?: Set<SystemId>
   ): SystemBox[] {
     const systems = [];
     const systemClasses = [];
     const typeNames = new Set<string>();
     let anonymousTypeCounter = 0;
     for (let i = 0; i < systemTypes.length; i++) {
+      if (assignedSystemIds && !assignedSystemIds.has((i + 1) as SystemId)) continue;
       const SystemClass = systemTypes[i] as SystemType<System>;
       let box = this.systemsByClass.get(SystemClass);
       if (!box) {
@@ -204,6 +315,7 @@ export class Dispatcher {
         box = new SystemBox(system, this);
         systems.push(box);
         this.systemsByClass.set(SystemClass, box);
+        this.systemsById[system.id] = box;
       }
       const props = systemTypes[i + 1];
       if (props && typeof props !== 'function') {
@@ -348,10 +460,40 @@ export class Dispatcher {
   private async finalize(): Promise<void> {
     await this.default.frame.begin();
     this.state = State.done;
+    // Don't await anything else after this, as in multi-threaded mode we'll shut down before we get
+    // to it!
     await this.default.group.__plan.finalize();
     await this.default.frame.end();
     STATS: this.stats.frames -= 1;
+    this.release();
+  }
+
+  release(): void {
     this.registry.releaseComponentTypes();
+  }
+
+  initializeLaborerSystem(system: SystemBox): void {
+    this.executing = true;
+    this.indexer.processLog();
+    system.initialize();
+    this.flushLaborer();
+    this.executing = false;
+  }
+
+  executeLaborerSystem(system: SystemBox, time: number, delta: number): void {
+    this.executing = true;
+    this.indexer.processLog();
+    system.execute(time, delta);
+    this.flushLaborer();
+    this.executing = false;
+  }
+
+  finalizeLaborerSystem(system: SystemBox): void {
+    this.executing = true;
+    this.indexer.processLog();
+    system.finalize();
+    this.flushLaborer();
+    this.executing = false;
   }
 
   async execute(time?: number, delta?: number): Promise<void> {
@@ -408,7 +550,6 @@ export class Dispatcher {
   }
 
   flush(): void {
-    this.indexer.flush();  // may update writeLog
     this.registry.flush();
     this.shapeLog.commit();
     this.writeLog?.commit();
@@ -427,10 +568,27 @@ export class Dispatcher {
     if (!this.executing) await this.finalize();
   }
 
+  flushLaborer(): void {
+    this.registry.flushLaborer();
+    this.shapeLog.sortCorral();
+    this.writeLog?.sortCorral();
+  }
+
+  flushDirector(laneId: number): void {
+    this.registry.flushDirector(laneId);
+    this.indexer.flushDirector(laneId);
+    this.shapeLog.commit(laneId);
+    this.writeLog?.commit(laneId);
+  }
+
   createEntity(initialComponents: (ComponentType<any> | Record<string, unknown>)[]): Entity {
     const entity = this.registry.createEntity(initialComponents);
     if (!this.executing) this.flush();
     return entity;
+  }
+
+  createCustomExecutor(groups: SystemGroup[]): Frame {
+    return new FrameImpl(this, groups);
   }
 
   control(options: ControlOptions): void {

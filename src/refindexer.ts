@@ -3,7 +3,7 @@ import {Log, LogPointer} from './datatypes/log';
 import {checkMask, Entity, EntityId} from './entity';
 import {
   COMPONENT_ID_BITS, COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK, FIELD_SEQ_BITS,
-  FIELD_SEQ_MASK, MAX_NUM_COMPONENTS,
+  FIELD_SEQ_MASK, LANE_ID_BITS, LANE_ID_MASK, MAX_NUM_COMPONENTS,
   MAX_NUM_FIELDS
 } from './consts';
 import type {Dispatcher} from './dispatcher';
@@ -224,13 +224,15 @@ export class RefIndexer {
 
   constructor(
     private readonly dispatcher: Dispatcher,
-    private readonly maxRefChangesPerFrame: number
+    private readonly maxRefChangesPerFrame: number,
+    private readonly keepLog: boolean,
+    private readonly laneId: number | undefined
   ) {
     this.registry = dispatcher.registry;
   }
 
   completeCycle(): void {
-    this.flush();  // to handle ref changes coming from registry.processEndOfFrame()
+    this.refLog?.commit();  // to handle ref changes coming from registry.completeCycle()
     STATS: this.dispatcher.stats.maxRefChangesPerFrame =
       this.refLog?.countSince(this.refLogStatsPointer!) ?? 0;
   }
@@ -241,10 +243,10 @@ export class RefIndexer {
   ): number {
     CHECK: if (targetType) checkTypeDefined(targetType);
     CHECK: if (sourceType) checkTypeDefined(sourceType);
-    if (!this.refLog) {
+    if (!this.refLog && this.keepLog) {
       this.refLog = new Log(
         this.maxRefChangesPerFrame, 'maxRefChangesPerFrame', this.dispatcher.buffers,
-        {localProcessingAllowed: true}
+        {prefixedWithLaneId: true, laneId: this.laneId}
       );
       this.refLogPointer = this.refLog.createPointer();
       this.refLogStatsPointer = this.refLog.createPointer();
@@ -287,9 +289,13 @@ export class RefIndexer {
     sourceInternalIndex: number | undefined, oldTargetId: EntityId, newTargetId: EntityId,
     unreference: boolean, release: boolean
   ): void {
-    DEBUG: if (!this.refLog) throw new InternalError(`Trying to trackRefChange without a refLog`);
-    DEBUG: if (oldTargetId === newTargetId && unreference) {
-      throw new InternalError('No-op call to trackRefChange');
+    DEBUG: {
+      if (this.keepLog && !this.refLog) {
+        throw new InternalError(`Trying to trackRefChange without a refLog`);
+      }
+      if (oldTargetId === newTargetId && unreference) {
+        throw new InternalError('No-op call to trackRefChange');
+      }
     }
     if (oldTargetId !== -1) {
       const action = (unreference ? Action.UNREFERENCE : 0) | (release ? Action.RELEASE : 0);
@@ -316,16 +322,18 @@ export class RefIndexer {
     sourceId: EntityId, sourceType: ComponentType<any>, sourceSeq: number,
     sourceInternalIndex: number | undefined, targetId: EntityId, action: Action,
   ): void {
-    const internallyIndexed = typeof sourceInternalIndex !== 'undefined';
-    DEBUG: {
-      if (internallyIndexed && !sourceType.__binding!.fields[sourceSeq].type.internallyIndexed) {
-        throw new InternalError('Inconsistent internally indexed flag');
+    if (this.refLog) {
+      const internallyIndexed = typeof sourceInternalIndex !== 'undefined';
+      DEBUG: {
+        if (internallyIndexed !== sourceType.__binding!.fields[sourceSeq].type.internallyIndexed) {
+          throw new InternalError('Inconsistent internally indexed flag');
+        }
       }
+      this.refLog.push(sourceId | (sourceType.id! << ENTITY_ID_BITS));
+      this.refLog.push(
+        targetId | (sourceSeq << ENTITY_ID_BITS) | action | (internallyIndexed ? 2 ** 29 : 0));
+      if (internallyIndexed) this.refLog.push(sourceInternalIndex!);
     }
-    this.refLog!.push(sourceId | (sourceType.id! << ENTITY_ID_BITS));
-    this.refLog!.push(
-      targetId | (sourceSeq << ENTITY_ID_BITS) | action | (internallyIndexed ? 2 ** 29 : 0));
-    if (internallyIndexed) this.refLog!.push(sourceInternalIndex!);
     this.processEntry(
       sourceId, sourceType.id!, sourceSeq, sourceInternalIndex, targetId, action, true
     );
@@ -351,27 +359,65 @@ export class RefIndexer {
     return this.trackers.get(targetId | (selector.id << ENTITY_ID_BITS) | (stale ? 2 ** 31 : 0));
   }
 
-  flush(): void {
+  flushDirector(laneId: number): void {
+    this.refLog!.commit(laneId);
+  }
+
+  processLog(): void {
     if (!this.refLog) return;
+    let runLength = 0, local = false;
+    let entryPart1: number | undefined, entryPart2: number | undefined;
+    let log: Uint32Array | undefined, startIndex: number | undefined, endIndex: number | undefined;
     while (true) {
-      const [log, startIndex, endIndex, local] =
-        this.refLog.processAndCommitSince(this.refLogPointer!);
+      [log, startIndex, endIndex] = this.refLog.processSince(this.refLogPointer!);
       if (!log) break;
-      if (local) continue;
-      for (let i = startIndex!; i < endIndex!; i += 2) {
-        const entryPart1 = log[i], entryPart2 = log[i + 1];
-        const sourceId = (entryPart1 & ENTITY_ID_MASK) as EntityId;
-        const sourceTypeId = entryPart1 >>> ENTITY_ID_BITS;
-        const targetId = (entryPart2 & ENTITY_ID_MASK) as EntityId;
-        const sourceSeq = (entryPart2 >>> ENTITY_ID_BITS) & (MAX_NUM_FIELDS - 1);
-        const action: Action = entryPart2 & ACTION_MASK;
-        const internallyIndexed = (entryPart2 & 2 ** 29) !== 0;
-        const internalIndex = internallyIndexed ? log[i + 2] : undefined;
-        if (internallyIndexed) i += 1;
+      if (runLength && local) {
+        startIndex! += runLength;
+        runLength = 0;
+      }
+      for (let i = startIndex!; i < endIndex!;) {
+        if (!runLength) {
+          const header = log[i++];
+          const laneId = header & LANE_ID_MASK;
+          runLength = header >>> LANE_ID_BITS;
+          local = laneId === this.laneId;
+          if (local) {
+            const skip = Math.min(runLength, endIndex! - i);
+            i += skip;
+            runLength -= skip;
+          }
+          continue;
+        }
+        if (entryPart1 === undefined) {
+          entryPart1 = log[i++];
+          runLength -= 1;
+        }
+        if (entryPart2 === undefined) {
+          if (i >= endIndex!) continue;
+          entryPart2 = log[i++];
+          runLength -= 1;
+        }
+        const internallyIndexed = (entryPart2! & 2 ** 29) !== 0;
+        if (internallyIndexed && i >= endIndex!) continue;
+
+        const sourceId = (entryPart1! & ENTITY_ID_MASK) as EntityId;
+        const sourceTypeId = entryPart1! >>> ENTITY_ID_BITS;
+        const targetId = (entryPart2! & ENTITY_ID_MASK) as EntityId;
+        const sourceSeq = (entryPart2! >>> ENTITY_ID_BITS) & (MAX_NUM_FIELDS - 1);
+        const action: Action = entryPart2! & ACTION_MASK;
+        let internalIndex: number | undefined;
+        if (internallyIndexed) {
+          internalIndex = log[i++];
+          runLength -= 1;
+        }
         this.processEntry(
           sourceId, sourceTypeId, sourceSeq, internalIndex, targetId, action, false
         );
+        entryPart1 = entryPart2 = undefined;
       }
+    }
+    DEBUG: if (entryPart1 !== undefined || entryPart2 !== undefined) {
+      throw new InternalError('Incomplete entry in reflog');
     }
   }
 

@@ -476,6 +476,15 @@ export class QueryBuilder {
    */
   get create(): this {
     this.set(this.__system.accessMasks.create);
+    for (const componentType of this.__lastTypes) {
+      if (typeof componentType === 'function') {
+        this.__system.safeCreateComponentTypes.set(componentType.id!);
+      } else {
+        for (const type of componentType.__types) {
+          this.__system.safeCreateComponentTypes.set(type.id!);
+        }
+      }
+    }
     return this;
   }
 
