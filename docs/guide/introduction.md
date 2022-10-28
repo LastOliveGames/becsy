@@ -59,4 +59,4 @@ Here are some public creations that use Becsy:
 
 ## Acknowledgements
 
-Many thanks to Becsy's early users, who helped shape the feature set and API, and found tons of bugs!  Thanks to [ECSY](https://ecsy.io) for the inspiration and their fine documentation, which served as the starting point for this site.  And thanks to [Kate Liu](https://www.instagram.com/lemonikate/) for the logo design!
+Many thanks to Becsy's early users, who helped shape the feature set and API, and found tons of bugs!  Thanks to [ECSY](https://github.com/ecsyjs/ecsy) for the inspiration and their fine documentation, which served as the starting point for this site.  And thanks to [Kate Liu](https://www.instagram.com/lemonikate/) for the logo design!
