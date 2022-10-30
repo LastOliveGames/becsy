@@ -1,4 +1,4 @@
-import {writeFile} from 'fs/promises';
+import {promises as fs} from 'fs';
 import {Session} from 'inspector';
 import {promisify} from 'util';
 
@@ -14,6 +14,6 @@ export async function profile(fn: () => Promise<any>): Promise<any> {
   const prof = (await post('Profiler.stop')).profile;
   await post('Profiler.disable');
 
-  await writeFile(`./profile_${Date.now()}.cpuprofile`, JSON.stringify(prof));
+  await fs.writeFile(`./profile_${Date.now()}.cpuprofile`, JSON.stringify(prof));
   return result;
 }
