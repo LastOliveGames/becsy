@@ -56,6 +56,8 @@ I'm actively supporting this package but it's not my primary job, so responses m
 
 Here are some public creations that use Becsy:
 - [Special Releases 2022](https://www.special-releases.com/)
+- [Moyosa Spaces](https://moyosaspaces.com/)
+- [Confluence whiteboards](https://www.atlassian.com/software/confluence/whiteboards)
 
 ## Acknowledgements
 
