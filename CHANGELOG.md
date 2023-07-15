@@ -3,6 +3,7 @@
 ### 0.15.6
 - Ensure `cancelIfCoroutineStarted` is respected even if coroutine throws an exception when invoked.
 - Rescind relaxation of requirements for the `update` entitlement from 0.15.1; there was a good reason for the original ones after all!
+- Export stats types.
 
 ### 0.15.4
 - Correctly cancel mutually exclusive scoped coroutines that declare their scope from *inside* the coroutine.
