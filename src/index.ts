@@ -10,3 +10,4 @@ export type {Frame, SystemGroup} from './schedule';
 export {co, CanceledError} from './coroutines';
 export type {Coroutine, CurrentCoroutine, Waitable} from './coroutines';
 export type {ComponentEnum} from './enums';
+export type {Stats, ComponentStats, SystemStats} from './stats';
