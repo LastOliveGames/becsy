@@ -65,7 +65,7 @@ class Position {
 ```
 
 ::: only-ts
-The `@component` decorator will automatically register these component types with our world.
+The `@component` decorator will automatically register these component types with our world.  (Don't forget to add `"experimentalDecorators": true` to your `tsconfig.json`.)
 :::
 
 ::: only-js
