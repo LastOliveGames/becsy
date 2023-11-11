@@ -112,10 +112,10 @@
   resolved "https://registry.yarnpkg.com/@esbuild/win32-x64/-/win32-x64-0.18.20.tgz#786c5f41f043b07afb1af37683d7c33668858f6d"
   integrity sha512-kTdfRcSiDfQca/y9QIkng02avJ+NCaQvrMejlsB3RRv5sE9rRoeBPISaZpKxHELzRxZyLvNts1P27W3wV+8geQ==
 
-"@lastolivegames/becsy@^0.15.5":
-  version "0.15.5"
-  resolved "https://registry.yarnpkg.com/@lastolivegames/becsy/-/becsy-0.15.5.tgz#ccf3ae2cf5c16797711c41d9f407b09a2321f5f0"
-  integrity sha512-RZEL52er3eH+zpczz2xPyVIxVId+tx0pfTRxYjvE4Vi14plgHzqX7q+4TTJvJDmaxR9pdVjGwFnrY0Oe23fN7Q==
+"@lastolivegames/becsy@^0.15.7":
+  version "0.15.7"
+  resolved "https://registry.yarnpkg.com/@lastolivegames/becsy/-/becsy-0.15.7.tgz#3adf3e8d56d0f2c28590f5198de8624782eba4f1"
+  integrity sha512-MbQT/EPiDWlsn1xmvWCChQrW2G013i32L//x3SS3KRzWc1Rx6Ga0QBVi4RO/eLk/JTclomCzbZyUSDvlml5tZw==
 
 esbuild@^0.18.10:
   version "0.18.20"
