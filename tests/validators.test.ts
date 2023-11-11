@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import {component, World, Entity, System} from '../src';
+import {component, World, type Entity, System} from '../src';
 
 @component class A {
   static validate(entity: Entity): void {

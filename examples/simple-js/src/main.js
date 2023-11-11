@@ -103,7 +103,8 @@ class Renderer extends System {
   // that is new or whose position changed since the last frame. Note that we don't need to declare
   // DOMRenderable as writable since we'll be modifying the DOM element's properties rather than
   // updating the component's fields, and Becsy doesn't track that.
-  renderables = this.query(q => q.addedOrChanged.with(DOMRenderable).and.with(Position).track);
+  renderables =
+    this.query(q => q.addedOrChanged.with(DOMRenderable).and.with(Position).trackWrites);
 
   execute() {
     for (const renderable of this.renderables.addedOrChanged) {

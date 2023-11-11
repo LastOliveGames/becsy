@@ -1,8 +1,8 @@
 import type {Component, ComponentType} from './component';
-import {ControlOptions, Dispatcher, State, WorldOptions} from './dispatcher';
+import {type ControlOptions, Dispatcher, State, type WorldOptions} from './dispatcher';
 import {ComponentEnum} from './enums';
 import {CheckError} from './errors';
-import {Frame, FrameImpl, SystemGroup} from './schedule';
+import {type Frame, FrameImpl, type SystemGroup} from './schedule';
 import type {Stats} from './stats';
 import type {System} from './system';
 

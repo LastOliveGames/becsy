@@ -1,6 +1,6 @@
-import {checkTypeDefined, ComponentType} from './component';
-import {Log, LogPointer} from './datatypes/log';
-import {checkMask, Entity, EntityId} from './entity';
+import {checkTypeDefined, type ComponentType} from './component';
+import {Log, type LogPointer} from './datatypes/log';
+import {checkMask, type Entity, type EntityId} from './entity';
 import {
   COMPONENT_ID_BITS, COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK, FIELD_SEQ_BITS,
   FIELD_SEQ_MASK, MAX_NUM_COMPONENTS,

@@ -1,5 +1,5 @@
 import buildTS from 'rollup-plugin-ts';
-import {terser} from 'rollup-plugin-terser';
+import terser from '@rollup/plugin-terser';
 import ts from 'typescript';
 
 const labeledBlockRemover = labels => {

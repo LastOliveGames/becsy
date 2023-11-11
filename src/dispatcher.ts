@@ -1,8 +1,8 @@
 import type {ComponentStorage, ComponentType} from './component';
-import {Entity, extendMaskAndSetFlag} from './entity';
+import {type Entity, extendMaskAndSetFlag} from './entity';
 import {MAX_NUM_COMPONENTS, MAX_NUM_ENTITIES} from './consts';
-import {Log, LogPointer} from './datatypes/log';
-import {RunState, System, SystemBox, SystemId, SystemType} from './system';
+import {Log, type LogPointer} from './datatypes/log';
+import {RunState, System, SystemBox, type SystemId, type SystemType} from './system';
 import {Registry} from './registry';
 import {Stats} from './stats';
 import {RefIndexer} from './refindexer';
@@ -10,7 +10,7 @@ import {Buffers} from './buffers';
 import {
   componentTypes as decoratedComponentTypes, systemTypes as decoratedSystemTypes
 } from './decorators';
-import {Frame, FrameImpl, SystemGroup, SystemGroupImpl} from './schedule';
+import {type Frame, FrameImpl, type SystemGroup, SystemGroupImpl} from './schedule';
 import {Planner} from './planner';
 import type {Coroutine, CoroutineFunction} from './coroutines';
 import {CheckError, InternalError} from './errors';

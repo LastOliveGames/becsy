@@ -1,5 +1,5 @@
 /* eslint-disable lines-between-class-members */
-import {field, component, World, Entity, Type} from '../src';
+import {field, component, World, type Entity, Type} from '../src';
 
 class Stuff {
   value: number;

@@ -1,4 +1,6 @@
-import {component, ComponentType, Entity, field, Query, System, SystemType, World} from '../src';
+import {
+  component, type ComponentType, type Entity, field, Query, System, type SystemType, World
+} from '../src';
 
 
 @component class Origin {

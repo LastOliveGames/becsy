@@ -51,7 +51,7 @@ export interface Coroutine {
    * Cancels this coroutine if the given condition is true at any `yield` point.
    * @param condition The condition to check at every `yield` point.
    */
-  cancelIf(condition: () => boolean): this;
+  cancelIf(condition: () => boolean): Coroutine;
 
   /**
    * Constrains the entity's scope to the given entity.  The coroutine will automatically be
@@ -62,14 +62,14 @@ export interface Coroutine {
    * been added.
    * @param entity The entity that this coroutine is processing somehow.
    */
-  scope(entity: Entity): this;
+  scope(entity: Entity): Coroutine;
 
   /**
    * Cancels this coroutine if the given component is missing from the scoped entity at any `yield`
    * point.
    * @param type The type of component to check for.
    */
-  cancelIfComponentMissing(type: ComponentType<any>): this;
+  cancelIfComponentMissing(type: ComponentType<any>): Coroutine;
 
   /**
    * Cancels this coroutine if another coroutine is started within this system.  By default, any
@@ -79,7 +79,7 @@ export interface Coroutine {
    * @param coroutineFn A specific mutually exclusive coroutine.  You can use `co.self` as a
    *  shortcut for the currently running coroutine.
    */
-  cancelIfCoroutineStarted(coroutineFn?: CoroutineFunction): this;
+  cancelIfCoroutineStarted(coroutineFn?: CoroutineFunction): Coroutine;
 }
 
 /**

@@ -1,4 +1,4 @@
-import {field, component, World, Entity, ComponentType} from '../src';
+import {field, component, World, type Entity, type ComponentType} from '../src';
 
 @component({storage: 'packed', initialCapacity: 2})
 class PackedElastic {

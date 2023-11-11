@@ -1,4 +1,6 @@
-import {co, component, Coroutine, Entity, field, System, SystemType, World} from '../src';
+import {
+  co, component, type Coroutine, type Entity, field, System, type SystemType, World
+} from '../src';
 
 let counter = 0;
 let coroutine: () => Generator;

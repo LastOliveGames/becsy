@@ -1,4 +1,5 @@
 ### Upcoming
+- Upgrade development stack to latest versions.
 
 ### 0.15.6
 - Ensure `cancelIfCoroutineStarted` is respected even if coroutine throws an exception when invoked.

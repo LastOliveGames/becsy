@@ -1,18 +1,18 @@
 import {
-  ComponentType, assimilateComponentType, defineAndAllocateComponentType, ComponentId,
+  type ComponentType, assimilateComponentType, defineAndAllocateComponentType, type ComponentId,
   dissimilateComponentType,
   initComponent,
   checkTypeDefined,
-  Component
+  type Component
 } from './component';
 import {ComponentEnum} from './enums';
-import {Log, LogPointer} from './datatypes/log';
-import {SharedAtomicPool, Uint32Pool, UnsharedPool} from './datatypes/intpool';
+import {Log, type LogPointer} from './datatypes/log';
+import {SharedAtomicPool, type Uint32Pool, UnsharedPool} from './datatypes/intpool';
 import type {Dispatcher} from './dispatcher';
-import {Entity, EntityId, EntityImpl} from './entity';
+import {type Entity, type EntityId, EntityImpl} from './entity';
 import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {SystemBox} from './system';
-import {AtomicSharedShapeArray, ShapeArray, UnsharedShapeArray} from './datatypes/shapearray';
+import {AtomicSharedShapeArray, type ShapeArray, UnsharedShapeArray} from './datatypes/shapearray';
 import {CheckError, InternalError} from './errors';
 import type {TrackingMask} from './query';
 

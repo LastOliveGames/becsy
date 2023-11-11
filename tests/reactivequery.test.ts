@@ -1,4 +1,4 @@
-import {component, ComponentType, field, Query, System, SystemType, World} from '../src';
+import {component, type ComponentType, field, Query, System, type SystemType, World} from '../src';
 
 
 @component class A {

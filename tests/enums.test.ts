@@ -1,4 +1,4 @@
-import {field, component, World, Entity, System} from '../src';
+import {field, component, World, type Entity, System} from '../src';
 import {CheckError} from '../src/errors';
 
 let message: string;

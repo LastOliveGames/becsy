@@ -8,7 +8,7 @@
     "declarationMap": true,
     "allowSyntheticDefaultImports": true,
     "allowUnusedLabels": true,
-    "importsNotUsedAsValues": "error",
+    "verbatimModuleSyntax": true,
     /* more strict checking for errors that per-file transpilers like `esbuild` would crash */
     "isolatedModules": true,
     "outDir": "./lib",

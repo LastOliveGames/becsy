@@ -103,7 +103,7 @@ import {component, field, system, System, World} from '@lastolivegames/becsy';
   // DOMRenderable as writable since we'll be modifying the DOM element's properties rather than
   // updating the component's fields, and Becsy doesn't track that.
   private readonly renderables =
-    this.query(q => q.addedOrChanged.with(DOMRenderable).and.with(Position).track);
+    this.query(q => q.addedOrChanged.with(DOMRenderable).and.with(Position).trackWrites);
 
   execute(): void {
     for (const renderable of this.renderables.addedOrChanged) {

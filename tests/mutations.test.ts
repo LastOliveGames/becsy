@@ -1,4 +1,4 @@
-import {component, Entity, field, System, SystemType, World} from '../src';
+import {component, type Entity, field, System, type SystemType, World} from '../src';
 
 
 @component class A {

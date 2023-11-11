@@ -4,14 +4,14 @@ import type {Entity, EntityId, AccessMasks} from './entity';
 import {COMPONENT_ID_MASK, ENTITY_ID_BITS, ENTITY_ID_MASK} from './consts';
 import type {World} from './world';  // eslint-disable-line @typescript-eslint/no-unused-vars
 import {Query, QueryBox, QueryBuilder} from './query';
-import {ComponentType, declareSingleton} from './component';
+import {type ComponentType, declareSingleton} from './component';
 import {
-  GroupContentsArray, now, Schedule, ScheduleBuilder, SystemGroup, SystemGroupImpl
+  type GroupContentsArray, now, Schedule, ScheduleBuilder, type SystemGroup, SystemGroupImpl
 } from './schedule';
 import type {Lane} from './planner';
 import type {SystemStats} from './stats';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import {co, Coroutine, CoroutineFunction, Supervisor} from './coroutines';
+import {co, type Coroutine, type CoroutineFunction, Supervisor} from './coroutines';
 import {CheckError, InternalError} from './errors';
 
 

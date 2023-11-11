@@ -1,8 +1,8 @@
 import {Bitset} from './datatypes/bitset';
-import {checkTypeDefined, ComponentType} from './component';
-import {Entity, EntityId, extendMaskAndSetFlag, isMaskFlagSet} from './entity';
+import {checkTypeDefined, type ComponentType} from './component';
+import {type Entity, type EntityId, extendMaskAndSetFlag, isMaskFlagSet} from './entity';
 import type {SystemBox} from './system';
-import {ArrayEntityList, EntityList, PackedArrayEntityList} from './datatypes/entitylist';
+import {ArrayEntityList, type EntityList, PackedArrayEntityList} from './datatypes/entitylist';
 import {CheckError, InternalError} from './errors';
 import type {ComponentEnum} from './enums';
 

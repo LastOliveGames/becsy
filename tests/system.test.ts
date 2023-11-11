@@ -1,4 +1,4 @@
-import {Entity, field, System, World} from '../src';
+import {type Entity, field, System, World} from '../src';
 
 let message: string;
 let initOrder: string[];

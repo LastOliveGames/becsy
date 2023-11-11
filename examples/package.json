@@ -9,10 +9,10 @@
     "update": "yarn upgrade-interactive --latest"
   },
   "devDependencies": {
-    "typescript": "^4.4.4",
-    "vite": "^2.6.10"
+    "typescript": "^5.2.2",
+    "vite": "^4.5.0"
   },
   "dependencies": {
-    "@lastolivegames/becsy": "^0.9.1"
+    "@lastolivegames/becsy": "^0.15.5"
   }
 }

@@ -1,4 +1,4 @@
-import {checkTypeDefined, ComponentType, initComponent} from './component';
+import {checkTypeDefined, type ComponentType, initComponent} from './component';
 import type {ComponentEnum} from './enums';
 import {CheckError} from './errors';
 import type {Registry} from './registry';
