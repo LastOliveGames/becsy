@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.15.7
 - Upgrade development stack to latest versions.
 
 ### 0.15.6
