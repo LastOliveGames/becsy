@@ -14,7 +14,7 @@ interface Printable {
  */
 export class Graph<V extends Printable> {
   private readonly numVertices: number;
-  private readonly edges: number[];
+  private edges: number[];
   private paths: number[];
   private readonly vertexIndexMap = new Map<V, number>();
   private sealed = false;
@@ -292,22 +292,23 @@ export class Graph<V extends Printable> {
         if (this.edges[i * n + j]) this.edges[i * n + j] = paths[i * n + j];
       }
     }
+    // console.log(this.printMatrix(this.edges));
   }
 
   private simplify(): void {
     const n = this.numVertices;
-    const paths = this.paths;
+    const paths = this.paths.slice();
 
     // Perform a transitive reduction
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        if (!this.edges[i * n + j]) continue;
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        if (!paths[i * n + j]) continue;
         for (let k = 0; k < n; k++) {
-          if (k === i || k === j) continue;
-          if (paths[i * n + k] && paths[k * n + j]) this.edges[i * n + j] = 0;
+          if (paths[j * n + k]) paths[i * n + k] = 0;
         }
       }
     }
+    this.edges = paths;
     // console.log(this.printMatrix(this.edges));
   }
 
@@ -368,6 +369,18 @@ export class Graph<V extends Printable> {
       lines.push(line.join(' '));
     }
     return lines.join('\n');
+  }
+
+  static fromMatrix(matrix: string | number[]): Graph<string> {
+    if (typeof matrix === 'string') {
+      matrix = matrix.trim().split(/\s+/).map(edge => parseInt(edge, 10));
+    }
+    const n = Math.sqrt(matrix.length);
+    const vertices = [];
+    for (let i = 1; i <= n; i++) vertices.push(`v${i}`);
+    const graph = new Graph(vertices);
+    (graph as any).edges = matrix;
+    return graph;
   }
 
 }

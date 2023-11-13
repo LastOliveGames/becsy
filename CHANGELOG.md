@@ -1,4 +1,5 @@
 ### Upcoming
+- Fix system ordering to consistently respect the given constraints as the number of systems grows larger.
 
 ### 0.15.7
 - Upgrade development stack to latest versions.
