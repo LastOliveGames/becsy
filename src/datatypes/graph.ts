@@ -304,7 +304,10 @@ export class Graph<V extends Printable> {
         if (!this.edges[i * n + j]) continue;
         for (let k = 0; k < n; k++) {
           if (k === i || k === j) continue;
-          if (paths[i * n + k] && paths[k * n + j]) this.edges[i * n + j] = 0;
+          if (paths[i * n + k] && paths[k * n + j]) {
+            this.edges[i * n + j] = 0;
+            break;
+          }
         }
       }
     }
@@ -368,6 +371,18 @@ export class Graph<V extends Printable> {
       lines.push(line.join(' '));
     }
     return lines.join('\n');
+  }
+
+  static fromMatrix(matrix: string | number[]): Graph<string> {
+    if (typeof matrix === 'string') {
+      matrix = matrix.trim().split(/\s+/).map(edge => parseInt(edge, 10));
+    }
+    const n = Math.sqrt(matrix.length);
+    const vertices = [];
+    for (let i = 1; i <= n; i++) vertices.push(`v${i}`);
+    const graph = new Graph(vertices);
+    (graph as any).edges = matrix;
+    return graph;
   }
 
 }
