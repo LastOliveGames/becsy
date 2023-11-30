@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.15.9
 - Make vectors iterable, and add an `asTypedArray()` method to return a typed array view.
 
 ### 0.15.8
