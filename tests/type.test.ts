@@ -29,10 +29,13 @@ const v3Type = Type.vector(Type.int8, ['x', 'y', 'z'], Vector3);
   @field.int32 declare int32: number;
   @field.float32 declare float32: number;
   @field.float64 declare float64: number;
-  @field.int32.vector(3) declare vectorWithLength: [number, number, number];
+  @field.int32.vector(3) declare vectorWithLength:
+    [number, number, number] & Iterable<number> & {asTypedArray(): Int32Array};
   @field.float64.vector(['x', 'y', 'z']) declare vectorWithProps:
-    [number, number, number] & {x: number, y: number, z: number};
-  @field.int16.vector(['x', 'y', 'z'], Vector3) declare vectorWithClass: Vector3;
+    [number, number, number] & {x: number, y: number, z: number} & Iterable<number> &
+    {asTypedArray(): Float64Array};
+  @field.int16.vector(['x', 'y', 'z'], Vector3) declare vectorWithClass:
+    Vector3 & Iterable<number> & {asTypedArray(): Int16Array};
   @field(v3Type) declare vectorWithPredefined: Vector3;
   @field.staticString(['foo', 'bar', 'baz']) declare staticString: string;
   @field.dynamicString(14) declare dynamicString: string;
@@ -90,7 +93,22 @@ function compare(object: any, prop: string | number | (string | number)[], value
     expect(getProp(object, prop)).toBe(value);
     expect(getProp(object, prop)).toBe(value);
   }
+}
 
+async function testVectorIterationAndView(
+  prop: string, accessor: 'read' | 'write', values: number[], ArrayType: any
+) {
+  const world = await World.create();
+  world.build(system => {
+    const entity = system.createEntity(Big, {[prop]: values});
+    const big = entity[accessor](Big);
+    const a = [], b = [];
+    for (const item of getProp(big, prop)) a.push(item);
+    for (const item of getProp(big, prop)) b.push(item);
+    expect(a).toEqual(values);
+    expect(a).toEqual(b);
+    expect(getProp(big, prop).asTypedArray()).toEqual(ArrayType.from(values));
+  });
 }
 
 describe('getting and setting fields of various types', () => {
@@ -135,6 +153,8 @@ describe('getting and setting fields of various types', () => {
     await testReadWrite(['vectorWithLength', 0], [0, 42, -10]);
     await testReadWrite(['vectorWithLength', 2], [0, 42, -10]);
     await testReadWrite('vectorWithLength', [[0, -1, 2]]);
+    await testVectorIterationAndView('vectorWithLength', 'read', [0, 42, -10], Int32Array);
+    await testVectorIterationAndView('vectorWithLength', 'write', [0, 42, -10], Int32Array);
   });
 
   test('vectorWithProps', async () => {
@@ -143,6 +163,8 @@ describe('getting and setting fields of various types', () => {
     await testReadWrite(['vectorWithProps', 'z'], [0, 42, -10]);
     await testReadWrite('vectorWithProps', [[0, -1, 2]]);
     await testReadWrite('vectorWithProps', [{x: 0, y: -1, z: 2}]);
+    await testVectorIterationAndView('vectorWithProps', 'read', [0, 42, -10], Float64Array);
+    await testVectorIterationAndView('vectorWithProps', 'write', [0, 42, -10], Float64Array);
   });
 
   test('vectorWithClass', async () => {
@@ -151,6 +173,8 @@ describe('getting and setting fields of various types', () => {
     await testReadWrite(['vectorWithClass', 'z'], [0, 42, -10]);
     await testReadWrite('vectorWithClass', [[0, -1, 2]]);
     await testReadWrite('vectorWithClass', [{x: 0, y: -1, z: 2}]);
+    await testVectorIterationAndView('vectorWithClass', 'read', [0, 42, -10], Int16Array);
+    await testVectorIterationAndView('vectorWithClass', 'write', [0, 42, -10], Int16Array);
     const world = await World.create();
     world.build(system => {
       const entity = system.createEntity(Big, {vectorWithClass: {x: 1, y: 2, z: 3}});

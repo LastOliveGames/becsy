@@ -33,6 +33,7 @@ module.exports = {
         'no-shadow': 'off',
         'no-unused-vars': 'off',
         'no-useless-constructor': 'off',
+        'no-empty-function': 'off',
         'no-use-before-define': 'off',
         '@typescript-eslint/explicit-module-boundary-types': ['warn', {
           allowArgumentsExplicitlyTypedAsAny: true,
@@ -48,6 +49,7 @@ module.exports = {
         '@typescript-eslint/no-unused-vars':
           ['error', {args: 'none', varsIgnorePattern: '[iI]gnored|[uU]nused'}],
         '@typescript-eslint/no-useless-constructor': 'error',
+        '@typescript-eslint/no-empty-function': 'error',
         '@typescript-eslint/no-use-before-define': ['error', {functions: false}],
       }
     }

@@ -192,6 +192,12 @@ class NumberType extends Type<number> {
   }
 }
 
+interface SelfIterator {
+  value: number | undefined;
+  done: boolean;
+  next(): this;
+}
+
 class VectorType extends Type<number[]> {
   private readonly stride: number;
   private readonly elementNames: string[] | undefined;
@@ -216,6 +222,7 @@ class VectorType extends Type<number[]> {
     const elementNames = this.elementNames;
     const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
     let data: TypedArray;
+    let writableIteratorIndex = 0, readonlyIteratorIndex = 0;
 
     field.updateBuffer = () => {
       binding.dispatcher.buffers.register(
@@ -225,10 +232,54 @@ class VectorType extends Type<number[]> {
     };
     field.updateBuffer();
 
+    const writableIterator: SelfIterator = {value: undefined, done: true, next() {
+      if (writableIteratorIndex < stride) {
+        this.done = false;
+        this.value = data[binding.writableIndex * stride + writableIteratorIndex];
+        writableIteratorIndex += 1;
+      } else {
+        this.done = true;
+        this.value = undefined;
+      }
+      return this;
+    }};
+    const readonlyIterator: SelfIterator = {
+      value: undefined, done: true, next() {
+        if (readonlyIteratorIndex < stride) {
+          this.done = false;
+          this.value = data[binding.readonlyIndex * stride + readonlyIteratorIndex];
+          readonlyIteratorIndex += 1;
+        } else {
+          this.done = true;
+          this.value = undefined;
+        }
+        return this;
+      }
+    };
     const masterWritableAccessor = this.Class ? new this.Class() : {};
     const masterReadonlyAccessor = this.Class ? new this.Class() : {};
     Object.defineProperty(masterWritableAccessor, 'length', {value: stride});
     Object.defineProperty(masterReadonlyAccessor, 'length', {value: stride});
+    if (!(this.Class && 'asTypedArray' in this.Class.prototype)) {
+      Object.defineProperty(masterWritableAccessor, 'asTypedArray', {value() {
+        CHECK: checkInvalid(this.__becsyComponent, binding);
+        return data.subarray(binding.writableIndex * stride, (binding.writableIndex + 1) * stride);
+      }});
+      Object.defineProperty(masterReadonlyAccessor, 'asTypedArray', {value() {
+        CHECK: checkInvalid(this.__becsyComponent, binding);
+        return data.subarray(binding.readonlyIndex * stride, (binding.readonlyIndex + 1) * stride);
+      }});
+    }
+    Object.defineProperty(masterWritableAccessor, Symbol.iterator, {value() {
+      CHECK: checkInvalid(this.__becsyComponent, binding);
+      writableIteratorIndex = 0;
+      return writableIterator;
+    }});
+    Object.defineProperty(masterReadonlyAccessor, Symbol.iterator, {value() {
+      CHECK: checkInvalid(this.__becsyComponent, binding);
+      readonlyIteratorIndex = 0;
+      return readonlyIterator;
+    }});
     CHECK: {
       Object.defineProperty(
         masterWritableAccessor, '__becsyComponent', {value: undefined, writable: true});
@@ -348,11 +399,58 @@ class VectorType extends Type<number[]> {
     const bufferKey = `component.${binding.type.id!}.field.${field.seq}`;
     const data = binding.dispatcher.buffers.register(
       bufferKey, binding.capacity * stride, this.type.NumberArray);
+    let writableIteratorIndex = 0, readonlyIteratorIndex = 0;
 
+    const writableIterator: SelfIterator = {
+      value: undefined, done: true, next() {
+        if (writableIteratorIndex < stride) {
+          this.done = false;
+          this.value = data[binding.writableIndex * stride + writableIteratorIndex];
+          writableIteratorIndex += 1;
+        } else {
+          this.done = true;
+          this.value = undefined;
+        }
+        return this;
+      }
+    };
+    const readonlyIterator: SelfIterator = {
+      value: undefined, done: true, next() {
+        if (readonlyIteratorIndex < stride) {
+          this.done = false;
+          this.value = data[binding.readonlyIndex * stride + readonlyIteratorIndex];
+          readonlyIteratorIndex += 1;
+        } else {
+          this.done = true;
+          this.value = undefined;
+        }
+        return this;
+      }
+    };
     const masterWritableAccessor = this.Class ? new this.Class() : {};
     const masterReadonlyAccessor = this.Class ? new this.Class() : {};
     Object.defineProperty(masterWritableAccessor, 'length', {value: stride});
     Object.defineProperty(masterReadonlyAccessor, 'length', {value: stride});
+    if (!(this.Class && 'asTypedArray' in this.Class.prototype)) {
+      Object.defineProperty(masterWritableAccessor, 'asTypedArray', {value() {
+        CHECK: checkInvalid(this.__becsyComponent, binding);
+        return data.subarray(binding.writableIndex * stride, (binding.writableIndex + 1) * stride);
+      }});
+      Object.defineProperty(masterReadonlyAccessor, 'asTypedArray', {value() {
+        CHECK: checkInvalid(this.__becsyComponent, binding);
+        return data.subarray(binding.readonlyIndex * stride, (binding.readonlyIndex + 1) * stride);
+      }});
+    }
+    Object.defineProperty(masterWritableAccessor, Symbol.iterator, {value() {
+      CHECK: checkInvalid(this.__becsyComponent, binding);
+      writableIteratorIndex = 0;
+      return writableIterator;
+    }});
+    Object.defineProperty(masterReadonlyAccessor, Symbol.iterator, {value() {
+      CHECK: checkInvalid(this.__becsyComponent, binding);
+      readonlyIteratorIndex = 0;
+      return readonlyIterator;
+    }});
     CHECK: {
       Object.defineProperty(
         masterWritableAccessor, '__becsyComponent', {value: undefined, writable: true});

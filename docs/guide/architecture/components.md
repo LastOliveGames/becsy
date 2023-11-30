@@ -80,8 +80,10 @@ When you need a component to hold some numeric values of the same type, you can 
 
 ```ts
 @component class MovingEntity {
-  @field.float64.vector(3) declare position: [number, number, number];
-  @field.float64.vector(3) declare velocity: [number, number, number];
+  @field.float64.vector(3)
+  declare position: [number, number, number] & {asTypedArray(): Float64Array};
+  @field.float64.vector(3)
+  declare velocity: [number, number, number] & {asTypedArray(): Float64Array};
 }
 
 world.build(sys => {
@@ -113,10 +115,16 @@ world.build(sys => {
 });
 ```
 
-This declares two fields, each a vector of exactly three `float64` numbers.  A vector's number elements will be stored together compactly by Becsy, and the vector will appear as an array-like object with a `length` property and indexed accessors for its properties.  You can access the elements individually, and you can also assign an array of the correct length to the field, which will get its elements copied into the component.
+This declares two fields, each a vector of exactly three `float64` numbers.  A vector's number elements will be stored together compactly by Becsy, and the vector will appear as an array-like object with a `length` property and indexed accessors for its properties.  You can access the elements individually, and you can also assign an array of the correct length to the field, which will get its elements copied into the component.  You can even iterate over it with a `for..of` loop, but be careful: for better performance, a vector has a single iterator that will be reset for everyone each time you start iterating, and the iterator will only work for as long as the vector's entity handle remains valid itself.
 
 ::: warning
 While a vector appears array-like, it is not an actual JavaScript array:  it has a fixed length, and lacks any of the usual `Array` methods.
+:::
+
+Additionally, a vector has an `asTypedArray()` method that returns a typed array view onto the underlying data, which can be useful with low-level APIs.  While this requires an allocation it doesn't actually copy any data around, so it's still pretty light-weight.
+
+::: warning
+You must only access the typed array while the corresponding entity handle is valid.  Furthermore, you must not write to a typed array obtained from a read-only handle (unfortunately, there's no way to enforce this prohibition but if you do you're into undefined behavior territory).
 :::
 
 For better readability, you can also name the vector's elements and access them that way:

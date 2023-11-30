@@ -1,4 +1,5 @@
 ### Upcoming
+- Make vectors iterable, and add an `asTypedArray()` method to return a typed array view.
 
 ### 0.15.8
 - Fix system ordering to consistently respect the given constraints as the number of systems grows larger.
