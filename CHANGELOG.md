@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.15.10
 - Track automatic clearing of refs due to target deletion as writes for reactive `changed` queries.
 
 ### 0.15.9
