@@ -353,6 +353,30 @@ describe('refs affected by entity deletion', () => {
     });
   });
 
+  test('track implicit write when clearing refs to deleted entity', async () => {
+    const world = await createWorld(
+      class extends System {
+        changedOrigins = this.query(q => q.changed.with(Origin).write.trackWrites);
+        execute() {
+          for (const entity of this.changedOrigins.changed) {
+            if (!entity.read(Origin).target) entity.write(Origin).value = 42;
+          }
+        }
+      }
+    );
+    let o: Entity;
+    world.build(sys => {
+      const d1 = sys.createEntity(GlobalDest);
+      o = sys.createEntity(Origin, {target: d1}).hold();
+      d1.delete();
+    });
+    await world.execute();
+    await world.execute();
+    world.build(sys => {
+      expect(o.read(Origin).value).toBe(42);
+    });
+  });
+
   test('overwrite cleared refs before deletion finalized', async () => {
     const world = await createWorld();
     let o: Entity;

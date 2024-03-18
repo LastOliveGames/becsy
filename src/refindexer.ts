@@ -77,6 +77,7 @@ class Tracker {
     CHECK: checkMask(sourceType, this.registry.executingSystem, 'write');
     sourceType.__bind!(sourceId, true);
     sourceType.__binding!.fields[sourceSeq].clearRef!(final, this.targetEntityId, internalIndex);
+    if (sourceType.__binding!.trackedWrites) this.registry.trackWrite(sourceId, sourceType);
   }
 
   trackReference(

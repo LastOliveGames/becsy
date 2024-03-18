@@ -1,4 +1,5 @@
 ### Upcoming
+- Track automatic clearing of refs due to target deletion as writes for reactive `changed` queries.
 
 ### 0.15.9
 - Make vectors iterable, and add an `asTypedArray()` method to return a typed array view.
