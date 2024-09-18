@@ -1,5 +1,5 @@
 <template>
-  <div style="float: right; background-color: rgba(27, 31, 35, 0.05); padding: 5px 10px; border-radius: 6px; font-size: 0.9rem;">
+  <div class="switcher">
     Code:
     <input type="radio" id="ts" value="ts" v-model="language" style="margin-left: 1em;">
     <label for="ts">TypeScript</label>
@@ -35,3 +35,21 @@ function update() {
   localStorage.setItem('language', language.value);
 }
 </script>
+
+<style scoped>
+
+.switcher {
+  float: right;
+  background-color: var(--vp-c-bg-alt);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  position: relative;
+  z-index: 1;
+}
+
+input, label {
+  cursor: pointer;
+}
+
+</style>

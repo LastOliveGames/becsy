@@ -1,3 +1,96 @@
+:root {
+  --vp-nav-logo-height: 1.8rem;
+  --vp-font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  --vp-font-family-mono: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+  --vp-sidebar-bg-color: var(--vp-c-bg-alt);
+  --vp-code-bg: var(--vp-code-block-bg);
+  --vp-code-color: var(--vp-c-text-2);
+  --vp-c-brand-1: #5e58e8;
+  --vp-c-brand-2: #7e77f4;
+  --vp-c-brand-3: #5e58e8;
+  --vp-custom-block-font-size: 0.9rem;
+  --c-info: #322ba8;
+  --c-tip: #008b15;
+  --c-warning: #c7a500;
+  --c-danger: #c80425;
+}
+
+header .title {
+  font-size: 1.3rem !important;
+}
+
+.VPNavBarMenuLink {
+  line-height: 1.2em !important;
+}
+
+.VPNavBarMenuLink.active {
+  color: var(--vp-c-text-1) !important;
+  text-decoration: underline;
+  text-decoration-color: var(--vp-c-brand-1);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+
+.VPLocalNav .menu-text {
+  display: none;
+}
+
+.VPLocalNav .menu::after {
+  content: "Table of contents";
+}
+
+.VPSidebarItem .text {
+  line-height: 1.4em;
+}
+
+.VPSidebarItem.is-link > .item > .link:hover .text,
+.VPSidebarItem.is-active > .item > .link > .text,
+.VPSidebarItem.has-active > .item > .link > .text {
+  color: var(--vp-c-brand-1) !important;
+}
+
+.VPSidebarItem.level-0 .text {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.VPSidebarItem.level-1 .text,
+.VPSidebarItem.level-2 .text,
+.VPSidebarItem.level-3 .text,
+.VPSidebarItem.level-4 .text,
+.VPSidebarItem.level-5 .text {
+  font-size: 0.9rem;
+  font-weight: normal !important;
+  color: var(--vp-c-text-1) !important;
+}
+
+.vp-doc a {
+  text-decoration: none;
+  font-weight: normal;
+}
+
+.vp-doc a:hover {
+  text-decoration: underline;
+}
+
+.pager-link {
+  border: none !important;
+  padding: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  transition: none !important;
+}
+
+.pager-link:hover {
+  color: var(--vp-c-brand-2);
+}
+
+.vp-doc div[class*='language-']+div[class*='language-'],
+.vp-doc div[class$='-api']+div[class*='language-'],
+.vp-doc div[class*='language-']+div[class$='-api']>div[class*='language-'] {
+  margin-top: 0;
+}
+
 .custom-block-title {
   display: none;
 }
@@ -6,17 +99,34 @@
   background-color: hsl(197, 37%, 96%) !important;
   color: var(--c-text) !important;
   position: relative;
+  border: none;
+  border-radius: 0;
   border-top-right-radius: 2px;
   border-bottom-right-radius: 2px;
-  border-width: 4px !important;
+  border-left: 4px black solid;
+  padding: 8px 16px;
   overflow-x: visible !important;
 }
 
-.custom-block a {
-  color: var(--c-brand) !important;
+.dark .custom-block {
+  background-color: hsl(197, 37%, 8%) !important;
 }
 
-.custom-block.info::before, .custom-block.tip::before, .custom-block.warning::before, .custom-block.danger::before {
+.custom-block a {
+  color: var(--vp-c-brand-1) !important;
+}
+
+.custom-block a:hover {
+  color: var(--vp-c-brand-2) !important;
+  text-decoration: underline;
+}
+
+.custom-block code {
+  color: var(--vp-code-color) !important;
+  background-color: var(--vp-code-bg) !important;
+}
+
+.custom-block::before {
   border-radius: 100%;
   color: #fff;
   font-size: 14px;
@@ -66,21 +176,4 @@
   background-color: var(--c-danger);
   content: "!";
   font-weight: 700;
-}
-
-.nav-bar-title .logo {
-  height: 1.8rem !important;
-}
-
-.dialog-item .icon.outbound {
-  margin-left: 0.25em;
-}
-
-:root {
-  --c-brand: #5e58e8;
-  --c-brand-light: #7e77f4;
-  --c-info: #322ba8;
-  --c-tip: #008b15;
-  --c-warning: #c7a500;
-  --c-danger: #c80425;
 }
