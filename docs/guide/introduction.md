@@ -58,7 +58,7 @@ Here are some public creations that use Becsy:
 - [Special Releases 2022](https://www.special-releases.com/)
 - [Moyosa Spaces](https://moyosaspaces.com/)
 - [Confluence whiteboards](https://www.atlassian.com/software/confluence/whiteboards)
-- [Crayon Town](https://crayon.town/) (
+- [Crayon Town](https://crayon.town/)
 
 ## Acknowledgements
 
