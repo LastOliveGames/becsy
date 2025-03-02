@@ -78,6 +78,16 @@ field.weakObject = addFieldSchema.bind(null, {type: Type.weakObject});
 
 export const componentTypes: (ComponentType<any> | ComponentEnum)[] = [];
 
+function addComponentTypeOrEnum(collection: typeof componentTypes, componentTypeOrEnum: typeof componentTypes[0]) {
+  const extantComponentIndex = collection.findIndex((collectionComponent) => collectionComponent.name === componentTypeOrEnum.name);
+
+  if (extantComponentIndex === -1) {
+    collection.push(componentTypeOrEnum);
+  } else {
+    collection[extantComponentIndex] = componentTypeOrEnum;
+  }
+}
+
 /**
  * Declares this class as a component type that will be automatically added to any new world.
  * @param componentClass The component class.
@@ -102,23 +112,48 @@ export function component(
   arg: ComponentType<Component> | ComponentOptions | ComponentEnum, options?: ComponentOptions
 ): ((componentClass: ComponentType<any>) => void) | void {
   if (typeof arg === 'function') {
-    componentTypes.push(arg);
+    addComponentTypeOrEnum(componentTypes, arg); // componentTypes.push(arg);
   } else if (arg instanceof ComponentEnum) {
     return (componentClass: ComponentType<any>) => {
       if (!arg.__types.includes(componentClass)) arg.__types.push(componentClass);
-      componentTypes.push(arg);  // duplicates will be removed by Dispatcher
+      addComponentTypeOrEnum(componentTypes, arg); // componentTypes.push(arg);  // duplicates will be removed by Dispatcher
       if (options) componentClass.options = options;
     };
   } else {
     return (componentClass: ComponentType<any>) => {
       componentClass.options = arg;
-      componentTypes.push(componentClass);
+      addComponentTypeOrEnum(componentTypes, componentClass); // componentTypes.push(componentClass);
     };
   }
 }
 
 
 export const systemTypes: (SystemType<any> | SystemGroup)[] = [];
+
+function addSystemTypeOrSystemGroup(collection: typeof systemTypes, systemTypeOrSystemGroup: typeof systemTypes[0]) {
+  const extantSystems = collection.map<[SystemType<any> | SystemGroup, number]>((collectionSystem, index) => {
+    return [collectionSystem, index];
+  }).filter(([collectionSystem, _index]) => {
+    if ('__systems' in collectionSystem && '__systems' in systemTypeOrSystemGroup) {
+      const systemSystemNames = systemTypeOrSystemGroup.__systems.map((system) => system.name);
+      const commonSystemNames = collectionSystem.__systems.map((system) => system.name).filter((name) => systemSystemNames.includes(name));
+      
+      if (commonSystemNames.length) {
+        return true;
+      }
+    } else if ('name' in collectionSystem && 'name' in systemTypeOrSystemGroup) {
+      return collectionSystem.name === systemTypeOrSystemGroup.name;
+    }
+  })
+  
+  if (extantSystems.length) {
+    for (const [_, index] of extantSystems) {
+      delete collection[index]
+    }
+  }
+
+  collection.push(systemTypeOrSystemGroup);
+}
 
 type ScheduleFn = (s: ScheduleBuilder) => ScheduleBuilder;
 
@@ -150,13 +185,13 @@ export function system(
     arg = undefined;
   }
   if (typeof arg === 'function') {
-    systemTypes.push(arg as SystemType<any>);
+    addSystemTypeOrSystemGroup(systemTypes, arg as SystemType<any>); // systemTypes.push(arg as SystemType<any>);
   } else {
-    if (arg && !systemTypes.includes(arg)) systemTypes.push(arg);
+    if (arg && !systemTypes.includes(arg)) addSystemTypeOrSystemGroup(systemTypes, arg); // systemTypes.push(arg);
     return (systemClass: SystemType<any>) => {
       if (arg) (arg as SystemGroup).__contents.push(systemClass);
       if (scheduler) systemClass.__staticScheduler = scheduler;
-      systemTypes.push(systemClass);
+      addSystemTypeOrSystemGroup(systemTypes, systemClass); // systemTypes.push(systemClass);
     };
   }
 }
