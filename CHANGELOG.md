@@ -1,4 +1,6 @@
 ### Upcoming
+
+### 0.16.0
 - Updated dependencies, which required reconfiguring how and where the bundle and typings are generated.
 
 ### 0.15.10
