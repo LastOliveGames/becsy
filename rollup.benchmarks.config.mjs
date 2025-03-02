@@ -1,4 +1,4 @@
-import buildTS from 'rollup-plugin-ts';
+import buildTS from '@rollup/plugin-typescript';
 import ts from 'typescript';
 
 const labeledBlockRemover = labels => {
@@ -19,7 +19,7 @@ export default [
     input: 'src/index.ts',
     output: [
       {
-        file: 'index.js',
+        file: 'lib/index.js',
         format: 'esm',
         sourcemap: true,
       },
@@ -34,7 +34,7 @@ export default [
     input: 'src/index.ts',
     output: [
       {
-        file: 'perf.js',
+        file: 'lib/perf.js',
         format: 'esm',
         sourcemap: true,
       },

@@ -18,7 +18,7 @@ import {
 @component class D {}
 
 for (let i = 0; i < 30; i++) {
-  @component class Foo { }  // eslint-disable-line @typescript-eslint/no-unused-vars
+  @component class Foo { }
   Object.defineProperty(Foo, 'name', {value: `Foo${i}`});
 }
 

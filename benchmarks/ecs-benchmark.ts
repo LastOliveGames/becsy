@@ -1,6 +1,6 @@
 // We'll get either the dev or perf variant of becsy injected, but just take types from one since
 // they're exactly the same anyway.
-import type * as becsyDev from '../index';
+import type * as becsyDev from '../src/index';
 type Becsy = {
   field: typeof becsyDev.field,
   Type: typeof becsyDev.Type,

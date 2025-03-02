@@ -1,4 +1,4 @@
-import buildTS from 'rollup-plugin-ts';
+import buildTS from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
 import ts from 'typescript';
 
@@ -20,12 +20,12 @@ export default [
     input: 'src/index.ts',
     output: [
       {
-        file: 'index.js',
+        file: 'lib/index.js',
         format: 'esm',
         sourcemap: true,
       },
       {
-        file: 'index.umd.js',
+        file: 'lib/index.umd.js',
         name: 'becsy',
         format: 'umd',
         sourcemap: true,
@@ -41,12 +41,12 @@ export default [
     input: 'src/index.ts',
     output: [
       {
-        file: 'perf.js',
+        file: 'lib/perf.js',
         format: 'esm',
         sourcemap: true,
       },
       {
-        file: 'perf.umd.js',
+        file: 'lib/perf.umd.js',
         name: 'becsy',
         format: 'umd',
         sourcemap: true,
@@ -62,12 +62,12 @@ export default [
     input: 'src/index.ts',
     output: [
       {
-        file: 'index.min.js',
+        file: 'lib/index.min.js',
         format: 'esm',
         sourcemap: true,
       },
       {
-        file: 'index.umd.min.js',
+        file: 'lib/index.umd.min.js',
         name: 'becsy',
         format: 'umd',
         sourcemap: true,
@@ -83,12 +83,12 @@ export default [
     input: 'src/index.ts',
     output: [
       {
-        file: 'perf.min.js',
+        file: 'lib/perf.min.js',
         format: 'esm',
         sourcemap: true,
       },
       {
-        file: 'perf.umd.min.js',
+        file: 'lib/perf.umd.min.js',
         name: 'becsy',
         format: 'umd',
         sourcemap: true,

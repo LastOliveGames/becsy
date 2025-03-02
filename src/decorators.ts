@@ -41,7 +41,7 @@ function makeVectorDecorator(type: Type<number>) {
   return fn;
 }
 
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 type NotFunction<T> = T extends Function ? never : T;
 function backrefs(type?: ComponentType<any>, fieldName?: string, trackDeletedBackrefs?: boolean):
   (target: any, name: string) => void;

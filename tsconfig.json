@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "module": "esnext",
-    "target": "esnext",
+    "target": "es2022",
     "moduleResolution": "node",
     "sourceMap": true,
     "declaration": true,
@@ -26,5 +26,5 @@
     "baseUrl": "./"
   },
   "include": ["src", "tests", "benchmarks"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "lib"]
 }

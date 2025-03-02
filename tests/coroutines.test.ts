@@ -49,7 +49,7 @@ class CatchNestedCoroutine extends System {
   @co *wrap() {
     try {
       yield this.start(coroutine);
-    } catch (e) {
+    } catch {
       counter += 1;
     }
   }
@@ -381,7 +381,7 @@ describe('test cancelling', () => {
     };
     const world = await createWorld(StartCoroutineTwice);
     world.build(sys => {
-      entity = sys.createEntity().hold();  // eslint-disable-line @typescript-eslint/no-unused-vars
+      entity = sys.createEntity().hold();
     });
     await world.execute();
     expect(counter).toBe(1);
@@ -413,7 +413,7 @@ describe('test cancelling', () => {
       deco2: (co2: Coroutine) => co2.scope(entity)
     });
     world.build(sys => {
-      entity = sys.createEntity().hold();  // eslint-disable-line @typescript-eslint/no-unused-vars
+      entity = sys.createEntity().hold();
     });
     await world.execute();
     expect(counter).toBe(1);
@@ -430,7 +430,7 @@ describe('test cancelling', () => {
       deco2: (co2: Coroutine) => co2
     });
     world.build(sys => {
-      entity = sys.createEntity().hold();  // eslint-disable-line @typescript-eslint/no-unused-vars
+      entity = sys.createEntity().hold();
     });
     await world.execute();
     expect(counter).toBe(1);

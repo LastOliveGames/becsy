@@ -8,8 +8,8 @@ if (workerData.baseline) {
   parentPort!.postMessage({name: 'baseline', ops});
 }
 
-const becsy = await import(workerData.env === 'dev' ? '../index' : '../perf');
-const module = await import(`./${workerData.filename}`);
+const becsy = await import(workerData.env === 'dev' ? '../index.js' : '../perf.js');
+const module = await import(`./${workerData.filename}.js`);
 const tests = module.default(becsy);
 let index = 0;
 for (const name in tests) {

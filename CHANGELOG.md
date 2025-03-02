@@ -1,4 +1,5 @@
 ### Upcoming
+- Updated dependencies, which required reconfiguring how and where the bundle and typings are generated.
 
 ### 0.15.10
 - Track automatic clearing of refs due to target deletion as writes for reactive `changed` queries.

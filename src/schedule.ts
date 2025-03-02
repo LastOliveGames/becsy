@@ -314,7 +314,7 @@ export class SystemGroupImpl {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface SystemGroup extends SystemGroupImpl { }
 
 
@@ -395,6 +395,6 @@ export class FrameImpl {
  * A frame executor that lets you manually run system groups.  You can create one by calling
  * `world.createCustomExecutor`.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Frame extends FrameImpl { }
 
