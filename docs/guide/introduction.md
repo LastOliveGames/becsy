@@ -59,6 +59,8 @@ Here are some public creations that use Becsy:
 - [Moyosa Spaces](https://moyosaspaces.com/)
 - [Confluence whiteboards](https://www.atlassian.com/software/confluence/whiteboards)
 - [Crayon Town](https://crayon.town/)
+- [Scrolly Page](https://scrolly.page/)
+- [Zines Forever](https://zinesforever.com/)
 
 ## Acknowledgements
 
