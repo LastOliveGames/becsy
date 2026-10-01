@@ -190,15 +190,14 @@ export class AtomicSharedShapeArray implements ShapeArray {
       trackingMask.lastMatches![entityId] = trackingMask.lastMatches![entityId] || [];
     const array = this.array;
     const index = entityId * this.stride;
+    let ok = false;
     for (let i = 0; i < mask.length; i++) {
       const masked = array[index + i] & mask[i];
-      if (masked === 0) {
-        delete trackingMask.lastMatches![entityId];
-        return false;
-      }
+      if (masked !== 0) ok = true;
       if (masked !== lastMatch[i]) trackingMask.changed = true;
       lastMatch[i] = masked;
     }
-    return true;
+    if (!ok) delete trackingMask.lastMatches![entityId];
+    return ok;
   }
 }
