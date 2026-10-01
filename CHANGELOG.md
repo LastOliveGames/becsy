@@ -1,4 +1,5 @@
 ### Upcoming
+- Fix `withAny` when combined with `trackMatches` to select the correct entities.
 - Bump Node version, switch to Yarn 4, and support `corepack`.
 
 ### 0.16.0
