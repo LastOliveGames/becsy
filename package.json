@@ -2,6 +2,7 @@
   "name": "@lastolivegames/becsy",
   "type": "module",
   "version": "0.16.0",
+  "packageManager": "yarn@4.13.0",
   "scripts": {
     "test": "jest --config jestconfig.json --detectOpenHandles",
     "test:watch": "jest --watch --config jestconfig.json --detectOpenHandles",
@@ -26,7 +27,7 @@
   "module": "lib/index.js",
   "types": "lib/index.d.ts",
   "engines": {
-    "node": ">=12"
+    "node": ">=16"
   },
   "repository": "git@github.com:lastolivegames/becsy.git",
   "author": "Piotr Kaminski <piotr@lastolive.games>",
