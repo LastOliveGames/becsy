@@ -16,7 +16,10 @@ jobs:
       with:
         node-version: '24'
 
-    - run: npm i -g yarn
+    - name: Install Yarn
+      run: |
+        corepack enable
+        corepack install
 
     - name: Install dependencies
       run: yarn install --pure-lockfile
