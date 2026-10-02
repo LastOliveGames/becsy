@@ -22,7 +22,7 @@ jobs:
         corepack install
 
     - name: Install dependencies
-      run: yarn install --pure-lockfile
+      run: yarn install --immutable
 
     - name: Run the tests
       run: yarn test --coverage
